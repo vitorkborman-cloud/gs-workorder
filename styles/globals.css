@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  PALETA OFICIAL DO SISTEMA
+  - Verde: cards de projetos e indicadores positivos
+  - Roxo: sidebar e identidade visual
+*/
+:root {
+  --green: #80b02d;
+  --purple: #391e2a;
+}
+
+body {
+  background-color: #f6f7f9;
+  color: #111827;
+  font-family: Inter, system-ui, sans-serif;
+}
