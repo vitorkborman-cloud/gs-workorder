@@ -6,6 +6,7 @@ import { supabase } from "../../../lib/supabase";
 import AppShell from "../../../components/AppShell";
 import Card from "../../../components/Card";
 import Button from "../../../components/Button";
+import { isMobileDevice } from "../../../lib/isMobile";
 
 type WorkOrder = {
   id: string;
@@ -20,6 +21,12 @@ export default function ProjetoPage() {
 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    setMobile(isMobileDevice());
+    load();
+  }, []);
 
   async function load() {
     const { data } = await supabase
@@ -54,18 +61,16 @@ export default function ProjetoPage() {
     load();
   }
 
-  useEffect(() => {
-    load();
-  }, []);
-
   return (
     <AppShell>
       <h1 className="text-2xl font-bold mb-6">Projeto</h1>
 
       <Card title="Work Orders">
-        <div className="mb-4">
-          <Button text="Criar Work Order" onClick={createWorkOrder} />
-        </div>
+        {!mobile && (
+          <div className="mb-4">
+            <Button text="Criar Work Order" onClick={createWorkOrder} />
+          </div>
+        )}
 
         {loading ? (
           <p>Carregando...</p>
@@ -82,21 +87,19 @@ export default function ProjetoPage() {
               >
                 <span
                   className="font-bold cursor-pointer"
-                  onClick={() =>
-                    router.push(`/work-orders/${wo.id}`)
-                  }
+                  onClick={() => router.push(`/work-orders/${wo.id}`)}
                 >
                   {wo.title}
                 </span>
 
-                <button
-                  onClick={() =>
-                    deleteWorkOrder(wo.id, wo.title)
-                  }
-                  className="text-sm font-bold underline"
-                >
-                  Excluir
-                </button>
+                {!mobile && (
+                  <button
+                    onClick={() => deleteWorkOrder(wo.id, wo.title)}
+                    className="text-sm font-bold underline"
+                  >
+                    Excluir
+                  </button>
+                )}
               </div>
             ))}
           </div>

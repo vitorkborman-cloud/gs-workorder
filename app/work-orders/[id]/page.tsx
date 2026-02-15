@@ -6,6 +6,7 @@ import { supabase } from "../../../lib/supabase";
 import AppShell from "../../../components/AppShell";
 import Card from "../../../components/Card";
 import Button from "../../../components/Button";
+import { isMobileDevice } from "../../../lib/isMobile";
 
 type Activity = {
   id: string;
@@ -20,6 +21,7 @@ export default function WorkOrderPage() {
 
   const [activities, setActivities] = useState<Activity[]>([]);
   const [finalized, setFinalized] = useState(false);
+  const [mobile, setMobile] = useState(false);
 
   async function load() {
     const { data: wo } = await supabase
@@ -40,7 +42,7 @@ export default function WorkOrderPage() {
   }
 
   async function createActivity() {
-    if (finalized) return;
+    if (finalized || mobile) return;
 
     const description = prompt("Descrição da atividade:");
     if (!description) return;
@@ -54,7 +56,7 @@ export default function WorkOrderPage() {
   }
 
   async function deleteActivity(id: string, description: string) {
-    if (finalized) return;
+    if (finalized || mobile) return;
 
     const ok = confirm(
       `Excluir a atividade:\n"${description}"?`
@@ -97,13 +99,14 @@ export default function WorkOrderPage() {
   }
 
   useEffect(() => {
+    setMobile(isMobileDevice());
     load();
   }, []);
 
   return (
     <AppShell>
       <Card title="Atividades">
-        {!finalized && (
+        {!finalized && !mobile && (
           <div className="mb-4">
             <Button text="Criar Atividade" onClick={createActivity} />
           </div>
@@ -118,7 +121,7 @@ export default function WorkOrderPage() {
               <div className="flex justify-between items-center">
                 <p className="font-bold">{act.description}</p>
 
-                {!finalized && (
+                {!finalized && !mobile && (
                   <button
                     onClick={() =>
                       deleteActivity(act.id, act.description)
