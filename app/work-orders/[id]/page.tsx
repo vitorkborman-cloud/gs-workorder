@@ -47,6 +47,30 @@ export default function WorkOrderPage() {
     if (data) setActivities(data);
   }
 
+  async function createActivity() {
+    if (finalized || mobile) return;
+
+    const description = prompt("Descrição da atividade:");
+    if (!description) return;
+
+    await supabase.from("activities").insert({
+      description,
+      work_order_id: workOrderId,
+    });
+
+    load();
+  }
+
+  async function deleteActivity(id: string, description: string) {
+    if (finalized || mobile) return;
+
+    const ok = confirm(`Excluir a atividade:\n"${description}"?`);
+    if (!ok) return;
+
+    await supabase.from("activities").delete().eq("id", id);
+    load();
+  }
+
   async function updateStatus(id: string, status: string) {
     if (finalized) return;
 
@@ -137,12 +161,30 @@ export default function WorkOrderPage() {
   return (
     <AppShell>
       <Card title="Atividades">
+
+        {/* BOTÃO CRIAR (apenas desktop) */}
+        {!finalized && !mobile && (
+          <div className="mb-4">
+            <Button text="Criar Atividade" onClick={createActivity} />
+          </div>
+        )}
+
         <div className="space-y-4">
           {activities.map(act => (
             <div key={act.id} className="border rounded-xl p-3 space-y-3">
 
               <div className="flex justify-between items-center">
                 <p className="font-bold">{act.description}</p>
+
+                {!finalized && !mobile && (
+                  <button
+                    onClick={() => deleteActivity(act.id, act.description)}
+                    className="text-xs font-bold underline"
+                  >
+                    Excluir
+                  </button>
+                )}
+
                 {finalized && statusBadge(act.status)}
               </div>
 
@@ -199,6 +241,7 @@ export default function WorkOrderPage() {
             <Button text="Finalizar Work Order" onClick={finalizeWorkOrder} />
           </div>
         )}
+
       </Card>
     </AppShell>
   );
