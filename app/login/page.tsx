@@ -2,59 +2,65 @@
 
 import { useState } from "react";
 import { supabase } from "../../lib/supabase";
-import AppShell from "../../components/AppShell";
-import Button from "../../components/Button";
-import Card from "../../components/Card";
-import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const router = useRouter();
+  const [password, setPassword] = useState("");
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
-      password: senha,
+      password,
     });
 
+    console.log("LOGIN DATA:", data);
+    console.log("LOGIN ERROR:", error);
+
     if (error) {
-      alert("Erro ao entrar");
+      alert(error.message);
       return;
     }
 
-    router.push("/dashboard");
+    window.location.href = "/dashboard";
   }
 
   return (
-    <AppShell>
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="w-full max-w-sm">
-          <Card title="GS Work Order">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <input
-                type="email"
-                placeholder="Email"
-                className="w-full border rounded-xl p-3"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+    <div className="min-h-screen flex items-center justify-center bg-[#f6f7f9]">
+      <form
+        onSubmit={handleLogin}
+        className="bg-white p-8 rounded-xl shadow-md w-80"
+      >
+        <h1 className="text-xl font-bold mb-6 text-center">
+          GS Work Order
+        </h1>
 
-              <input
-                type="password"
-                placeholder="Senha"
-                className="w-full border rounded-xl p-3"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-              />
+        <input
+          type="email"
+          placeholder="Email"
+          className="w-full border rounded-lg p-2 mb-4"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
 
-              <Button text="Entrar" type="submit" />
-            </form>
-          </Card>
-        </div>
-      </div>
-    </AppShell>
+        <input
+          type="password"
+          placeholder="Senha"
+          className="w-full border rounded-lg p-2 mb-6"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+
+        <button
+          type="submit"
+          className="w-full bg-[#80b02d] text-white font-bold py-2 rounded-lg"
+        >
+          Entrar
+        </button>
+      </form>
+    </div>
   );
 }
