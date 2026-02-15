@@ -131,6 +131,29 @@ export default function WorkOrderPage() {
       .eq("id", id);
   }
 
+  async function removeImage(id: string, imageUrl: string) {
+    if (finalized) return;
+
+    const ok = confirm("Remover esta imagem?");
+    if (!ok) return;
+
+    const path = imageUrl.split("/activity-images/")[1];
+
+    await supabase.storage.from("activity-images").remove([path]);
+
+    const activity = activities.find(a => a.id === id);
+    const newImages = (activity?.images ?? []).filter(img => img !== imageUrl);
+
+    setActivities(prev =>
+      prev.map(a => (a.id === id ? { ...a, images: newImages } : a))
+    );
+
+    await supabase
+      .from("activities")
+      .update({ images: newImages })
+      .eq("id", id);
+  }
+
   async function finalizeWorkOrder() {
     if (finalized) return;
 
@@ -162,7 +185,6 @@ export default function WorkOrderPage() {
     <AppShell>
       <Card title="Atividades">
 
-        {/* BOTÃO CRIAR (apenas desktop) */}
         {!finalized && !mobile && (
           <div className="mb-4">
             <Button text="Criar Atividade" onClick={createActivity} />
@@ -199,7 +221,6 @@ export default function WorkOrderPage() {
                 </div>
               )}
 
-              {/* OBSERVAÇÃO */}
               <textarea
                 placeholder="Observações..."
                 value={act.note ?? ""}
@@ -208,7 +229,6 @@ export default function WorkOrderPage() {
                 className="w-full border rounded-lg p-2 text-sm"
               />
 
-              {/* IMAGENS */}
               <div className="space-y-2">
                 {!finalized && (
                   <input
@@ -223,11 +243,21 @@ export default function WorkOrderPage() {
 
                 <div className="flex gap-2 flex-wrap">
                   {act.images?.map((img, i) => (
-                    <img
-                      key={i}
-                      src={img}
-                      className="w-24 h-24 object-cover rounded-lg border"
-                    />
+                    <div key={i} className="relative">
+                      <img
+                        src={img}
+                        className="w-24 h-24 object-cover rounded-lg border"
+                      />
+
+                      {!finalized && (
+                        <button
+                          onClick={() => removeImage(act.id, img)}
+                          className="absolute -top-2 -right-2 bg-white border rounded-full px-2 text-xs"
+                        >
+                          X
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
