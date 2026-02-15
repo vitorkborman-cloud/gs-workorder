@@ -70,14 +70,12 @@ export default function WorkOrderPage() {
   async function updateStatus(id: string, status: string) {
     if (finalized) return;
 
-    // atualização imediata na tela (resolve problema no mobile)
     setActivities((prev) =>
       prev.map((a) =>
         a.id === id ? { ...a, status } : a
       )
     );
 
-    // depois sincroniza com banco
     await supabase
       .from("activities")
       .update({ status })
@@ -109,6 +107,24 @@ export default function WorkOrderPage() {
     load();
   }, []);
 
+  function statusBadge(status: string | null) {
+    if (!status) return null;
+
+    if (status === "concluído") {
+      return (
+        <span className="text-green-600 font-bold text-sm">
+          ✔ Concluído
+        </span>
+      );
+    }
+
+    return (
+      <span className="text-red-600 font-bold text-sm">
+        ✖ Não concluído
+      </span>
+    );
+  }
+
   return (
     <AppShell>
       <Card title="Atividades">
@@ -139,24 +155,30 @@ export default function WorkOrderPage() {
                 )}
               </div>
 
-              <div className="flex gap-2 mt-2">
-                <button
-                  disabled={finalized}
-                  onClick={() =>
-                    updateStatus(act.id, "concluído")
-                  }
-                >
-                  Concluído
-                </button>
-                <button
-                  disabled={finalized}
-                  onClick={() =>
-                    updateStatus(act.id, "não concluído")
-                  }
-                >
-                  Não concluído
-                </button>
-              </div>
+              {finalized && (
+                <div className="mt-1">
+                  {statusBadge(act.status)}
+                </div>
+              )}
+
+              {!finalized && (
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() =>
+                      updateStatus(act.id, "concluído")
+                    }
+                  >
+                    Concluído
+                  </button>
+                  <button
+                    onClick={() =>
+                      updateStatus(act.id, "não concluído")
+                    }
+                  >
+                    Não concluído
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
