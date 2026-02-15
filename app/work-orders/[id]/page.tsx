@@ -70,12 +70,18 @@ export default function WorkOrderPage() {
   async function updateStatus(id: string, status: string) {
     if (finalized) return;
 
+    // atualização imediata na tela (resolve problema no mobile)
+    setActivities((prev) =>
+      prev.map((a) =>
+        a.id === id ? { ...a, status } : a
+      )
+    );
+
+    // depois sincroniza com banco
     await supabase
       .from("activities")
       .update({ status })
       .eq("id", id);
-
-    load();
   }
 
   async function finalizeWorkOrder() {
