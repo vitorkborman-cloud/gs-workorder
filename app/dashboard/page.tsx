@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AdminLayout from "../../components/AdminLayout";
-import SimpleCard from "../../components/SimpleCard";
 import Button from "../../components/Button";
 import { isMobileDevice } from "../../lib/isMobile";
 
@@ -16,7 +15,6 @@ export default function DashboardPage() {
   const [doneActivities, setDoneActivities] = useState(0);
 
   useEffect(() => {
-    // se for celular → manda para o app
     if (isMobileDevice()) {
       router.replace("/mobile");
       return;
@@ -54,61 +52,47 @@ export default function DashboardPage() {
   }
 
   return (
-    <AdminLayout
-      sidebar={
-        <div className="space-y-4 text-white">
-          <SimpleCard
-            title="Nº atividades programadas"
-            value={totalActivities}
-          />
+    <AdminLayout>
 
-          <SimpleCard
-            title="Nº atividades realizadas"
-            value={doneActivities}
-          />
-        </div>
-      }
-    >
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">
+      {/* TÍTULO */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold text-gray-800">
           Projetos
         </h1>
 
         <Button text="Novo Projeto" onClick={createProject} />
       </div>
 
-      {/* CARDS DE PROJETOS */}
-      <div className="grid grid-cols-3 gap-5">
+      {/* MÉTRICAS */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white border rounded-xl p-4">
+          <p className="text-sm text-gray-500">Atividades programadas</p>
+          <p className="text-2xl font-bold">{totalActivities}</p>
+        </div>
+
+        <div className="bg-white border rounded-xl p-4">
+          <p className="text-sm text-gray-500">Atividades realizadas</p>
+          <p className="text-2xl font-bold text-[var(--green)]">
+            {doneActivities}
+          </p>
+        </div>
+      </div>
+
+      {/* LISTA DE PROJETOS */}
+      <div className="grid grid-cols-3 gap-4">
         {projects.map((project) => (
           <button
             key={project.id}
             onClick={() => router.push(`/projetos/${project.id}`)}
-            className="
-              text-left
-              bg-white
-              border border-gray-200
-              rounded-xl
-              p-5
-              shadow-sm
-              hover:shadow-md
-              hover:border-[var(--green)]
-              transition-all
-              group
-            "
+            className="bg-white border rounded-xl p-4 text-left hover:shadow-md hover:border-[var(--green)] transition"
           >
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-gray-800 group-hover:text-[var(--green)]">
-                {project.name}
-              </span>
-
-              <span className="text-sm text-gray-400 group-hover:text-[var(--green)]">
-                Abrir →
-              </span>
-            </div>
+            <p className="font-medium text-gray-800">
+              {project.name}
+            </p>
           </button>
         ))}
       </div>
+
     </AdminLayout>
   );
 }

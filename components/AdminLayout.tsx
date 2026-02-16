@@ -1,40 +1,47 @@
 "use client";
 
 export default function AdminLayout({
-  sidebar,
   children,
 }: {
-  sidebar: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex bg-[#f3f4f6]">
+    <div className="min-h-screen bg-[#f3f4f6] flex flex-col">
 
-      {/* SIDEBAR */}
-      <aside className="w-60 bg-[var(--purple)] text-white flex flex-col">
+      {/* TOPBAR */}
+      <header className="h-14 bg-[var(--purple)] text-white flex items-center px-6 shadow-sm">
+        <img
+          src="/logo.png"
+          className="h-6 brightness-0 invert mr-3"
+        />
+        <span className="font-semibold tracking-wide">
+          GS Work Order
+        </span>
+      </header>
 
-        {/* LOGO */}
-        <div className="h-16 flex items-center justify-center border-b border-white/10">
-          <img
-            src="/logo.png"
-            className="h-7 object-contain brightness-0 invert"
-          />
-        </div>
+      <div className="flex flex-1">
 
-        {/* MÉTRICAS */}
-        <div className="p-4 space-y-3 text-white">
-          {sidebar}
-        </div>
+        {/* SIDEBAR */}
+        <aside className="w-52 bg-white border-r border-gray-200 p-4">
+          <nav className="space-y-2 text-sm">
+            <div className="font-semibold text-gray-400 uppercase text-xs mb-2">
+              Navegação
+            </div>
 
-      </aside>
+            <button className="w-full text-left px-3 py-2 rounded-lg bg-gray-100 font-medium">
+              Projetos
+            </button>
+          </nav>
+        </aside>
 
-      {/* CONTEÚDO */}
-      <main className="flex-1 p-8">
-        <div className="max-w-6xl mx-auto space-y-6">
-          {children}
-        </div>
-      </main>
+        {/* CONTEÚDO */}
+        <main className="flex-1 p-8">
+          <div className="max-w-6xl mx-auto space-y-6">
+            {children}
+          </div>
+        </main>
 
+      </div>
     </div>
   );
 }
