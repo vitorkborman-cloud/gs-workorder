@@ -12,3 +12,38 @@ body {
   color: #111827;
   font-family: Inter, system-ui, sans-serif;
 }
+:root {
+  --green: #80b02d;
+  --green-dark: #6b9726;
+  --purple: #391e2a;
+  --bg: #f3f4f6;
+}
+
+/* Texto */
+h1 { font-size: 28px; font-weight: 700; }
+h2 { font-size: 22px; font-weight: 600; }
+h3 { font-size: 18px; font-weight: 600; }
+
+/* Cartões padrão */
+.card {
+  background: white;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 1px solid #e5e7eb;
+}
+
+/* Botões padrão */
+.btn {
+  background: var(--green);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: all .15s ease;
+}
+
+.btn:hover {
+  background: var(--green-dark);
+  transform: translateY(-1px);
+}
