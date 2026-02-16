@@ -6,17 +6,23 @@ import { supabase } from "../../lib/supabase";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    setMsg(null);
+    setLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
+    setLoading(false);
+
     if (error) {
-      alert("Email ou senha inválidos");
+      setMsg("Email ou senha inválidos");
       return;
     }
 
@@ -24,40 +30,57 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f6f7f9]">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-8 rounded-xl shadow-md w-80"
-      >
-        <h1 className="text-xl font-bold mb-6 text-center">
-          GS Work Order
-        </h1>
+    <div className="min-h-screen bg-[#2b1720] flex items-center justify-center p-6">
 
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full border rounded-lg p-2 mb-4"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+      <div className="w-full max-w-md rounded-2xl bg-[#391e2a] border border-white/10 shadow-2xl p-8">
 
-        <input
-          type="password"
-          placeholder="Senha"
-          className="w-full border rounded-lg p-2 mb-6"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        <div className="mb-8 text-center">
+          <img src="/logo.png" className="h-10 mx-auto brightness-0 invert mb-4"/>
+          <p className="text-sm text-white/70">
+            Acesse com seu e-mail e senha
+          </p>
+        </div>
 
-        <button
-          type="submit"
-          className="w-full bg-[#80b02d] text-white font-bold py-2 rounded-lg"
-        >
-          Entrar
-        </button>
-      </form>
+        <form onSubmit={handleLogin} className="space-y-4">
+
+          <div>
+            <label className="text-sm text-white/80">Email</label>
+            <input
+              className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#80b02d]"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-white/80">Senha</label>
+            <input
+              className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#80b02d]"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-lg bg-[#80b02d] text-black py-2 font-semibold hover:brightness-110 transition"
+          >
+            {loading ? "Entrando..." : "Entrar"}
+          </button>
+
+          {msg && (
+            <div className="text-sm text-red-200 bg-red-900/40 border border-red-900 rounded-lg p-3">
+              {msg}
+            </div>
+          )}
+        </form>
+
+      </div>
     </div>
   );
 }

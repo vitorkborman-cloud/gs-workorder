@@ -1,18 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
-import AdminLayout from "../../components/AdminLayout";
-import Button from "../../components/Button";
 import { isMobileDevice } from "../../lib/isMobile";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const router = useRouter();
-
-  const [projects, setProjects] = useState<any[]>([]);
-  const [totalActivities, setTotalActivities] = useState(0);
-  const [doneActivities, setDoneActivities] = useState(0);
+  const [email, setEmail] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (isMobileDevice()) {
@@ -20,79 +16,97 @@ export default function DashboardPage() {
       return;
     }
 
+    async function load() {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        window.location.href = "/login";
+        return;
+      }
+      setEmail(data.user.email ?? "");
+      setLoading(false);
+    }
+
     load();
   }, []);
 
-  async function load() {
-    const { data: projectsData } = await supabase
-      .from("projects")
-      .select("id, name")
-      .order("created_at", { ascending: true });
-
-    setProjects(projectsData || []);
-
-    const { data: activities } = await supabase
-      .from("activities")
-      .select("status");
-
-    if (activities) {
-      setTotalActivities(activities.length);
-      setDoneActivities(
-        activities.filter((a) => a.status === "concluído").length
-      );
-    }
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
   }
 
-  async function createProject() {
-    const name = prompt("Nome do projeto:");
-    if (!name) return;
-
-    await supabase.from("projects").insert({ name });
-    load();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#2b1720] flex items-center justify-center text-white">
+        Carregando...
+      </div>
+    );
   }
 
   return (
-    <AdminLayout>
+    <div className="min-h-screen bg-[#2b1720] text-white flex">
 
-      {/* TÍTULO */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-gray-800">
-          Projetos
-        </h1>
+      {/* SIDEBAR */}
+      <aside className="w-72 bg-[#391e2a] border-r border-white/10 p-6 hidden md:block">
 
-        <Button text="Novo Projeto" onClick={createProject} />
-      </div>
-
-      {/* MÉTRICAS */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border rounded-xl p-4">
-          <p className="text-sm text-gray-500">Atividades programadas</p>
-          <p className="text-2xl font-bold">{totalActivities}</p>
+        <div className="mb-10">
+          <img src="/logo.png" className="h-8 brightness-0 invert mb-3"/>
+          <div className="text-xs text-white/60">Painel administrativo</div>
         </div>
 
-        <div className="bg-white border rounded-xl p-4">
-          <p className="text-sm text-gray-500">Atividades realizadas</p>
-          <p className="text-2xl font-bold text-[var(--green)]">
-            {doneActivities}
-          </p>
-        </div>
-      </div>
+        <nav className="space-y-2">
+          <a href="/dashboard" className="block rounded-xl px-4 py-3 bg-black/30 border border-white/10">
+            Dashboard
+          </a>
 
-      {/* LISTA DE PROJETOS */}
-      <div className="grid grid-cols-3 gap-4">
-        {projects.map((project) => (
+          <a href="/projetos" className="block rounded-xl px-4 py-3 hover:bg-black/30 border border-white/10">
+            Projetos
+          </a>
+        </nav>
+
+        <div className="mt-10 pt-6 border-t border-white/10 text-xs text-white/70">
+          <div className="font-semibold text-white">{email}</div>
+
           <button
-            key={project.id}
-            onClick={() => router.push(`/projetos/${project.id}`)}
-            className="bg-white border rounded-xl p-4 text-left hover:shadow-md hover:border-[var(--green)] transition"
+            onClick={handleLogout}
+            className="mt-4 w-full rounded-xl bg-red-600 py-2 font-bold hover:bg-red-500 transition"
           >
-            <p className="font-medium text-gray-800">
-              {project.name}
-            </p>
+            Sair
           </button>
-        ))}
-      </div>
+        </div>
+      </aside>
 
-    </AdminLayout>
+      {/* CONTEÚDO */}
+      <main className="flex-1 p-8">
+
+        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+          <div className="rounded-2xl bg-[#391e2a] border border-white/10 p-5">
+            <div className="text-sm text-white/70">Acesso rápido</div>
+            <div className="text-lg font-bold mt-1">Projetos</div>
+            <p className="text-sm text-white/70 mt-2">
+              Crie e gerencie Work Orders
+            </p>
+            <a
+              href="/projetos"
+              className="inline-block mt-4 rounded-xl bg-[#80b02d] text-black px-4 py-2 font-bold hover:brightness-110 transition"
+            >
+              Abrir
+            </a>
+          </div>
+
+          <div className="rounded-2xl bg-[#391e2a] border border-white/10 p-5">
+            <div className="text-sm text-white/70">Campo</div>
+            <div className="text-lg font-bold mt-1">Aplicativo Mobile</div>
+            <p className="text-sm text-white/70 mt-2">
+              Uso em campo para execução das atividades
+            </p>
+          </div>
+
+        </div>
+
+      </main>
+    </div>
   );
 }
