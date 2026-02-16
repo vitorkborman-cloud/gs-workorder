@@ -20,8 +20,6 @@ export default function MobileWorkOrderPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [finalized, setFinalized] = useState(false);
 
-  /* ================= LOAD ================= */
-
   async function load() {
     const { data: wo } = await supabase
       .from("work_orders")
@@ -44,11 +42,8 @@ export default function MobileWorkOrderPage() {
     load();
   }, []);
 
-  /* ================= STATUS ================= */
-
   async function updateStatus(id: string, status: string) {
     if (finalized) return;
-
     setActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     await supabase.from("activities").update({ status }).eq("id", id);
   }
@@ -146,8 +141,6 @@ export default function MobileWorkOrderPage() {
     await supabase.from("activities").update({ images: newImages }).eq("id", id);
   }
 
-  /* ================= FINALIZE ================= */
-
   async function finalize() {
     const incomplete = activities.some(a => !a.status);
     if (incomplete) {
@@ -198,7 +191,6 @@ export default function MobileWorkOrderPage() {
       >
         <p className="font-semibold">{act.description}</p>
 
-        {/* OBS */}
         <textarea
           disabled={finalized}
           defaultValue={act.note ?? ""}
@@ -207,17 +199,22 @@ export default function MobileWorkOrderPage() {
           className="w-full rounded-xl border p-3 text-sm"
         />
 
-        {/* FOTO */}
+        {/* BOTÃO GALERIA/CAMERA */}
         {!finalized && (
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => {
-              if (!e.target.files?.[0]) return;
-              uploadImage(act.id, e.target.files[0]);
-            }}
-          />
+          <label className="block w-full text-center py-3 rounded-xl bg-[var(--purple)] text-white font-bold">
+            Adicionar foto
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const files = e.target.files;
+                if (!files) return;
+                Array.from(files).forEach(f => uploadImage(act.id, f));
+              }}
+            />
+          </label>
         )}
 
         <div className="flex gap-2 flex-wrap">
