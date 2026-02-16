@@ -11,26 +11,26 @@ export default function AdminLayout({
     <div className="min-h-screen flex bg-[#f3f4f6]">
 
       {/* SIDEBAR */}
-      <aside className="w-72 bg-[var(--purple)] text-white flex flex-col px-6 py-8">
+      <aside className="w-60 bg-[var(--purple)] text-white flex flex-col">
 
         {/* LOGO */}
-        <div className="mb-10 flex items-center justify-center">
+        <div className="h-16 flex items-center justify-center border-b border-white/10">
           <img
             src="/logo.png"
-            className="h-10 object-contain brightness-0 invert"
+            className="h-7 object-contain brightness-0 invert"
           />
         </div>
 
-        {/* CONTEÚDO DA SIDEBAR */}
-        <div className="space-y-4 text-white">
+        {/* MÉTRICAS */}
+        <div className="p-4 space-y-3 text-white">
           {sidebar}
         </div>
 
       </aside>
 
       {/* CONTEÚDO */}
-      <main className="flex-1 p-10">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <main className="flex-1 p-8">
+        <div className="max-w-6xl mx-auto space-y-6">
           {children}
         </div>
       </main>

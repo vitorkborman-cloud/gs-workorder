@@ -1,27 +1,18 @@
-type Props = {
-  title: string;
-  value?: number;
-  onClick?: () => void;
-};
-
 export default function SimpleCard({
   title,
   value,
-  onClick,
-}: Props) {
+}: {
+  title: string;
+  value: number;
+}) {
   return (
-    <div
-      onClick={onClick}
-      className={`rounded-2xl p-5 font-extrabold ${
-        onClick
-          ? "cursor-pointer hover:opacity-90"
-          : ""
-      }`}
-    >
-      <p className="text-sm">{title}</p>
-      {value !== undefined && (
-        <p className="text-3xl mt-2">{value}</p>
-      )}
+    <div className="bg-white/10 border border-white/15 rounded-lg px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide opacity-80">
+        {title}
+      </p>
+      <p className="text-xl font-semibold leading-tight">
+        {value}
+      </p>
     </div>
   );
 }
