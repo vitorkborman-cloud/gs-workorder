@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ================= THEME (TAILWIND V4 OBRIGATÓRIO) ================= */
+/* ================= THEME ================= */
 
 @theme {
   --color-background: hsl(0 0% 98%);
@@ -21,9 +21,19 @@
   --radius: 0.75rem;
 }
 
+/* ================= COMPATIBILIDADE COM O PROJETO ================= */
+/* (faz todo código antigo voltar a usar as cores novas) */
+
+:root {
+  --green: var(--color-primary);
+  --purple: var(--color-secondary);
+  --bg: var(--color-background);
+}
+
 /* BASE */
 
-body {
-  background: var(--color-background);
+html, body {
+  background: var(--bg);
   color: var(--color-foreground);
+  overscroll-behavior-x: none; /* necessário pro swipe funcionar */
 }
