@@ -56,7 +56,7 @@ export default function DashboardPage() {
   return (
     <AdminLayout
       sidebar={
-        <div className="space-y-4 text-black">
+        <div className="space-y-4 text-white">
           <SimpleCard
             title="Nº atividades programadas"
             value={totalActivities}
@@ -69,25 +69,44 @@ export default function DashboardPage() {
         </div>
       }
     >
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-extrabold text-gray-900">
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">
           Projetos
         </h1>
 
         <Button text="Novo Projeto" onClick={createProject} />
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      {/* CARDS DE PROJETOS */}
+      <div className="grid grid-cols-3 gap-5">
         {projects.map((project) => (
-          <div
+          <button
             key={project.id}
-            className="bg-[var(--green)] rounded-2xl p-6 cursor-pointer hover:opacity-90"
             onClick={() => router.push(`/projetos/${project.id}`)}
+            className="
+              text-left
+              bg-white
+              border border-gray-200
+              rounded-xl
+              p-5
+              shadow-sm
+              hover:shadow-md
+              hover:border-[var(--green)]
+              transition-all
+              group
+            "
           >
-            <p className="font-extrabold text-black text-lg">
-              {project.name}
-            </p>
-          </div>
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-gray-800 group-hover:text-[var(--green)]">
+                {project.name}
+              </span>
+
+              <span className="text-sm text-gray-400 group-hover:text-[var(--green)]">
+                Abrir →
+              </span>
+            </div>
+          </button>
         ))}
       </div>
     </AdminLayout>
