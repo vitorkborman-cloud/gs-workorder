@@ -47,58 +47,49 @@ export default function WorkOrderPage() {
     if (data) setActivities(data);
   }
 
-  async function createActivity() {
-    if (finalized || mobile) return;
+  /* ---------- REDIMENSIONAMENTO ---------- */
+  async function resizeImage(file: File): Promise<File> {
+    const img = document.createElement("img");
+    const reader = new FileReader();
 
-    const description = prompt("Descrição da atividade:");
-    if (!description) return;
+    return new Promise((resolve) => {
+      reader.onload = e => img.src = e.target?.result as string;
 
-    await supabase.from("activities").insert({
-      description,
-      work_order_id: workOrderId,
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 1200;
+
+        const ratio = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
+        const width = img.width * ratio;
+        const height = img.height * ratio;
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          blob => resolve(new File([blob!], file.name, { type: "image/jpeg" })),
+          "image/jpeg",
+          0.8
+        );
+      };
+
+      reader.readAsDataURL(file);
     });
-
-    load();
-  }
-
-  async function deleteActivity(id: string, description: string) {
-    if (finalized || mobile) return;
-
-    const ok = confirm(`Excluir a atividade:\n"${description}"?`);
-    if (!ok) return;
-
-    await supabase.from("activities").delete().eq("id", id);
-    load();
-  }
-
-  async function updateStatus(id: string, status: string) {
-    if (finalized) return;
-
-    setActivities(prev =>
-      prev.map(a => (a.id === id ? { ...a, status } : a))
-    );
-
-    await supabase.from("activities").update({ status }).eq("id", id);
-  }
-
-  async function updateNote(id: string, note: string) {
-    if (finalized) return;
-
-    setActivities(prev =>
-      prev.map(a => (a.id === id ? { ...a, note } : a))
-    );
-
-    await supabase.from("activities").update({ note }).eq("id", id);
   }
 
   async function uploadImage(id: string, file: File) {
     if (finalized) return;
 
-    const fileName = `${id}/${Date.now()}-${file.name}`;
+    const resized = await resizeImage(file);
+
+    const fileName = `${id}/${Date.now()}.jpg`;
 
     const { error } = await supabase.storage
       .from("activity-images")
-      .upload(fileName, file);
+      .upload(fileName, resized);
 
     if (error) {
       alert("Erro ao enviar imagem");
@@ -125,20 +116,13 @@ export default function WorkOrderPage() {
       prev.map(a => (a.id === id ? { ...a, images: newImages } : a))
     );
 
-    await supabase
-      .from("activities")
-      .update({ images: newImages })
-      .eq("id", id);
+    await supabase.from("activities").update({ images: newImages }).eq("id", id);
   }
 
   async function removeImage(id: string, imageUrl: string) {
     if (finalized) return;
 
-    const ok = confirm("Remover esta imagem?");
-    if (!ok) return;
-
     const path = imageUrl.split("/activity-images/")[1];
-
     await supabase.storage.from("activity-images").remove([path]);
 
     const activity = activities.find(a => a.id === id);
@@ -148,10 +132,21 @@ export default function WorkOrderPage() {
       prev.map(a => (a.id === id ? { ...a, images: newImages } : a))
     );
 
-    await supabase
-      .from("activities")
-      .update({ images: newImages })
-      .eq("id", id);
+    await supabase.from("activities").update({ images: newImages }).eq("id", id);
+  }
+
+  async function updateStatus(id: string, status: string) {
+    if (finalized) return;
+
+    setActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+    await supabase.from("activities").update({ status }).eq("id", id);
+  }
+
+  async function updateNote(id: string, note: string) {
+    if (finalized) return;
+
+    setActivities(prev => prev.map(a => a.id === id ? { ...a, note } : a));
+    await supabase.from("activities").update({ note }).eq("id", id);
   }
 
   async function finalizeWorkOrder() {
@@ -166,30 +161,20 @@ export default function WorkOrderPage() {
     const ok = confirm("Finalizar Work Order?");
     if (!ok) return;
 
-    await supabase
-      .from("work_orders")
-      .update({ finalized: true })
-      .eq("id", workOrderId);
-
+    await supabase.from("work_orders").update({ finalized: true }).eq("id", workOrderId);
     load();
   }
 
   function statusBadge(status: string | null) {
     if (!status) return null;
-    if (status === "concluído")
-      return <span className="text-green-600 font-bold text-sm">✔ Concluído</span>;
-    return <span className="text-red-600 font-bold text-sm">✖ Não concluído</span>;
+    return status === "concluído"
+      ? <span className="text-green-600 font-bold text-sm">✔ Concluído</span>
+      : <span className="text-red-600 font-bold text-sm">✖ Não concluído</span>;
   }
 
   return (
     <AppShell>
       <Card title="Atividades">
-
-        {!finalized && !mobile && (
-          <div className="mb-4">
-            <Button text="Criar Atividade" onClick={createActivity} />
-          </div>
-        )}
 
         <div className="space-y-4">
           {activities.map(act => (
@@ -197,27 +182,13 @@ export default function WorkOrderPage() {
 
               <div className="flex justify-between items-center">
                 <p className="font-bold">{act.description}</p>
-
-                {!finalized && !mobile && (
-                  <button
-                    onClick={() => deleteActivity(act.id, act.description)}
-                    className="text-xs font-bold underline"
-                  >
-                    Excluir
-                  </button>
-                )}
-
                 {finalized && statusBadge(act.status)}
               </div>
 
               {!finalized && (
                 <div className="flex gap-2">
-                  <button onClick={() => updateStatus(act.id, "concluído")}>
-                    Concluído
-                  </button>
-                  <button onClick={() => updateStatus(act.id, "não concluído")}>
-                    Não concluído
-                  </button>
+                  <button onClick={() => updateStatus(act.id, "concluído")}>Concluído</button>
+                  <button onClick={() => updateStatus(act.id, "não concluído")}>Não concluído</button>
                 </div>
               )}
 
@@ -244,18 +215,12 @@ export default function WorkOrderPage() {
                 <div className="flex gap-2 flex-wrap">
                   {act.images?.map((img, i) => (
                     <div key={i} className="relative">
-                      <img
-                        src={img}
-                        className="w-24 h-24 object-cover rounded-lg border"
-                      />
-
+                      <img src={img} className="w-24 h-24 object-cover rounded-lg border"/>
                       {!finalized && (
                         <button
                           onClick={() => removeImage(act.id, img)}
                           className="absolute -top-2 -right-2 bg-white border rounded-full px-2 text-xs"
-                        >
-                          X
-                        </button>
+                        >X</button>
                       )}
                     </div>
                   ))}
@@ -268,7 +233,7 @@ export default function WorkOrderPage() {
 
         {!finalized && (
           <div className="mt-6">
-            <Button text="Finalizar Work Order" onClick={finalizeWorkOrder} />
+            <Button text="Finalizar Work Order" onClick={finalizeWorkOrder}/>
           </div>
         )}
 

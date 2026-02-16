@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AdminLayout from "../../components/AdminLayout";
 import SimpleCard from "../../components/SimpleCard";
+import Button from "../../components/Button";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -17,7 +18,8 @@ export default function DashboardPage() {
     // Projetos
     const { data: projectsData } = await supabase
       .from("projects")
-      .select("id, name");
+      .select("id, name")
+      .order("created_at", { ascending: true });
 
     setProjects(projectsData || []);
 
@@ -29,11 +31,17 @@ export default function DashboardPage() {
     if (activities) {
       setTotalActivities(activities.length);
       setDoneActivities(
-        activities.filter(
-          (a) => a.status === "concluído"
-        ).length
+        activities.filter((a) => a.status === "concluído").length
       );
     }
+  }
+
+  async function createProject() {
+    const name = prompt("Nome do projeto:");
+    if (!name) return;
+
+    await supabase.from("projects").insert({ name });
+    load();
   }
 
   useEffect(() => {
@@ -56,10 +64,14 @@ export default function DashboardPage() {
         </div>
       }
     >
-      {/* TÍTULO */}
-      <h1 className="text-2xl font-extrabold text-gray-900 mb-6">
-        Projetos
-      </h1>
+      {/* TOPO */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-extrabold text-gray-900">
+          Projetos
+        </h1>
+
+        <Button text="Novo Projeto" onClick={createProject} />
+      </div>
 
       {/* CARDS DE PROJETOS */}
       <div className="grid grid-cols-3 gap-6">
@@ -67,9 +79,7 @@ export default function DashboardPage() {
           <div
             key={project.id}
             className="bg-[var(--green)] rounded-2xl p-6 cursor-pointer hover:opacity-90"
-            onClick={() =>
-              router.push(`/projetos/${project.id}`)
-            }
+            onClick={() => router.push(`/projetos/${project.id}`)}
           >
             <p className="font-extrabold text-black text-lg">
               {project.name}
