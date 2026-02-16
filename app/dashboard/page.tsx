@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 import AdminLayout from "../../components/AdminLayout";
 import SimpleCard from "../../components/SimpleCard";
 import Button from "../../components/Button";
+import { isMobileDevice } from "../../lib/isMobile";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -14,8 +15,17 @@ export default function DashboardPage() {
   const [totalActivities, setTotalActivities] = useState(0);
   const [doneActivities, setDoneActivities] = useState(0);
 
+  useEffect(() => {
+    // se for celular → manda para o app
+    if (isMobileDevice()) {
+      router.replace("/mobile");
+      return;
+    }
+
+    load();
+  }, []);
+
   async function load() {
-    // Projetos
     const { data: projectsData } = await supabase
       .from("projects")
       .select("id, name")
@@ -23,7 +33,6 @@ export default function DashboardPage() {
 
     setProjects(projectsData || []);
 
-    // Todas as atividades
     const { data: activities } = await supabase
       .from("activities")
       .select("status");
@@ -44,10 +53,6 @@ export default function DashboardPage() {
     load();
   }
 
-  useEffect(() => {
-    load();
-  }, []);
-
   return (
     <AdminLayout
       sidebar={
@@ -64,7 +69,6 @@ export default function DashboardPage() {
         </div>
       }
     >
-      {/* TOPO */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-extrabold text-gray-900">
           Projetos
@@ -73,7 +77,6 @@ export default function DashboardPage() {
         <Button text="Novo Projeto" onClick={createProject} />
       </div>
 
-      {/* CARDS DE PROJETOS */}
       <div className="grid grid-cols-3 gap-6">
         {projects.map((project) => (
           <div
