@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
-import AppShell from "../../../components/AppShell";
-import Card from "../../../components/Card";
-import Button from "../../../components/Button";
+import AdminShell from "../../../components/layout/AdminShell";
+import { Button } from "../../../components/ui/button";
+import { Card, CardContent } from "../../../components/ui/card";
 import { isMobileDevice } from "../../../lib/isMobile";
 
 type Activity = {
@@ -47,108 +47,33 @@ export default function WorkOrderPage() {
     if (data) setActivities(data);
   }
 
-  /* ---------- REDIMENSIONAMENTO ---------- */
-  async function resizeImage(file: File): Promise<File> {
-    const img = document.createElement("img");
-    const reader = new FileReader();
+  /* ---------------- CRIAR ATIVIDADE (DESKTOP) ---------------- */
+  async function createActivity() {
+    const description = prompt("Descrição da atividade:");
+    if (!description) return;
 
-    return new Promise((resolve) => {
-      reader.onload = e => img.src = e.target?.result as string;
-
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 1200;
-
-        const ratio = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
-        const width = img.width * ratio;
-        const height = img.height * ratio;
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d")!;
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          blob => resolve(new File([blob!], file.name, { type: "image/jpeg" })),
-          "image/jpeg",
-          0.8
-        );
-      };
-
-      reader.readAsDataURL(file);
+    await supabase.from("activities").insert({
+      description,
+      work_order_id: workOrderId,
     });
+
+    load();
   }
 
-  async function uploadImage(id: string, file: File) {
-    if (finalized) return;
-
-    const resized = await resizeImage(file);
-
-    const fileName = `${id}/${Date.now()}.jpg`;
-
-    const { error } = await supabase.storage
-      .from("activity-images")
-      .upload(fileName, resized);
-
-    if (error) {
-      alert("Erro ao enviar imagem");
-      return;
-    }
-
-    const { data } = supabase.storage
-      .from("activity-images")
-      .getPublicUrl(fileName);
-
-    const url = data.publicUrl;
-
-    const activity = activities.find(a => a.id === id);
-    const images = activity?.images ?? [];
-
-    if (images.length >= 3) {
-      alert("Máximo de 3 imagens");
-      return;
-    }
-
-    const newImages = [...images, url];
-
-    setActivities(prev =>
-      prev.map(a => (a.id === id ? { ...a, images: newImages } : a))
-    );
-
-    await supabase.from("activities").update({ images: newImages }).eq("id", id);
-  }
-
-  async function removeImage(id: string, imageUrl: string) {
-    if (finalized) return;
-
-    const path = imageUrl.split("/activity-images/")[1];
-    await supabase.storage.from("activity-images").remove([path]);
-
-    const activity = activities.find(a => a.id === id);
-    const newImages = (activity?.images ?? []).filter(img => img !== imageUrl);
-
-    setActivities(prev =>
-      prev.map(a => (a.id === id ? { ...a, images: newImages } : a))
-    );
-
-    await supabase.from("activities").update({ images: newImages }).eq("id", id);
-  }
-
+  /* ---------------- STATUS ---------------- */
   async function updateStatus(id: string, status: string) {
     if (finalized) return;
-
     setActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     await supabase.from("activities").update({ status }).eq("id", id);
   }
 
   async function updateNote(id: string, note: string) {
     if (finalized) return;
-
     setActivities(prev => prev.map(a => a.id === id ? { ...a, note } : a));
     await supabase.from("activities").update({ note }).eq("id", id);
   }
 
+  /* ---------------- FINALIZAR ---------------- */
   async function finalizeWorkOrder() {
     if (finalized) return;
 
@@ -173,71 +98,73 @@ export default function WorkOrderPage() {
   }
 
   return (
-    <AppShell>
-      <Card title="Atividades">
+    <AdminShell>
 
-        <div className="space-y-4">
+      <div className="space-y-6">
+
+        {/* HEADER */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Atividades</h1>
+
+          {!mobile && !finalized && (
+            <Button className="bg-primary text-white" onClick={createActivity}>
+              + Adicionar atividade
+            </Button>
+          )}
+        </div>
+
+        {/* LISTA */}
+        <div className="bg-secondary rounded-2xl p-6 shadow-inner space-y-4">
+
           {activities.map(act => (
-            <div key={act.id} className="border rounded-xl p-3 space-y-3">
+            <Card key={act.id} className="border-0 shadow bg-card">
+              <CardContent className="p-5 space-y-4">
 
-              <div className="flex justify-between items-center">
-                <p className="font-bold">{act.description}</p>
-                {finalized && statusBadge(act.status)}
-              </div>
-
-              {!finalized && (
-                <div className="flex gap-2">
-                  <button onClick={() => updateStatus(act.id, "concluído")}>Concluído</button>
-                  <button onClick={() => updateStatus(act.id, "não concluído")}>Não concluído</button>
+                <div className="flex justify-between items-center">
+                  <p className="font-semibold">{act.description}</p>
+                  {finalized && statusBadge(act.status)}
                 </div>
-              )}
 
-              <textarea
-                placeholder="Observações..."
-                value={act.note ?? ""}
-                disabled={finalized}
-                onChange={(e) => updateNote(act.id, e.target.value)}
-                className="w-full border rounded-lg p-2 text-sm"
-              />
-
-              <div className="space-y-2">
                 {!finalized && (
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (!e.target.files?.[0]) return;
-                      uploadImage(act.id, e.target.files[0]);
-                    }}
-                  />
+                  <div className="flex gap-3">
+                    <Button
+                      className="bg-green-600 text-white"
+                      onClick={() => updateStatus(act.id, "concluído")}
+                    >
+                      Concluído
+                    </Button>
+
+                    <Button
+                      className="bg-red-600 text-white"
+                      onClick={() => updateStatus(act.id, "não concluído")}
+                    >
+                      Não concluído
+                    </Button>
+                  </div>
                 )}
 
-                <div className="flex gap-2 flex-wrap">
-                  {act.images?.map((img, i) => (
-                    <div key={i} className="relative">
-                      <img src={img} className="w-24 h-24 object-cover rounded-lg border"/>
-                      {!finalized && (
-                        <button
-                          onClick={() => removeImage(act.id, img)}
-                          className="absolute -top-2 -right-2 bg-white border rounded-full px-2 text-xs"
-                        >X</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+                <textarea
+                  placeholder="Observações..."
+                  value={act.note ?? ""}
+                  disabled={finalized}
+                  onChange={(e) => updateNote(act.id, e.target.value)}
+                  className="w-full border rounded-lg p-3 text-sm"
+                />
 
-            </div>
+              </CardContent>
+            </Card>
           ))}
+
         </div>
 
         {!finalized && (
-          <div className="mt-6">
-            <Button text="Finalizar Work Order" onClick={finalizeWorkOrder}/>
-          </div>
+          <Button className="bg-primary text-white" onClick={finalizeWorkOrder}>
+            Finalizar Work Order
+          </Button>
         )}
 
-      </Card>
-    </AppShell>
+      </div>
+
+    </AdminShell>
   );
 }

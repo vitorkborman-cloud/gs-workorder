@@ -1,10 +1,4 @@
 import "./globals.css";
-import { Inter } from "next/font/google";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
 
 export const metadata = {
   title: "GS Work Order",
@@ -18,8 +12,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body className={`${inter.variable} font-sans bg-[#f3f4f6] text-gray-800`}>
-        {children}
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <div className="theme light">
+          {children}
+        </div>
       </body>
     </html>
   );

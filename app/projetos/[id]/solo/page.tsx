@@ -19,6 +19,7 @@ export default function SoloDesktopPage() {
       .from("soil_descriptions")
       .select("*")
       .eq("project_id", projectId)
+      .eq("finalized", true) // MOSTRAR SOMENTE PERFIS CONCLUÍDOS
       .order("created_at", { ascending: false });
 
     if (data) setItems(data);
@@ -32,14 +33,14 @@ export default function SoloDesktopPage() {
   return (
     <AppShell>
       <h1 className="text-2xl font-bold text-[var(--purple)] mb-6">
-        Descrições de Solo
+        Perfis Descritivos
       </h1>
 
       {loading ? (
         <p>Carregando...</p>
       ) : items.length === 0 ? (
         <p className="text-sm text-gray-500">
-          Nenhuma descrição cadastrada.
+          Nenhum perfil descritivo concluído.
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -48,9 +49,7 @@ export default function SoloDesktopPage() {
               key={item.id}
               className="cursor-pointer"
               onClick={() =>
-                router.push(
-                  `/projetos/${projectId}/solo/${item.id}`
-                )
+                router.push(`/projetos/${projectId}/solo/${item.id}`)
               }
             >
               <Card title={item.nome_sondagem || "Sem nome"}>

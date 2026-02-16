@@ -2,111 +2,154 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { isMobileDevice } from "../../lib/isMobile";
 import { useRouter } from "next/navigation";
+import { isMobileDevice } from "../../lib/isMobile";
+
+import AdminShell from "../../components/layout/AdminShell";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "../../components/ui/dialog";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [email, setEmail] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+
+  const [projects, setProjects] = useState<any[]>([]);
+  const [name, setName] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const [totalProjects, setTotalProjects] = useState(0);
+  const [totalActivities, setTotalActivities] = useState(0);
+  const [doneActivities, setDoneActivities] = useState(0);
 
   useEffect(() => {
     if (isMobileDevice()) {
       router.replace("/mobile");
       return;
     }
-
-    async function load() {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        window.location.href = "/login";
-        return;
-      }
-      setEmail(data.user.email ?? "");
-      setLoading(false);
-    }
-
     load();
   }, []);
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
+  async function load() {
+    const { data: p } = await supabase.from("projects").select("*");
+    setProjects(p || []);
+    setTotalProjects(p?.length || 0);
+
+    const { data: a } = await supabase.from("activities").select("status");
+    if (a) {
+      setTotalActivities(a.length);
+      setDoneActivities(a.filter((x) => x.status === "concluído").length);
+    }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#2b1720] flex items-center justify-center text-white">
-        Carregando...
-      </div>
-    );
+  async function createProject() {
+    if (!name) return;
+    await supabase.from("projects").insert({ name });
+    setName("");
+    setOpen(false);
+    load();
+  }
+
+  async function deleteProject(id: string, name: string) {
+    const ok = confirm(`Excluir o projeto "${name}" permanentemente?`);
+    if (!ok) return;
+
+    await supabase.from("projects").delete().eq("id", id);
+    load();
   }
 
   return (
-    <div className="min-h-screen bg-[#2b1720] text-white flex">
+    <AdminShell>
+      <div className="space-y-6">
 
-      {/* SIDEBAR */}
-      <aside className="w-72 bg-[#391e2a] border-r border-white/10 p-6 hidden md:block">
+        {/* HEADER */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Painel</h1>
 
-        <div className="mb-10">
-          <img src="/logo.png" className="h-8 brightness-0 invert mb-3"/>
-          <div className="text-xs text-white/60">Painel administrativo</div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:opacity-90 text-white font-semibold">
+                Novo Projeto
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Criar projeto</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-2">
+                <Label>Nome do projeto</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+
+              <DialogFooter>
+                <Button onClick={createProject} className="bg-primary text-white">
+                  Criar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <nav className="space-y-2">
-          <a href="/dashboard" className="block rounded-xl px-4 py-3 bg-black/30 border border-white/10">
-            Dashboard
-          </a>
+        {/* CARDS */}
+        <div className="grid md:grid-cols-3 gap-4">
+          <Card className="bg-primary text-white border-0 shadow-md">
+            <CardContent className="p-6">
+              <p className="text-sm opacity-80">Projetos</p>
+              <p className="text-3xl font-bold mt-2">{totalProjects}</p>
+            </CardContent>
+          </Card>
 
-          <a href="/projetos" className="block rounded-xl px-4 py-3 hover:bg-black/30 border border-white/10">
-            Projetos
-          </a>
-        </nav>
+          <Card className="bg-primary text-white border-0 shadow-md">
+            <CardContent className="p-6">
+              <p className="text-sm opacity-80">Atividades</p>
+              <p className="text-3xl font-bold mt-2">{totalActivities}</p>
+            </CardContent>
+          </Card>
 
-        <div className="mt-10 pt-6 border-t border-white/10 text-xs text-white/70">
-          <div className="font-semibold text-white">{email}</div>
-
-          <button
-            onClick={handleLogout}
-            className="mt-4 w-full rounded-xl bg-red-600 py-2 font-bold hover:bg-red-500 transition"
-          >
-            Sair
-          </button>
+          <Card className="bg-primary text-white border-0 shadow-md">
+            <CardContent className="p-6">
+              <p className="text-sm opacity-80">Concluídas</p>
+              <p className="text-3xl font-bold mt-2">{doneActivities}</p>
+            </CardContent>
+          </Card>
         </div>
-      </aside>
 
-      {/* CONTEÚDO */}
-      <main className="flex-1 p-8">
+        {/* LOUSA ROXA */}
+        <div className="bg-secondary rounded-2xl p-6 space-y-4 shadow-inner">
+          <h2 className="text-white text-lg font-semibold">Projetos</h2>
 
-        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+          <div className="grid md:grid-cols-3 gap-4">
+            {projects.map((project) => (
+              <div key={project.id} className="relative">
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* BOTÃO X */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteProject(project.id, project.name);
+                  }}
+                  className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 z-10"
+                >
+                  ✕
+                </button>
 
-          <div className="rounded-2xl bg-[#391e2a] border border-white/10 p-5">
-            <div className="text-sm text-white/70">Acesso rápido</div>
-            <div className="text-lg font-bold mt-1">Projetos</div>
-            <p className="text-sm text-white/70 mt-2">
-              Crie e gerencie Work Orders
-            </p>
-            <a
-              href="/projetos"
-              className="inline-block mt-4 rounded-xl bg-[#80b02d] text-black px-4 py-2 font-bold hover:brightness-110 transition"
-            >
-              Abrir
-            </a>
+                {/* CARD DO PROJETO */}
+                <button
+                  onClick={() => router.push(`/projetos/${project.id}`)}
+                  className="w-full bg-primary text-white font-semibold rounded-xl p-6 text-left shadow hover:scale-[1.02] transition"
+                >
+                  {project.name}
+                </button>
+
+              </div>
+            ))}
           </div>
-
-          <div className="rounded-2xl bg-[#391e2a] border border-white/10 p-5">
-            <div className="text-sm text-white/70">Campo</div>
-            <div className="text-lg font-bold mt-1">Aplicativo Mobile</div>
-            <p className="text-sm text-white/70 mt-2">
-              Uso em campo para execução das atividades
-            </p>
-          </div>
-
         </div>
 
-      </main>
-    </div>
+      </div>
+    </AdminShell>
   );
 }

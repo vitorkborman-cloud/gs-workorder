@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
-import AppShell from "../../../../../components/AppShell";
-import Card from "../../../../../components/Card";
-import Button from "../../../../../components/Button";
+import AdminShell from "../../../../../components/layout/AdminShell";
+import { Card, CardContent } from "../../../../../components/ui/card";
+import { Button } from "../../../../../components/ui/button";
 import jsPDF from "jspdf";
 
 type Layer = {
@@ -44,146 +44,85 @@ export default function SoloDetailPage() {
     if (!data) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
     let y = 20;
 
-    // ===== CORES =====
-    pdf.setDrawColor(57, 30, 42); // roxo
-    pdf.setTextColor(57, 30, 42);
+    pdf.setFontSize(14);
+    pdf.text(`Descrição de Solo - ${data.nome_sondagem}`, 10, y);
+    y += 10;
 
-    // ===== LOGO =====
-    const logo = new Image();
-    logo.src = "/logo.png";
-
-    await new Promise((resolve) => {
-      logo.onload = resolve;
+    Object.entries(data).forEach(([key, value]) => {
+      if (key === "layers" || key === "id") return;
+      pdf.text(`${key}: ${value ?? "-"}`, 10, y);
+      y += 6;
     });
 
-    pdf.addImage(logo, "PNG", 10, 8, 30, 15);
-
-    // ===== TÍTULO =====
-    pdf.setFontSize(16);
-    pdf.text("RELATÓRIO – DESCRIÇÃO DE SOLO", pageWidth / 2, 15, {
-      align: "center",
-    });
-
-    y = 30;
-
-    // ===== SUBTÍTULO =====
-    pdf.setFontSize(12);
-    pdf.text(`Sondagem: ${data.nome_sondagem}`, 10, y);
-    y += 8;
-
-    pdf.setLineWidth(0.5);
-    pdf.line(10, y, pageWidth - 10, y);
+    y += 6;
+    pdf.text("Camadas:", 10, y);
     y += 6;
 
-    // ===== DADOS GERAIS =====
-    pdf.setFontSize(11);
-
-    const campos = [
-      ["Data", data.data],
-      ["Hora", data.hora],
-      ["Nível d'água (m)", data.nivel_agua],
-      ["Tipo de sondagem", data.tipo_sondagem],
-      ["Diâmetro sondagem (in)", data.diametro_sondagem],
-      ["Diâmetro poço (in)", data.diametro_poco],
-      ["Pré-filtro", data.pre_filtro],
-      ["Seção filtrante", data.secao_filtrante],
-      ["Coordenada X", data.coord_x],
-      ["Coordenada Y", data.coord_y],
-      ["Profundidade total", data.profundidade_total],
-    ];
-
-    campos.forEach(([label, value]) => {
-      pdf.text(`${label}: ${value || "-"}`, 10, y);
+    layers.forEach((l, i) => {
+      pdf.text(`${i + 1}. ${l.profundidade}m - ${l.tipo}`, 10, y);
       y += 6;
-
-      if (y > 270) {
-        pdf.addPage();
-        y = 20;
-      }
     });
 
-    // ===== CAMADAS =====
-    y += 4;
-    pdf.setFontSize(13);
-    pdf.setTextColor(128, 176, 45); // verde
-    pdf.text("Camadas de Solo", 10, y);
-    y += 8;
-
-    pdf.setFontSize(11);
-    pdf.setTextColor(0, 0, 0);
-
-    layers.forEach((layer, index) => {
-      pdf.text(
-        `${index + 1}. Profundidade: ${layer.profundidade} m | Solo: ${layer.tipo}`,
-        10,
-        y
-      );
-      y += 6;
-
-      if (y > 270) {
-        pdf.addPage();
-        y = 20;
-      }
-    });
-
-    // ===== RODAPÉ =====
-    const totalPages = pdf.getNumberOfPages();
-    const dataGeracao = new Date().toLocaleDateString("pt-BR");
-
-    for (let i = 1; i <= totalPages; i++) {
-      pdf.setPage(i);
-      pdf.setFontSize(9);
-      pdf.setTextColor(120);
-      pdf.text(
-        `Gerado em ${dataGeracao} | Página ${i} de ${totalPages}`,
-        pageWidth / 2,
-        290,
-        { align: "center" }
-      );
-    }
-
-    pdf.save(`descricao_solo_${data.nome_sondagem}.pdf`);
+    pdf.save(`perfil_${data.nome_sondagem}.pdf`);
   }
 
-  if (loading) {
-    return (
-      <AppShell>
-        <p>Carregando...</p>
-      </AppShell>
-    );
-  }
+  if (loading) return <AdminShell><p>Carregando...</p></AdminShell>;
+
+  if (!data) return <AdminShell><p>Perfil não encontrado.</p></AdminShell>;
 
   return (
-    <AppShell>
-      <Card title={`Sondagem: ${data.nome_sondagem}`}>
-        <div className="mb-6">
-          <Button text="Gerar PDF" onClick={gerarPDF} />
+    <AdminShell>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Perfil descritivo</h1>
+          <Button onClick={gerarPDF} className="bg-primary text-white">
+            Baixar PDF
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.entries({
-            "Data": data.data,
-            "Hora": data.hora,
-            "Nível d’água (m)": data.nivel_agua,
-            "Tipo de sondagem": data.tipo_sondagem,
-            "Diâmetro sondagem (in)": data.diametro_sondagem,
-            "Diâmetro poço (in)": data.diametro_poco,
-            "Pré-filtro": data.pre_filtro,
-            "Seção filtrante": data.secao_filtrante,
-            "Coordenada X": data.coord_x,
-            "Coordenada Y": data.coord_y,
-            "Profundidade": data.profundidade_total,
-          }).map(([label, value]) => (
-            <div key={label}>
-              <p className="text-xs text-gray-500">{label}</p>
-              <p className="font-bold">{value || "-"}</p>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </AppShell>
+        <Card className="bg-secondary text-white border-0">
+          <CardContent className="p-6 grid md:grid-cols-2 gap-4">
+            {Object.entries({
+              "Sondagem": data.nome_sondagem,
+              "Data": data.data,
+              "Hora": data.hora,
+              "Nível d'água": data.nivel_agua,
+              "Tipo": data.tipo_sondagem,
+              "Diâmetro sondagem": data.diametro_sondagem,
+              "Diâmetro poço": data.diametro_poco,
+              "Pré-filtro": data.pre_filtro,
+              "Seção filtrante": data.secao_filtrante,
+              "Coord X": data.coord_x,
+              "Coord Y": data.coord_y,
+              "Profundidade total": data.profundidade_total,
+            }).map(([label, value]) => (
+              <div key={label}>
+                <p className="text-sm opacity-70">{label}</p>
+                <p className="font-semibold">{value || "-"}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-secondary text-white border-0">
+          <CardContent className="p-6 space-y-3">
+            <h2 className="text-xl font-semibold">Camadas</h2>
+
+            {layers.length === 0 ? (
+              <p className="opacity-70">Nenhuma camada informada</p>
+            ) : (
+              layers.map((l, i) => (
+                <div key={i} className="bg-primary rounded-xl px-4 py-3">
+                  <p className="font-semibold">{l.profundidade} m</p>
+                  <p className="text-sm opacity-90">{l.tipo}</p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </AdminShell>
   );
 }
