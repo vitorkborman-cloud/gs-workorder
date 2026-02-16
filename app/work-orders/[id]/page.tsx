@@ -8,6 +8,9 @@ import { Button } from "../../../components/ui/button";
 import { Card, CardContent } from "../../../components/ui/card";
 import { isMobileDevice } from "../../../lib/isMobile";
 
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 type Activity = {
   id: string;
   description: string;
@@ -23,6 +26,7 @@ export default function WorkOrderPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [finalized, setFinalized] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [workOrder, setWorkOrder] = useState<any>(null);
 
   useEffect(() => {
     setMobile(isMobileDevice());
@@ -32,11 +36,12 @@ export default function WorkOrderPage() {
   async function load() {
     const { data: wo } = await supabase
       .from("work_orders")
-      .select("finalized")
+      .select("*")
       .eq("id", workOrderId)
       .single();
 
     setFinalized(!!wo?.finalized);
+    setWorkOrder(wo);
 
     const { data } = await supabase
       .from("activities")
@@ -90,6 +95,56 @@ export default function WorkOrderPage() {
     load();
   }
 
+  /* ================= PDF PROFISSIONAL ================= */
+
+  async function gerarPDF() {
+    if (!workOrder) return;
+
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const logo = new Image();
+    logo.src = "/logo.png";
+    await new Promise(res => (logo.onload = res));
+
+    pdf.addImage(logo, "PNG", 14, 10, 40, 18);
+
+    pdf.setFontSize(18);
+    pdf.text("RELATÓRIO DE WORK ORDER", 105, 20, { align: "center" });
+
+    pdf.setFontSize(11);
+    pdf.text(`Work Order: ${workOrder.title}`, 14, 40);
+    pdf.text(`Data: ${new Date().toLocaleDateString()}`, 14, 46);
+
+    const rows = activities.map(a => [
+      a.description,
+      a.status === "concluído" ? "CONCLUÍDO" : "NÃO CONCLUÍDO",
+      a.note || "-"
+    ]);
+
+    autoTable(pdf, {
+      startY: 55,
+      head: [["Atividade", "Status", "Observação"]],
+      body: rows,
+      theme: "grid",
+      headStyles: { fillColor: [57, 30, 42] },
+      styles: { fontSize: 10 },
+    });
+
+    if (workOrder.signature_url) {
+      const finalY = (pdf as any).lastAutoTable.finalY + 15;
+
+      pdf.text("Assinatura do responsável:", 14, finalY);
+
+      const img = new Image();
+      img.src = workOrder.signature_url;
+      await new Promise(res => (img.onload = res));
+
+      pdf.addImage(img, "PNG", 14, finalY + 5, 70, 35);
+    }
+
+    pdf.save(`workorder_${workOrder.title}.pdf`);
+  }
+
   function statusBadge(status: string | null) {
     if (!status) return null;
     return status === "concluído"
@@ -102,7 +157,6 @@ export default function WorkOrderPage() {
 
       <div className="space-y-6">
 
-        {/* HEADER */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Atividades</h1>
 
@@ -113,7 +167,6 @@ export default function WorkOrderPage() {
           )}
         </div>
 
-        {/* LISTA */}
         <div className="bg-secondary rounded-2xl p-6 shadow-inner space-y-4">
 
           {activities.map(act => (
@@ -156,6 +209,12 @@ export default function WorkOrderPage() {
           ))}
 
         </div>
+
+        {finalized && (
+          <Button className="bg-primary text-white" onClick={gerarPDF}>
+            Gerar Relatório PDF
+          </Button>
+        )}
 
         {!finalized && (
           <Button className="bg-primary text-white" onClick={finalizeWorkOrder}>
