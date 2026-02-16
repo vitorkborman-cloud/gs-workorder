@@ -20,6 +20,8 @@ export default function MobileWorkOrderPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [finalized, setFinalized] = useState(false);
 
+  /* ================= LOAD ================= */
+
   async function load() {
     const { data: wo } = await supabase
       .from("work_orders")
@@ -41,6 +43,14 @@ export default function MobileWorkOrderPage() {
   useEffect(() => {
     load();
   }, []);
+
+  /* ================= PROGRESS ================= */
+
+  const total = activities.length;
+  const done = activities.filter(a => a.status !== null).length;
+  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+
+  /* ================= STATUS ================= */
 
   async function updateStatus(id: string, status: string) {
     if (finalized) return;
@@ -199,7 +209,6 @@ export default function MobileWorkOrderPage() {
           className="w-full rounded-xl border p-3 text-sm"
         />
 
-        {/* BOTÃO GALERIA/CAMERA */}
         {!finalized && (
           <label className="block w-full text-center py-3 rounded-xl bg-[var(--purple)] text-white font-bold">
             Adicionar foto
@@ -243,9 +252,20 @@ export default function MobileWorkOrderPage() {
   return (
     <MobileShell
       title="Checklist"
+      subtitle={`${done}/${total} atividades • ${percent}%`}
       backHref={`/mobile/projetos/${params.id}/work-orders`}
     >
-      <div className="space-y-4 pb-28">
+      {/* BARRA DE PROGRESSO */}
+      <div className="px-4 pt-4">
+        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-[var(--green)] transition-all"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-4 pb-28 mt-4">
         {activities.map(act => (
           <SwipeCard key={act.id} act={act} />
         ))}
