@@ -1,8 +1,7 @@
 "use client";
 
 import { useRouter, useParams } from "next/navigation";
-import AppShell from "../../../../components/AppShell";
-import Card from "../../../../components/Card";
+import MobileShell from "../../../../components/layout/MobileShell";
 
 export default function MobileProjetoPage() {
   const router = useRouter();
@@ -10,34 +9,52 @@ export default function MobileProjetoPage() {
   const projectId = params.id as string;
 
   return (
-    <AppShell>
+    <MobileShell
+      title="Módulos do Projeto"
+      subtitle="Escolha o que deseja preencher em campo"
+      backHref="/mobile"
+    >
       <div className="space-y-4">
-        <Card
-          title="Work Orders"
-        >
-          <button
-            onClick={() =>
-              router.push(`/mobile/projetos/${projectId}/work-orders`)
-            }
-            className="w-full bg-[var(--green)] text-white font-bold py-3 rounded-xl"
-          >
-            Acessar
-          </button>
-        </Card>
 
-        <Card
-          title="Descrição de Solo"
+        {/* WORK ORDERS */}
+        <button
+          onClick={() =>
+            router.push(`/mobile/projetos/${projectId}/work-orders`)
+          }
+          className="
+            w-full rounded-2xl p-5
+            bg-[var(--green)] text-white
+            shadow-md active:scale-[0.97] transition
+          "
         >
-          <button
-            onClick={() =>
-              router.push(`/mobile/projetos/${projectId}/solo`)
-            }
-            className="w-full bg-[var(--purple)] text-white font-bold py-3 rounded-xl"
-          >
-            Acessar
-          </button>
-        </Card>
+          <div className="text-lg font-semibold">
+            Work Orders
+          </div>
+          <div className="text-sm opacity-90 mt-1">
+            Preencher checklist da visita
+          </div>
+        </button>
+
+        {/* PERFIL DESCRITIVO */}
+        <button
+          onClick={() =>
+            router.push(`/mobile/projetos/${projectId}/solo`)
+          }
+          className="
+            w-full rounded-2xl p-5
+            bg-[var(--purple)] text-white
+            shadow-md active:scale-[0.97] transition
+          "
+        >
+          <div className="text-lg font-semibold">
+            Perfil descritivo
+          </div>
+          <div className="text-sm opacity-90 mt-1">
+            Registrar sondagem de solo
+          </div>
+        </button>
+
       </div>
-    </AppShell>
+    </MobileShell>
   );
 }

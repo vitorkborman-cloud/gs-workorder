@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
-import AppShell from "../../components/AppShell";
-import Card from "../../components/Card";
+import MobileShell from "../../components/layout/MobileShell";
 
 type Project = {
   id: string;
@@ -29,24 +28,36 @@ export default function MobileHome() {
   }, []);
 
   return (
-    <AppShell>
-      <h1 className="text-xl font-bold text-[var(--purple)] mb-4">
-        Projetos
-      </h1>
+    <MobileShell title="Projetos" subtitle="Selecione um projeto para continuar">
 
-      <div className="space-y-3">
-        {projects.map((project) => (
-          <div
-            key={project.id}
-            onClick={() =>
-              router.push(`/mobile/projetos/${project.id}`)
-            }
-            className="cursor-pointer"
-          >
-            <Card title={project.name} />
-          </div>
-        ))}
-      </div>
-    </AppShell>
+      {projects.length === 0 ? (
+        <div className="text-center text-gray-500 mt-10">
+          Nenhum projeto disponível
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {projects.map((project) => (
+            <button
+              key={project.id}
+              onClick={() => router.push(`/mobile/projetos/${project.id}`)}
+              className="
+                w-full text-left p-4 rounded-2xl
+                bg-[var(--green)] text-white
+                shadow-sm active:scale-[0.98]
+                transition-transform
+              "
+            >
+              <div className="font-semibold text-base">
+                {project.name}
+              </div>
+              <div className="text-xs opacity-90 mt-1">
+                Abrir projeto
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+    </MobileShell>
   );
 }
