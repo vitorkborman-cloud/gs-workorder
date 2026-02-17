@@ -92,22 +92,20 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF TESTE ================= */
+  /* ================= PDF DEFINITIVO ================= */
 
   async function gerarPDF() {
-
-    console.log("PDF CLICK");
-    alert("clicou no botão");
-
-    if (!workOrder) return;
+    if (!workOrder || mobile) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
 
+    // LOGO
     const logo = new Image();
     logo.src = "/logo.png";
     await new Promise(res => (logo.onload = res));
     pdf.addImage(logo, "PNG", 14, 10, 40, 18);
 
+    // TITULO
     pdf.setFontSize(18);
     pdf.text("RELATÓRIO DE WORK ORDER", 105, 20, { align: "center" });
 
@@ -115,6 +113,7 @@ export default function WorkOrderPage() {
     pdf.text(`Work Order: ${workOrder.title}`, 14, 40);
     pdf.text(`Data: ${new Date().toLocaleDateString()}`, 14, 46);
 
+    // TABELA
     const rows = activities.map(a => [
       a.description,
       a.status === "concluído" ? "CONCLUÍDO" : "NÃO CONCLUÍDO",
@@ -129,6 +128,20 @@ export default function WorkOrderPage() {
       headStyles: { fillColor: [57, 30, 42] },
       styles: { fontSize: 10 },
     });
+
+    // ASSINATURA
+    if (workOrder.signature_url) {
+      const finalY = (pdf as any).lastAutoTable.finalY + 15;
+
+      pdf.text("Assinatura do responsável:", 14, finalY);
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = workOrder.signature_url;
+      await new Promise(res => (img.onload = res));
+
+      pdf.addImage(img, "PNG", 14, finalY + 5, 70, 35);
+    }
 
     pdf.save(`workorder_${workOrder.title}.pdf`);
   }
@@ -191,7 +204,7 @@ export default function WorkOrderPage() {
 
         </div>
 
-        {finalized && (
+        {finalized && !mobile && (
           <Button className="bg-primary text-white" onClick={gerarPDF}>
             Gerar Relatório PDF
           </Button>
