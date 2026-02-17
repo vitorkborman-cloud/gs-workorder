@@ -6,7 +6,7 @@ import { supabase } from "../../../lib/supabase";
 import AdminShell from "../../../components/layout/AdminShell";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent } from "../../../components/ui/card";
-import { isMobileDevice } from "../../../lib/isMobile";
+import { isMobileDevice } from "../../../components/../lib/isMobile";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -52,7 +52,6 @@ export default function WorkOrderPage() {
     if (data) setActivities(data);
   }
 
-  /* ---------------- CRIAR ATIVIDADE (DESKTOP) ---------------- */
   async function createActivity() {
     const description = prompt("Descrição da atividade:");
     if (!description) return;
@@ -65,7 +64,6 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ---------------- STATUS ---------------- */
   async function updateStatus(id: string, status: string) {
     if (finalized) return;
     setActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a));
@@ -78,7 +76,6 @@ export default function WorkOrderPage() {
     await supabase.from("activities").update({ note }).eq("id", id);
   }
 
-  /* ---------------- FINALIZAR ---------------- */
   async function finalizeWorkOrder() {
     if (finalized) return;
 
@@ -95,18 +92,25 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF PROFISSIONAL ================= */
+  /* ================= PDF ================= */
+
+  async function toBase64(url: string) {
+    const blob = await fetch(url).then(r => r.blob());
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  }
 
   async function gerarPDF() {
     if (!workOrder) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
 
-    const logo = new Image();
-    logo.src = "/logo.png";
-    await new Promise(res => (logo.onload = res));
-
-    pdf.addImage(logo, "PNG", 14, 10, 40, 18);
+    // LOGO
+    const logoBase64 = await toBase64("/logo.png");
+    pdf.addImage(logoBase64, "PNG", 14, 10, 40, 18);
 
     pdf.setFontSize(18);
     pdf.text("RELATÓRIO DE WORK ORDER", 105, 20, { align: "center" });
@@ -115,6 +119,7 @@ export default function WorkOrderPage() {
     pdf.text(`Work Order: ${workOrder.title}`, 14, 40);
     pdf.text(`Data: ${new Date().toLocaleDateString()}`, 14, 46);
 
+    // TABELA
     const rows = activities.map(a => [
       a.description,
       a.status === "concluído" ? "CONCLUÍDO" : "NÃO CONCLUÍDO",
@@ -130,16 +135,17 @@ export default function WorkOrderPage() {
       styles: { fontSize: 10 },
     });
 
+    // ASSINATURA
     if (workOrder.signature_url) {
-      const finalY = (pdf as any).lastAutoTable.finalY + 15;
+      try {
+        const signatureBase64 = await toBase64(workOrder.signature_url);
+        const finalY = (pdf as any).lastAutoTable.finalY + 15;
 
-      pdf.text("Assinatura do responsável:", 14, finalY);
-
-      const img = new Image();
-      img.src = workOrder.signature_url;
-      await new Promise(res => (img.onload = res));
-
-      pdf.addImage(img, "PNG", 14, finalY + 5, 70, 35);
+        pdf.text("Assinatura do responsável:", 14, finalY);
+        pdf.addImage(signatureBase64, "PNG", 14, finalY + 5, 70, 35);
+      } catch {
+        console.warn("Falha ao carregar assinatura");
+      }
     }
 
     pdf.save(`workorder_${workOrder.title}.pdf`);
@@ -154,7 +160,6 @@ export default function WorkOrderPage() {
 
   return (
     <AdminShell>
-
       <div className="space-y-6">
 
         <div className="flex justify-between items-center">
@@ -223,7 +228,6 @@ export default function WorkOrderPage() {
         )}
 
       </div>
-
     </AdminShell>
   );
 }
