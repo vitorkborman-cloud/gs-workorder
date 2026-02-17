@@ -97,6 +97,10 @@ export default function WorkOrderPage() {
   async function gerarPDF() {
     if (!workOrder || mobile) return;
 
+    // 👇 interação do usuário para liberar download
+    const confirmar = confirm("Selecione o local para salvar o relatório.");
+    if (!confirmar) return;
+
     const pdf = new jsPDF("p", "mm", "a4");
 
     // LOGO
