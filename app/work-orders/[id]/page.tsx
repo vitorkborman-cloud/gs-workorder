@@ -92,29 +92,41 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF TESTE ================= */
+  /* ================= PDF PROFISSIONAL DEFINITIVO ================= */
 
   async function gerarPDF() {
-
-    console.log("PDF CLICK");
-    alert("Selecione o diretório");
+    alert("Selecione o local para salvar o relatório");
 
     if (!workOrder) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
 
+    /* HEADER */
+    pdf.setFillColor(57, 30, 42);
+    pdf.rect(0, 0, pageWidth, 28, "F");
+
+    /* LOGO */
     const logo = new Image();
     logo.src = "/logo.png";
     await new Promise(res => (logo.onload = res));
-    pdf.addImage(logo, "PNG", 14, 10, 40, 18);
+    pdf.addImage(logo, "PNG", 10, 6, 36, 16);
 
-    pdf.setFontSize(18);
-    pdf.text("RELATÓRIO DE WORK ORDER", 105, 20, { align: "center" });
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(16);
+    pdf.text("RELATÓRIO DE WORK ORDER", pageWidth / 2, 17, { align: "center" });
+
+    pdf.setTextColor(0, 0, 0);
+
+    /* INFO BOX */
+    pdf.setDrawColor(200);
+    pdf.roundedRect(10, 35, pageWidth - 20, 20, 3, 3);
 
     pdf.setFontSize(11);
-    pdf.text(`Work Order: ${workOrder.title}`, 14, 40);
-    pdf.text(`Data: ${new Date().toLocaleDateString()}`, 14, 46);
+    pdf.text(`Work Order: ${workOrder.title}`, 14, 45);
+    pdf.text(`Data de emissão: ${new Date().toLocaleDateString()}`, 14, 52);
 
+    /* TABELA */
     const rows = activities.map(a => [
       a.description,
       a.status === "concluído" ? "CONCLUÍDO" : "NÃO CONCLUÍDO",
@@ -122,13 +134,33 @@ export default function WorkOrderPage() {
     ]);
 
     autoTable(pdf, {
-      startY: 55,
+      startY: 65,
       head: [["Atividade", "Status", "Observação"]],
       body: rows,
       theme: "grid",
-      headStyles: { fillColor: [57, 30, 42] },
-      styles: { fontSize: 10 },
+      headStyles: { fillColor: [128, 176, 45] },
+      styles: { fontSize: 10, cellPadding: 3 },
+      alternateRowStyles: { fillColor: [245, 245, 245] }
     });
+
+    /* ASSINATURA */
+    if (workOrder.signature_url) {
+      const finalY = (pdf as any).lastAutoTable.finalY + 15;
+
+      pdf.setFontSize(11);
+      pdf.text("Assinatura do responsável:", 14, finalY);
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = workOrder.signature_url;
+      await new Promise(res => (img.onload = res));
+
+      pdf.addImage(img, "PNG", 14, finalY + 5, 80, 35);
+
+      pdf.line(14, finalY + 42, 94, finalY + 42);
+      pdf.setFontSize(9);
+      pdf.text("Responsável pela execução", 14, finalY + 47);
+    }
 
     pdf.save(`workorder_${workOrder.title}.pdf`);
   }
