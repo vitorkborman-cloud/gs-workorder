@@ -92,14 +92,10 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF DEFINITIVO ================= */
+  /* ================= PDF DEFINITIVO (VERSÃO CORRETA) ================= */
 
   async function gerarPDF() {
     if (!workOrder || mobile) return;
-
-    // 👇 interação do usuário para liberar download
-    const confirmar = confirm("Selecione o local para salvar o relatório.");
-    if (!confirmar) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
 
@@ -146,6 +142,9 @@ export default function WorkOrderPage() {
 
       pdf.addImage(img, "PNG", 14, finalY + 5, 70, 35);
     }
+
+    // 🔴 AQUI É O SEGREDO — interação imediatamente antes do download
+    alert("Selecione o local para salvar o relatório.");
 
     pdf.save(`workorder_${workOrder.title}.pdf`);
   }
