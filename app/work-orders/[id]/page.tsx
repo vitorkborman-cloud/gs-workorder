@@ -88,45 +88,48 @@ export default function WorkOrderPage() {
     const ok = confirm("Finalizar Work Order?");
     if (!ok) return;
 
-    await supabase.from("work_orders").update({ finalized: true }).eq("id", workOrderId);
+    await supabase
+      .from("work_orders")
+      .update({ finalized: true })
+      .eq("id", workOrderId);
+
     load();
   }
 
-  /* ================= CONVERTER URL PARA BASE64 ================= */
-
-  async function toBase64(url: string) {
-    const res = await fetch(url);
-    const blob = await res.blob();
-
-    return new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  /* ================= PDF PROFISSIONAL ================= */
+  /* ================= PDF PROFISSIONAL DEFINITIVO ================= */
 
   async function gerarPDF() {
-
-    console.log("PDF CLICK");
-    alert("Selecione o diretório");
 
     if (!workOrder) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
 
-    // LOGO
-    const logoBase64 = await toBase64("/logo.png");
-    pdf.addImage(logoBase64, "PNG", 14, 10, 40, 18);
+    async function urlToBase64(url: string) {
+      const response = await fetch(url);
+      const blob = await response.blob();
 
+      return await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    /* LOGO */
+    try {
+      const logoBase64 = await urlToBase64("/logo.png");
+      pdf.addImage(logoBase64, "PNG", 14, 10, 35, 15);
+    } catch {}
+
+    /* TÍTULO */
     pdf.setFontSize(18);
-    pdf.text("RELATÓRIO DE WORK ORDER", 105, 20, { align: "center" });
+    pdf.text("RELATÓRIO DE WORK ORDER", 105, 25, { align: "center" });
 
     pdf.setFontSize(11);
     pdf.text(`Work Order: ${workOrder.title}`, 14, 40);
     pdf.text(`Data: ${new Date().toLocaleDateString()}`, 14, 46);
 
+    /* TABELA */
     const rows = activities.map(a => [
       a.description,
       a.status === "concluído" ? "CONCLUÍDO" : "NÃO CONCLUÍDO",
@@ -139,50 +142,43 @@ export default function WorkOrderPage() {
       body: rows,
       theme: "grid",
       headStyles: { fillColor: [57, 30, 42] },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
       styles: { fontSize: 10 },
     });
 
-    let y = (pdf as any).lastAutoTable.finalY + 10;
-
-    /* ================= IMAGENS ================= */
-
+    /* FOTOS */
     for (const act of activities) {
       if (!act.images || act.images.length === 0) continue;
 
-      pdf.setFontSize(12);
-      pdf.text(`Fotos — ${act.description}`, 14, y);
-      y += 6;
+      pdf.addPage();
+      pdf.setFontSize(14);
+      pdf.text(`Evidências - ${act.description}`, 14, 20);
+
+      let y = 30;
 
       for (const imgUrl of act.images) {
+        try {
+          const imgBase64 = await urlToBase64(imgUrl);
+          pdf.addImage(imgBase64, "JPEG", 14, y, 90, 60);
+          y += 70;
 
-        const base64 = await toBase64(imgUrl);
-
-        if (y > 250) {
-          pdf.addPage();
-          y = 20;
-        }
-
-        pdf.addImage(base64, "JPEG", 14, y, 60, 45);
-        y += 50;
+          if (y > 250) {
+            pdf.addPage();
+            y = 20;
+          }
+        } catch {}
       }
     }
 
-    /* ================= ASSINATURA ================= */
-
+    /* ASSINATURA */
     if (workOrder.signature_url) {
-
-      if (y > 230) {
+      try {
         pdf.addPage();
-        y = 20;
-      }
+        pdf.setFontSize(14);
+        pdf.text("Assinatura do Responsável", 14, 20);
 
-      pdf.setFontSize(12);
-      pdf.text("Assinatura do responsável:", 14, y);
-      y += 5;
-
-      const signBase64 = await toBase64(workOrder.signature_url);
-      pdf.addImage(signBase64, "PNG", 14, y, 70, 35);
+        const signBase64 = await urlToBase64(workOrder.signature_url);
+        pdf.addImage(signBase64, "PNG", 14, 30, 80, 40);
+      } catch {}
     }
 
     pdf.save(`workorder_${workOrder.title}.pdf`);
@@ -222,11 +218,17 @@ export default function WorkOrderPage() {
 
                 {!finalized && (
                   <div className="flex gap-3">
-                    <Button className="bg-green-600 text-white" onClick={() => updateStatus(act.id, "concluído")}>
+                    <Button
+                      className="bg-green-600 text-white"
+                      onClick={() => updateStatus(act.id, "concluído")}
+                    >
                       Concluído
                     </Button>
 
-                    <Button className="bg-red-600 text-white" onClick={() => updateStatus(act.id, "não concluído")}>
+                    <Button
+                      className="bg-red-600 text-white"
+                      onClick={() => updateStatus(act.id, "não concluído")}
+                    >
                       Não concluído
                     </Button>
                   </div>
@@ -239,19 +241,6 @@ export default function WorkOrderPage() {
                   onChange={(e) => updateNote(act.id, e.target.value)}
                   className="w-full border rounded-lg p-3 text-sm"
                 />
-
-                {/* IMAGENS NO DESKTOP */}
-                {act.images && act.images.length > 0 && (
-                  <div className="flex gap-2 flex-wrap">
-                    {act.images.map((img, i) => (
-                      <img
-                        key={i}
-                        src={img}
-                        className="w-28 h-28 object-cover rounded-lg border"
-                      />
-                    ))}
-                  </div>
-                )}
 
               </CardContent>
             </Card>
