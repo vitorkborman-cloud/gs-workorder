@@ -220,7 +220,7 @@ export default function MobileWorkOrderPage() {
     load();
   }
 
-  /* ================= SWIPE CARD ================= */
+  /* ================= SWIPE ================= */
 
   function SwipeCard({ act }: { act: Activity }) {
     const startX = useRef<number | null>(null);
@@ -267,7 +267,6 @@ export default function MobileWorkOrderPage() {
           className="w-full rounded-xl border p-3 text-sm"
         />
 
-        {/* BOTÃO ANEXAR IMAGEM */}
         {!finalized && (
           <>
             <input
@@ -322,6 +321,26 @@ export default function MobileWorkOrderPage() {
       subtitle={`${done}/${total} atividades • ${percent}%`}
       backHref={`/mobile/projetos/${projectId}/work-orders`}
     >
+      {!finalized && (
+        <div className="px-4 mt-4">
+          <button
+            onClick={() => setOpenSign(true)}
+            className="w-full py-4 rounded-2xl font-bold text-white bg-[var(--purple)]"
+          >
+            {signatureUrl ? "Refazer assinatura" : "Assinar responsável"}
+          </button>
+        </div>
+      )}
+
+      {signatureUrl && (
+        <div className="px-4 mt-4">
+          <div className="bg-white rounded-2xl p-3 border">
+            <p className="text-xs mb-2 text-gray-500">Assinatura registrada</p>
+            <img src={signatureUrl} className="w-full h-32 object-contain" />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4 pb-28 mt-4">
         {activities.map(act => (
           <SwipeCard key={act.id} act={act} />
@@ -336,6 +355,45 @@ export default function MobileWorkOrderPage() {
           >
             Finalizar Work Order
           </button>
+        </div>
+      )}
+
+      {openSign && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-4 space-y-3">
+            <p className="font-bold text-center">Assine abaixo</p>
+
+            <SignatureCanvas
+              ref={sigRef}
+              penColor="black"
+              canvasProps={{
+                className: "w-full h-48 bg-white border rounded-xl",
+              }}
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => sigRef.current?.clear()}
+                className="flex-1 py-3 rounded-xl bg-gray-200 font-bold"
+              >
+                Limpar
+              </button>
+
+              <button
+                onClick={salvarAssinatura}
+                className="flex-1 py-3 rounded-xl bg-[var(--green)] text-white font-bold"
+              >
+                Salvar
+              </button>
+            </div>
+
+            <button
+              onClick={() => setOpenSign(false)}
+              className="w-full text-sm text-gray-500"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
     </MobileShell>
