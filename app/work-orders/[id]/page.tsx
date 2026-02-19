@@ -17,6 +17,7 @@ type Activity = {
   status: string | null;
   note: string | null;
   images: string[] | null;
+  images_original?: string[] | null;
 };
 
 export default function WorkOrderPage() {
@@ -99,7 +100,6 @@ export default function WorkOrderPage() {
   /* ================= PDF PROFISSIONAL DEFINITIVO ================= */
 
   async function gerarPDF() {
-
     if (!workOrder) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
@@ -145,9 +145,12 @@ export default function WorkOrderPage() {
       styles: { fontSize: 10 },
     });
 
-    /* FOTOS */
+    /* FOTOS EM ALTA RESOLUÇÃO */
     for (const act of activities) {
-      if (!act.images || act.images.length === 0) continue;
+
+      const imageList = act.images_original ?? act.images ?? [];
+
+      if (imageList.length === 0) continue;
 
       pdf.addPage();
       pdf.setFontSize(14);
@@ -155,11 +158,12 @@ export default function WorkOrderPage() {
 
       let y = 30;
 
-      for (const imgUrl of act.images) {
+      for (const imgUrl of imageList) {
         try {
           const imgBase64 = await urlToBase64(imgUrl);
-          pdf.addImage(imgBase64, "JPEG", 14, y, 90, 60);
-          y += 70;
+
+          pdf.addImage(imgBase64, "JPEG", 14, y, 120, 80);
+          y += 90;
 
           if (y > 250) {
             pdf.addPage();
