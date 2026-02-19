@@ -92,22 +92,33 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF TESTE ================= */
+  /* ================= CONVERTER URL → BASE64 ================= */
+
+  async function toBase64(url: string): Promise<string> {
+    const res = await fetch(url);
+    const blob = await res.blob();
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  /* ================= PDF COMPLETO ================= */
 
   async function gerarPDF() {
-
-    console.log("PDF CLICK");
-    alert("Selecione o diretório");
+    alert("Selecione o local para salvar o relatório");
 
     if (!workOrder) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
 
-    const logo = new Image();
-    logo.src = "/logo.png";
-    await new Promise(res => (logo.onload = res));
-    pdf.addImage(logo, "PNG", 14, 10, 40, 18);
+    // LOGO
+    const logoBase64 = await toBase64("/logo.png");
+    pdf.addImage(logoBase64, "PNG", 14, 10, 40, 18);
 
+    // CABEÇALHO
     pdf.setFontSize(18);
     pdf.text("RELATÓRIO DE WORK ORDER", 105, 20, { align: "center" });
 
@@ -115,6 +126,7 @@ export default function WorkOrderPage() {
     pdf.text(`Work Order: ${workOrder.title}`, 14, 40);
     pdf.text(`Data: ${new Date().toLocaleDateString()}`, 14, 46);
 
+    // TABELA
     const rows = activities.map(a => [
       a.description,
       a.status === "concluído" ? "CONCLUÍDO" : "NÃO CONCLUÍDO",
@@ -127,8 +139,49 @@ export default function WorkOrderPage() {
       body: rows,
       theme: "grid",
       headStyles: { fillColor: [57, 30, 42] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
       styles: { fontSize: 10 },
     });
+
+    let y = (pdf as any).lastAutoTable.finalY + 10;
+
+    /* ================= IMAGENS ================= */
+
+    for (const act of activities) {
+      if (!act.images || act.images.length === 0) continue;
+
+      pdf.setFontSize(12);
+      pdf.text(`Fotos — ${act.description}`, 14, y);
+      y += 6;
+
+      for (const imgUrl of act.images) {
+        const base64 = await toBase64(imgUrl);
+
+        if (y > 250) {
+          pdf.addPage();
+          y = 20;
+        }
+
+        pdf.addImage(base64, "JPEG", 14, y, 60, 45);
+        y += 50;
+      }
+    }
+
+    /* ================= ASSINATURA ================= */
+
+    if (workOrder.signature_url) {
+      if (y > 230) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.setFontSize(12);
+      pdf.text("Assinatura do responsável:", 14, y);
+      y += 5;
+
+      const signBase64 = await toBase64(workOrder.signature_url);
+      pdf.addImage(signBase64, "PNG", 14, y, 70, 35);
+    }
 
     pdf.save(`workorder_${workOrder.title}.pdf`);
   }
@@ -184,6 +237,15 @@ export default function WorkOrderPage() {
                   onChange={(e) => updateNote(act.id, e.target.value)}
                   className="w-full border rounded-lg p-3 text-sm"
                 />
+
+                {/* MOSTRAR IMAGENS NO DESKTOP */}
+                {act.images && act.images.length > 0 && (
+                  <div className="flex gap-2 flex-wrap">
+                    {act.images.map((img, i) => (
+                      <img key={i} src={img} className="w-28 h-28 object-cover rounded-lg border" />
+                    ))}
+                  </div>
+                )}
 
               </CardContent>
             </Card>
