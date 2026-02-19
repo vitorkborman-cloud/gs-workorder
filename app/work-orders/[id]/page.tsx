@@ -92,23 +92,25 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= CONVERTER URL → BASE64 ================= */
+  /* ================= CONVERTER URL PARA BASE64 ================= */
 
-  async function toBase64(url: string): Promise<string> {
+  async function toBase64(url: string) {
     const res = await fetch(url);
     const blob = await res.blob();
 
-    return new Promise((resolve) => {
+    return new Promise<string>((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
       reader.readAsDataURL(blob);
     });
   }
 
-  /* ================= PDF COMPLETO ================= */
+  /* ================= PDF PROFISSIONAL ================= */
 
   async function gerarPDF() {
-    alert("Selecione o local para salvar o relatório");
+
+    console.log("PDF CLICK");
+    alert("Selecione o diretório");
 
     if (!workOrder) return;
 
@@ -118,7 +120,6 @@ export default function WorkOrderPage() {
     const logoBase64 = await toBase64("/logo.png");
     pdf.addImage(logoBase64, "PNG", 14, 10, 40, 18);
 
-    // CABEÇALHO
     pdf.setFontSize(18);
     pdf.text("RELATÓRIO DE WORK ORDER", 105, 20, { align: "center" });
 
@@ -126,7 +127,6 @@ export default function WorkOrderPage() {
     pdf.text(`Work Order: ${workOrder.title}`, 14, 40);
     pdf.text(`Data: ${new Date().toLocaleDateString()}`, 14, 46);
 
-    // TABELA
     const rows = activities.map(a => [
       a.description,
       a.status === "concluído" ? "CONCLUÍDO" : "NÃO CONCLUÍDO",
@@ -155,6 +155,7 @@ export default function WorkOrderPage() {
       y += 6;
 
       for (const imgUrl of act.images) {
+
         const base64 = await toBase64(imgUrl);
 
         if (y > 250) {
@@ -170,6 +171,7 @@ export default function WorkOrderPage() {
     /* ================= ASSINATURA ================= */
 
     if (workOrder.signature_url) {
+
       if (y > 230) {
         pdf.addPage();
         y = 20;
@@ -238,11 +240,15 @@ export default function WorkOrderPage() {
                   className="w-full border rounded-lg p-3 text-sm"
                 />
 
-                {/* MOSTRAR IMAGENS NO DESKTOP */}
+                {/* IMAGENS NO DESKTOP */}
                 {act.images && act.images.length > 0 && (
                   <div className="flex gap-2 flex-wrap">
                     {act.images.map((img, i) => (
-                      <img key={i} src={img} className="w-28 h-28 object-cover rounded-lg border" />
+                      <img
+                        key={i}
+                        src={img}
+                        className="w-28 h-28 object-cover rounded-lg border"
+                      />
                     ))}
                   </div>
                 )}
