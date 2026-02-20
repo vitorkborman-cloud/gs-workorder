@@ -17,7 +17,6 @@ type Activity = {
   status: string | null;
   note: string | null;
   images: string[] | null;
-  images_original?: string[] | null;
 };
 
 export default function WorkOrderPage() {
@@ -97,7 +96,7 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF PROFISSIONAL DEFINITIVO ================= */
+  /* ================= PDF PROFISSIONAL COM PROPORÇÃO REAL ================= */
 
   async function gerarPDF() {
     if (!workOrder) return;
@@ -145,12 +144,10 @@ export default function WorkOrderPage() {
       styles: { fontSize: 10 },
     });
 
-    /* FOTOS EM ALTA RESOLUÇÃO */
+    /* ================= FOTOS COM PROPORÇÃO REAL ================= */
+
     for (const act of activities) {
-
-      const imageList = act.images_original ?? act.images ?? [];
-
-      if (imageList.length === 0) continue;
+      if (!act.images || act.images.length === 0) continue;
 
       pdf.addPage();
       pdf.setFontSize(14);
@@ -158,17 +155,30 @@ export default function WorkOrderPage() {
 
       let y = 30;
 
-      for (const imgUrl of imageList) {
+      for (const imgUrl of act.images) {
         try {
           const imgBase64 = await urlToBase64(imgUrl);
 
-          pdf.addImage(imgBase64, "JPEG", 14, y, 120, 80);
-          y += 90;
+          const img = new Image();
+          img.src = imgBase64;
 
-          if (y > 250) {
+          await new Promise(res => (img.onload = res));
+
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const maxWidth = pageWidth - 28; // margem lateral
+          const ratio = img.height / img.width;
+
+          const width = maxWidth;
+          const height = width * ratio;
+
+          if (y + height > 280) {
             pdf.addPage();
             y = 20;
           }
+
+          pdf.addImage(imgBase64, "JPEG", 14, y, width, height);
+          y += height + 10;
+
         } catch {}
       }
     }
@@ -181,7 +191,17 @@ export default function WorkOrderPage() {
         pdf.text("Assinatura do Responsável", 14, 20);
 
         const signBase64 = await urlToBase64(workOrder.signature_url);
-        pdf.addImage(signBase64, "PNG", 14, 30, 80, 40);
+
+        const img = new Image();
+        img.src = signBase64;
+
+        await new Promise(res => (img.onload = res));
+
+        const ratio = img.height / img.width;
+        const width = 80;
+        const height = width * ratio;
+
+        pdf.addImage(signBase64, "PNG", 14, 30, width, height);
       } catch {}
     }
 
