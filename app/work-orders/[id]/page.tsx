@@ -178,48 +178,52 @@ export default function WorkOrderPage() {
     pdf.text(`Work Order: ${workOrder.title}`, pageWidth / 2, 140, { align: "center" });
 
     pdf.setFont("helvetica", "normal");
-    pdf.text(`Data de emissão: ${new Date().toLocaleDateString()}`, pageWidth / 2, 155, { align: "center" });
+    pdf.text(
+      `Data de emissão: ${new Date().toLocaleDateString()}`,
+      pageWidth / 2,
+      155,
+      { align: "center" }
+    );
 
-    /* ================= ATIVIDADES ================= */
-
-    pdf.addPage();
-    addHeaderBase();
-
-    let currentY = 40;
+    /* ================= ATIVIDADES (1 POR PÁGINA) ================= */
 
     for (const act of activities) {
+      pdf.addPage();
+      addHeaderBase();
+
+      let currentY = 40;
 
       const statusTexto =
         act.status === "concluído" ? "Concluída" : "Não Concluída";
 
-      // 🔥 CORREÇÃO AQUI: quebra automática
-      if (currentY > pageHeight - 40) {
-        pdf.addPage();
-        addHeaderBase();
-        currentY = 40;
-      }
-
       pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(13);
+      pdf.text("Atividade", margin, currentY);
+      currentY += 10;
+
       pdf.setFontSize(12);
-      pdf.text(`${act.description} - ${statusTexto}`, margin, currentY);
-      currentY += 8;
+      pdf.text(act.description, margin, currentY);
+      currentY += 10;
 
       pdf.setFont("helvetica", "normal");
+      pdf.text(`Status: ${statusTexto}`, margin, currentY);
+      currentY += 8;
+
       pdf.text(
-        `Comentário: ${act.note?.trim() ? act.note : "Sem observações"}`,
+        `Observações: ${act.note?.trim() ? act.note : "Sem observações"}`,
         margin,
         currentY,
         { maxWidth: pageWidth - margin * 2 }
       );
 
-      currentY += 12;
+      currentY += 15;
 
       if (act.images?.length) {
-
         const imgBase64 = await urlToBase64(act.images[0]);
+
         const img = new Image();
         img.src = imgBase64;
-        await new Promise(resolve => img.onload = resolve);
+        await new Promise(resolve => { img.onload = resolve; });
 
         const maxWidth = pageWidth - margin * 2;
         const maxHeight = pageHeight - currentY - 30;
@@ -238,21 +242,94 @@ export default function WorkOrderPage() {
           width = height * ratio;
         }
 
-        if (currentY + height > pageHeight - 30) {
-          pdf.addPage();
-          addHeaderBase();
-          currentY = 40;
-        }
-
         const x = (pageWidth - width) / 2;
         pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
-        currentY += height + 10;
       }
-
-      currentY += 10;
     }
 
-    /* ================= RODAPÉ ================= */
+    /* ================= INFORMAÇÕES ADICIONAIS ================= */
+
+    if (
+      workOrder.additional_info ||
+      (workOrder.additional_images?.length ?? 0) > 0
+    ) {
+      pdf.addPage();
+      addHeaderBase();
+
+      let currentY = 40;
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(13);
+      pdf.text("Informações adicionais", margin, currentY);
+      currentY += 10;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.text(
+        workOrder.additional_info?.trim() ||
+          "Sem observações adicionais.",
+        margin,
+        currentY,
+        { maxWidth: pageWidth - margin * 2 }
+      );
+
+      currentY += 15;
+
+      if (workOrder.additional_images?.length) {
+        const imgBase64 = await urlToBase64(
+          workOrder.additional_images[0]
+        );
+
+        const img = new Image();
+        img.src = imgBase64;
+        await new Promise(resolve => { img.onload = resolve; });
+
+        const ratio = img.width / img.height;
+        const width = pageWidth - margin * 2;
+        const height = width / ratio;
+
+        pdf.addImage(imgBase64, "JPEG", margin, currentY, width, height);
+      }
+    }
+
+    /* ================= ASSINATURA ================= */
+
+    if (workOrder.signature_url) {
+      pdf.addPage();
+      addHeaderBase();
+
+      let signY = 80;
+
+      pdf.setFontSize(12);
+      pdf.text("Assinatura do Responsável", pageWidth / 2, signY - 10, {
+        align: "center",
+      });
+
+      const signBase64 = await urlToBase64(workOrder.signature_url);
+      const img = new Image();
+      img.src = signBase64;
+      await new Promise(resolve => { img.onload = resolve; });
+
+      const ratio = img.width / img.height;
+      const width = 80;
+      const height = width / ratio;
+
+      pdf.addImage(signBase64, "PNG", pageWidth / 2 - width / 2, signY, width, height);
+
+      const hoje = new Date();
+      const meses = [
+        "janeiro","fevereiro","março","abril","maio","junho",
+        "julho","agosto","setembro","outubro","novembro","dezembro"
+      ];
+
+      const dataExtenso = `São Paulo, ${hoje.getDate()} de ${
+        meses[hoje.getMonth()]
+      } de ${hoje.getFullYear()}.`;
+
+      pdf.text(dataExtenso, pageWidth / 2, signY + height + 20, {
+        align: "center",
+      });
+    }
 
     const totalPages = pdf.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
