@@ -98,8 +98,6 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF PROFISSIONAL COM CAPA ================= */
-
   async function gerarPDF() {
     if (!workOrder) return;
 
@@ -167,7 +165,6 @@ export default function WorkOrderPage() {
     });
 
     pdf.setFontSize(12);
-    pdf.setFont("helvetica", "normal");
     pdf.text("CNPJ: 29.088.151/0001-25", pageWidth / 2, 75, {
       align: "center",
     });
@@ -231,16 +228,46 @@ export default function WorkOrderPage() {
 
       currentY += 12;
 
+      /* ===== IMAGEM PROPORCIONAL ===== */
+
       if (act.images?.length) {
         const imgBase64 = await urlToBase64(act.images[0]);
 
+        const img = new Image();
+        img.src = imgBase64;
+
+        await new Promise(resolve => {
+          img.onload = resolve;
+        });
+
         const maxWidth = pageWidth - margin * 2;
-        const imgWidth = maxWidth;
-        const imgHeight = 60;
+        const maxHeight = pageHeight - currentY - 30;
 
-        pdf.addImage(imgBase64, "JPEG", margin, currentY, imgWidth, imgHeight);
+        let width = img.width;
+        let height = img.height;
+        const ratio = width / height;
 
-        currentY += imgHeight + 10;
+        if (width > maxWidth) {
+          width = maxWidth;
+          height = width / ratio;
+        }
+
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * ratio;
+        }
+
+        if (currentY + height > pageHeight - 30) {
+          pdf.addPage();
+          addHeaderBase();
+          currentY = 40;
+        }
+
+        const x = (pageWidth - width) / 2;
+
+        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
+
+        currentY += height + 10;
       }
     }
 
@@ -258,7 +285,19 @@ export default function WorkOrderPage() {
       });
 
       const signBase64 = await urlToBase64(workOrder.signature_url);
-      pdf.addImage(signBase64, "PNG", pageWidth / 2 - 40, signY, 80, 40);
+
+      const img = new Image();
+      img.src = signBase64;
+
+      await new Promise(resolve => {
+        img.onload = resolve;
+      });
+
+      const ratio = img.width / img.height;
+      const width = 80;
+      const height = width / ratio;
+
+      pdf.addImage(signBase64, "PNG", pageWidth / 2 - width / 2, signY, width, height);
 
       const hoje = new Date();
       const meses = [
@@ -270,12 +309,12 @@ export default function WorkOrderPage() {
         meses[hoje.getMonth()]
       } de ${hoje.getFullYear()}.`;
 
-      pdf.text(dataExtenso, pageWidth / 2, signY + 70, {
+      pdf.text(dataExtenso, pageWidth / 2, signY + height + 20, {
         align: "center",
       });
     }
 
-    /* ================= RODAPÉ EM TODAS ================= */
+    /* ================= RODAPÉ ================= */
 
     const totalPages = pdf.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
