@@ -7,7 +7,6 @@ import AdminShell from "../../../components/layout/AdminShell";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent } from "../../../components/ui/card";
 import { isMobileDevice } from "../../../lib/isMobile";
-
 import jsPDF from "jspdf";
 
 type Activity = {
@@ -65,13 +64,17 @@ export default function WorkOrderPage() {
 
   async function updateStatus(id: string, status: string) {
     if (finalized) return;
-    setActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+    setActivities(prev =>
+      prev.map(a => (a.id === id ? { ...a, status } : a))
+    );
     await supabase.from("activities").update({ status }).eq("id", id);
   }
 
   async function updateNote(id: string, note: string) {
     if (finalized) return;
-    setActivities(prev => prev.map(a => a.id === id ? { ...a, note } : a));
+    setActivities(prev =>
+      prev.map(a => (a.id === id ? { ...a, note } : a))
+    );
     await supabase.from("activities").update({ note }).eq("id", id);
   }
 
@@ -95,7 +98,7 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF RELATÓRIO TÉCNICO ================= */
+  /* ================= PDF RELATÓRIO OFICIAL ================= */
 
   async function gerarPDF() {
     if (!workOrder) return;
@@ -105,7 +108,6 @@ export default function WorkOrderPage() {
     async function urlToBase64(url: string) {
       const response = await fetch(url);
       const blob = await response.blob();
-
       return await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -117,7 +119,15 @@ export default function WorkOrderPage() {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 20;
 
-    /* ================= LOGO PROPORCIONAL ================= */
+    const roxo: [number, number, number] = [57, 30, 42];
+    const verde: [number, number, number] = [128, 176, 45];
+
+    /* Cabeçalho */
+    pdf.setFillColor(...roxo);
+    pdf.rect(0, 0, pageWidth, 25, "F");
+
+    pdf.setFillColor(...verde);
+    pdf.rect(0, 25, pageWidth, 3, "F");
 
     try {
       const logoBase64 = await urlToBase64("/logo.png");
@@ -125,61 +135,81 @@ export default function WorkOrderPage() {
       img.src = logoBase64;
       await new Promise(res => (img.onload = res));
 
-      const maxWidth = 35;
+      const maxWidth = 28;
       const ratio = img.width / img.height;
       const width = maxWidth;
       const height = width / ratio;
 
-      pdf.addImage(logoBase64, "PNG", margin, 15, width, height);
+      pdf.addImage(logoBase64, "PNG", margin, 5, width, height);
     } catch {}
 
-    /* ================= TÍTULO ================= */
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(14);
+    pdf.text(
+      "RELATÓRIO TÉCNICO DE WORK ORDER",
+      pageWidth / 2,
+      15,
+      { align: "center" }
+    );
 
-    pdf.setFontSize(16);
-    pdf.text("RELATÓRIO TÉCNICO DE WORK ORDER", pageWidth / 2, 25, { align: "center" });
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+
+    pdf.text("GreenSoil Group Ambiental LTDA", margin, 38);
+    pdf.text("CNPJ: 29.088.151/0001-25", margin, 44);
+    pdf.text(
+      "Avenida Brigadeiro Faria Lima, 1572, Conjunto 1601 - Jardim Paulistano, São Paulo/SP - 014151-001",
+      margin,
+      50,
+      { maxWidth: pageWidth - margin * 2 }
+    );
+
+    pdf.line(margin, 55, pageWidth - margin, 55);
 
     pdf.setFontSize(11);
-    pdf.text(`Work Order: ${workOrder.title}`, margin, 45);
-    pdf.text(`Data de emissão: ${new Date().toLocaleDateString()}`, margin, 52);
+    pdf.text(`Projeto: ${workOrder.project_name ?? "-"}`, margin, 65);
+    pdf.text(`Work Order: ${workOrder.title}`, margin, 72);
+    pdf.text(
+      `Data de emissão: ${new Date().toLocaleDateString()}`,
+      margin,
+      79
+    );
 
-    let currentY = 65;
+    let currentY = 90;
 
-    /* ================= ATIVIDADES ================= */
+    /* Atividades */
+    for (const act of activities) {
 
-    for (let i = 0; i < activities.length; i++) {
-      const act = activities[i];
+      const statusTexto =
+        act.status === "concluído" ? "Concluída" : "Não Concluída";
 
+      pdf.setFont("helvetica", "bold");
       pdf.setFontSize(12);
-      pdf.text(
-        `Atividade ${i + 1} - ${act.status === "concluído" ? "Concluída" : "Não concluída"}`,
-        margin,
-        currentY
-      );
+      pdf.text(`${act.description} - ${statusTexto}`, margin, currentY);
 
       currentY += 8;
 
+      pdf.setFont("helvetica", "normal");
       pdf.setFontSize(11);
       pdf.text(
-        `Comentários: ${act.note?.trim() ? act.note : "Sem observações"}`,
+        `Comentário: ${act.note?.trim() ? act.note : "Sem observações"}`,
         margin,
         currentY,
         { maxWidth: pageWidth - margin * 2 }
       );
 
-      currentY += 15;
+      currentY += 12;
 
-      /* FOTO */
-      if (act.images && act.images.length > 0) {
-        pdf.addPage();
-        currentY = 20;
-
+      if (act.images?.length) {
         const imgBase64 = await urlToBase64(act.images[0]);
         const img = new Image();
         img.src = imgBase64;
         await new Promise(res => (img.onload = res));
 
         const maxWidth = pageWidth - margin * 2;
-        const maxHeight = pageHeight - 40;
+        const maxHeight = pageHeight - currentY - 40;
 
         let width = img.width;
         let height = img.height;
@@ -197,84 +227,33 @@ export default function WorkOrderPage() {
 
         const x = (pageWidth - width) / 2;
         pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
+
+        currentY += height + 15;
       }
 
-      pdf.addPage();
-      currentY = 20;
-    }
-
-    /* ================= INFORMAÇÕES ADICIONAIS ================= */
-
-    if (workOrder.additional_info || (workOrder.additional_images?.length ?? 0) > 0) {
-      pdf.setFontSize(12);
-      pdf.text("Informações adicionais", margin, currentY);
-      currentY += 8;
-
-      pdf.setFontSize(11);
-      pdf.text(
-        workOrder.additional_info?.trim() || "Sem observações adicionais.",
-        margin,
-        currentY,
-        { maxWidth: pageWidth - margin * 2 }
-      );
-
-      currentY += 15;
-
-      if (workOrder.additional_images?.length > 0) {
+      if (currentY > pageHeight - 40) {
         pdf.addPage();
-        currentY = 20;
-
-        const imgBase64 = await urlToBase64(workOrder.additional_images[0]);
-        const img = new Image();
-        img.src = imgBase64;
-        await new Promise(res => (img.onload = res));
-
-        const maxWidth = pageWidth - margin * 2;
-        const maxHeight = pageHeight - 40;
-
-        let width = img.width;
-        let height = img.height;
-        const ratio = width / height;
-
-        if (width > maxWidth) {
-          width = maxWidth;
-          height = width / ratio;
-        }
-
-        if (height > maxHeight) {
-          height = maxHeight;
-          width = height * ratio;
-        }
-
-        const x = (pageWidth - width) / 2;
-        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
+        currentY = 40;
       }
-
-      pdf.addPage();
-      currentY = 40;
     }
 
-    /* ================= ASSINATURA ================= */
-
+    /* Assinatura */
     if (workOrder.signature_url) {
       const signBase64 = await urlToBase64(workOrder.signature_url);
       const img = new Image();
       img.src = signBase64;
       await new Promise(res => (img.onload = res));
 
-      const maxWidth = 80;
+      const maxWidth = 70;
       const ratio = img.width / img.height;
       const width = maxWidth;
       const height = width / ratio;
-
       const x = (pageWidth - width) / 2;
 
       pdf.addImage(signBase64, "PNG", x, currentY, width, height);
 
       currentY += height + 15;
     }
-
-    /* ================= DATA FORMAL ================= */
 
     const meses = [
       "janeiro","fevereiro","março","abril","maio","junho",
@@ -284,7 +263,27 @@ export default function WorkOrderPage() {
     const hoje = new Date();
     const dataExtenso = `São Paulo, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}.`;
 
-    pdf.text(dataExtenso, pageWidth / 2, currentY + 10, { align: "center" });
+    pdf.text(dataExtenso, pageWidth / 2, currentY + 10, {
+      align: "center"
+    });
+
+    /* Rodapé */
+    const totalPages = pdf.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+
+      pdf.setFillColor(...roxo);
+      pdf.rect(0, pageHeight - 15, pageWidth, 15, "F");
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(9);
+      pdf.text(
+        `Página ${i} de ${totalPages}`,
+        pageWidth - 20,
+        pageHeight - 6,
+        { align: "right" }
+      );
+    }
 
     pdf.save(`workorder_${workOrder.title}.pdf`);
   }
@@ -307,10 +306,7 @@ export default function WorkOrderPage() {
           {activities.map(act => (
             <Card key={act.id} className="border-0 shadow bg-card">
               <CardContent className="p-5 space-y-4">
-
-                <div className="flex justify-between items-center">
-                  <p className="font-semibold">{act.description}</p>
-                </div>
+                <p className="font-semibold">{act.description}</p>
 
                 {!finalized && (
                   <div className="flex gap-3">
@@ -333,7 +329,6 @@ export default function WorkOrderPage() {
                   onChange={(e) => updateNote(act.id, e.target.value)}
                   className="w-full border rounded-lg p-3 text-sm"
                 />
-
               </CardContent>
             </Card>
           ))}
