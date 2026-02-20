@@ -34,10 +34,7 @@ export default function WorkOrderPage() {
   async function load() {
     const { data: wo } = await supabase
       .from("work_orders")
-      .select(`
-        *,
-        projects ( name )
-      `)
+      .select(`*, projects ( name )`)
       .eq("id", workOrderId)
       .single();
 
@@ -101,12 +98,19 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF OFICIAL COMPLETO ================= */
+  /* ================= PDF PROFISSIONAL COM CAPA ================= */
 
   async function gerarPDF() {
     if (!workOrder) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 20;
+
+    const roxo: [number, number, number] = [57, 30, 42];
+    const verde: [number, number, number] = [128, 176, 45];
 
     async function urlToBase64(url: string) {
       const response = await fetch(url);
@@ -118,14 +122,7 @@ export default function WorkOrderPage() {
       });
     }
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 20;
-
-    const roxo: [number, number, number] = [57, 30, 42];
-    const verde: [number, number, number] = [128, 176, 45];
-
-    function addHeader() {
+    function addHeaderBase() {
       pdf.setFillColor(...roxo);
       pdf.rect(0, 0, pageWidth, 25, "F");
 
@@ -143,27 +140,6 @@ export default function WorkOrderPage() {
       );
 
       pdf.setTextColor(0, 0, 0);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-
-      pdf.text("GreenSoil Group Ambiental LTDA", margin, 38);
-      pdf.text("CNPJ: 29.088.151/0001-25", margin, 44);
-      pdf.text(
-        "Avenida Brigadeiro Faria Lima, 1572, Conjunto 1601 - Jardim Paulistano, São Paulo/SP - 014151-001",
-        margin,
-        50,
-        { maxWidth: pageWidth - margin * 2 }
-      );
-
-      pdf.line(margin, 55, pageWidth - margin, 55);
-
-      pdf.text(`Projeto: ${workOrder.projects?.name ?? "-"}`, margin, 65);
-      pdf.text(`Work Order: ${workOrder.title}`, margin, 72);
-      pdf.text(
-        `Data de emissão: ${new Date().toLocaleDateString()}`,
-        margin,
-        79
-      );
     }
 
     function addFooter(pageNumber: number, total: number) {
@@ -180,17 +156,69 @@ export default function WorkOrderPage() {
       );
     }
 
-    addHeader();
-    let currentY = 90;
+    /* ================= CAPA ================= */
+
+    addHeaderBase();
+
+    pdf.setFontSize(18);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("GreenSoil Group Ambiental LTDA", pageWidth / 2, 60, {
+      align: "center",
+    });
+
+    pdf.setFontSize(12);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("CNPJ: 29.088.151/0001-25", pageWidth / 2, 75, {
+      align: "center",
+    });
+
+    pdf.text(
+      "Avenida Brigadeiro Faria Lima, 1572, Conjunto 1601 - Jardim Paulistano, São Paulo/SP - 014151-001",
+      pageWidth / 2,
+      85,
+      { align: "center", maxWidth: 140 }
+    );
+
+    pdf.line(margin, 105, pageWidth - margin, 105);
+
+    pdf.setFontSize(14);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(`Projeto: ${workOrder.projects?.name ?? "-"}`, pageWidth / 2, 125, {
+      align: "center",
+    });
+
+    pdf.text(`Work Order: ${workOrder.title}`, pageWidth / 2, 140, {
+      align: "center",
+    });
+
+    pdf.setFont("helvetica", "normal");
+    pdf.text(
+      `Data de emissão: ${new Date().toLocaleDateString()}`,
+      pageWidth / 2,
+      155,
+      { align: "center" }
+    );
+
+    /* ================= ATIVIDADES ================= */
+
+    pdf.addPage();
+    addHeaderBase();
+
+    let currentY = 40;
 
     for (const act of activities) {
+      if (currentY > pageHeight - 40) {
+        pdf.addPage();
+        addHeaderBase();
+        currentY = 40;
+      }
+
       const statusTexto =
         act.status === "concluído" ? "Concluída" : "Não Concluída";
 
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(12);
       pdf.text(`${act.description} - ${statusTexto}`, margin, currentY);
-
       currentY += 8;
 
       pdf.setFont("helvetica", "normal");
@@ -205,79 +233,50 @@ export default function WorkOrderPage() {
 
       if (act.images?.length) {
         const imgBase64 = await urlToBase64(act.images[0]);
-        const img = new Image();
-        img.src = imgBase64;
-        await new Promise(res => (img.onload = res));
 
         const maxWidth = pageWidth - margin * 2;
-        const maxHeight = pageHeight - currentY - 40;
+        const imgWidth = maxWidth;
+        const imgHeight = 60;
 
-        let width = img.width;
-        let height = img.height;
-        const ratio = width / height;
+        pdf.addImage(imgBase64, "JPEG", margin, currentY, imgWidth, imgHeight);
 
-        if (width > maxWidth) {
-          width = maxWidth;
-          height = width / ratio;
-        }
-
-        if (height > maxHeight) {
-          height = maxHeight;
-          width = height * ratio;
-        }
-
-        const x = (pageWidth - width) / 2;
-        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
-
-        currentY += height + 15;
-      }
-
-      if (currentY > pageHeight - 60) {
-        pdf.addPage();
-        addHeader();
-        currentY = 90;
+        currentY += imgHeight + 10;
       }
     }
 
-    /* ASSINATURA */
+    /* ================= ASSINATURA ================= */
+
     if (workOrder.signature_url) {
       pdf.addPage();
-      addHeader();
-      currentY = 100;
+      addHeaderBase();
 
-      const signBase64 = await urlToBase64(workOrder.signature_url);
-      const img = new Image();
-      img.src = signBase64;
-      await new Promise(res => (img.onload = res));
-
-      const maxWidth = 80;
-      const ratio = img.width / img.height;
-      const width = maxWidth;
-      const height = width / ratio;
-
-      const x = (pageWidth - width) / 2;
+      let signY = 80;
 
       pdf.setFontSize(12);
-      pdf.text("Assinatura do Responsável", pageWidth / 2, currentY - 10, {
+      pdf.text("Assinatura do Responsável", pageWidth / 2, signY - 10, {
         align: "center",
       });
 
-      pdf.addImage(signBase64, "PNG", x, currentY, width, height);
+      const signBase64 = await urlToBase64(workOrder.signature_url);
+      pdf.addImage(signBase64, "PNG", pageWidth / 2 - 40, signY, 80, 40);
 
+      const hoje = new Date();
       const meses = [
         "janeiro","fevereiro","março","abril","maio","junho",
         "julho","agosto","setembro","outubro","novembro","dezembro"
       ];
 
-      const hoje = new Date();
-      const dataExtenso = `São Paulo, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}.`;
+      const dataExtenso = `São Paulo, ${hoje.getDate()} de ${
+        meses[hoje.getMonth()]
+      } de ${hoje.getFullYear()}.`;
 
-      pdf.text(dataExtenso, pageWidth / 2, currentY + height + 20, {
+      pdf.text(dataExtenso, pageWidth / 2, signY + 70, {
         align: "center",
       });
     }
 
-    /* Rodapé final */
+    /* ================= RODAPÉ EM TODAS ================= */
+
     const totalPages = pdf.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       pdf.setPage(i);
@@ -308,13 +307,17 @@ export default function WorkOrderPage() {
 
                 {!finalized && (
                   <div className="flex gap-3">
-                    <Button className="bg-green-600 text-white"
-                      onClick={() => updateStatus(act.id, "concluído")}>
+                    <Button
+                      className="bg-green-600 text-white"
+                      onClick={() => updateStatus(act.id, "concluído")}
+                    >
                       Concluído
                     </Button>
 
-                    <Button className="bg-red-600 text-white"
-                      onClick={() => updateStatus(act.id, "não concluído")}>
+                    <Button
+                      className="bg-red-600 text-white"
+                      onClick={() => updateStatus(act.id, "não concluído")}
+                    >
                       Não concluído
                     </Button>
                   </div>
