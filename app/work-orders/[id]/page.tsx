@@ -127,12 +127,7 @@ export default function WorkOrderPage() {
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text(
-        "RELATÓRIO TÉCNICO DE WORK ORDER",
-        pageWidth / 2,
-        15,
-        { align: "center" }
-      );
+      pdf.text("RELATÓRIO TÉCNICO DE WORK ORDER", pageWidth / 2, 15, { align: "center" });
 
       pdf.setTextColor(0, 0, 0);
     }
@@ -143,12 +138,9 @@ export default function WorkOrderPage() {
 
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(9);
-      pdf.text(
-        `Página ${pageNumber} de ${total}`,
-        pageWidth - margin,
-        pageHeight - 6,
-        { align: "right" }
-      );
+      pdf.text(`Página ${pageNumber} de ${total}`, pageWidth - margin, pageHeight - 6, {
+        align: "right",
+      });
     }
 
     /* ================= CAPA ================= */
@@ -178,12 +170,9 @@ export default function WorkOrderPage() {
     pdf.text(`Work Order: ${workOrder.title}`, pageWidth / 2, 140, { align: "center" });
 
     pdf.setFont("helvetica", "normal");
-    pdf.text(
-      `Data de emissão: ${new Date().toLocaleDateString()}`,
-      pageWidth / 2,
-      155,
-      { align: "center" }
-    );
+    pdf.text(`Data de emissão: ${new Date().toLocaleDateString()}`, pageWidth / 2, 155, {
+      align: "center",
+    });
 
     /* ================= ATIVIDADES (1 POR PÁGINA) ================= */
 
@@ -223,7 +212,7 @@ export default function WorkOrderPage() {
 
         const img = new Image();
         img.src = imgBase64;
-        await new Promise(resolve => { img.onload = resolve; });
+        await new Promise(resolve => (img.onload = resolve));
 
         const maxWidth = pageWidth - margin * 2;
         const maxHeight = pageHeight - currentY - 30;
@@ -249,10 +238,7 @@ export default function WorkOrderPage() {
 
     /* ================= INFORMAÇÕES ADICIONAIS ================= */
 
-    if (
-      workOrder.additional_info ||
-      (workOrder.additional_images?.length ?? 0) > 0
-    ) {
+    if (workOrder.additional_info || (workOrder.additional_images?.length ?? 0) > 0) {
       pdf.addPage();
       addHeaderBase();
 
@@ -266,8 +252,7 @@ export default function WorkOrderPage() {
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(11);
       pdf.text(
-        workOrder.additional_info?.trim() ||
-          "Sem observações adicionais.",
+        workOrder.additional_info?.trim() || "Sem observações adicionais.",
         margin,
         currentY,
         { maxWidth: pageWidth - margin * 2 }
@@ -276,19 +261,37 @@ export default function WorkOrderPage() {
       currentY += 15;
 
       if (workOrder.additional_images?.length) {
-        const imgBase64 = await urlToBase64(
-          workOrder.additional_images[0]
-        );
+        const imgBase64 = await urlToBase64(workOrder.additional_images[0]);
 
         const img = new Image();
         img.src = imgBase64;
-        await new Promise(resolve => { img.onload = resolve; });
+        await new Promise(resolve => (img.onload = resolve));
 
-        const ratio = img.width / img.height;
-        const width = pageWidth - margin * 2;
-        const height = width / ratio;
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - currentY - 30;
 
-        pdf.addImage(imgBase64, "JPEG", margin, currentY, width, height);
+        let width = img.width;
+        let height = img.height;
+        const ratio = width / height;
+
+        if (width > maxWidth) {
+          width = maxWidth;
+          height = width / ratio;
+        }
+
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * ratio;
+        }
+
+        if (currentY + height > pageHeight - 30) {
+          pdf.addPage();
+          addHeaderBase();
+          currentY = 40;
+        }
+
+        const x = (pageWidth - width) / 2;
+        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
       }
     }
 
@@ -308,7 +311,7 @@ export default function WorkOrderPage() {
       const signBase64 = await urlToBase64(workOrder.signature_url);
       const img = new Image();
       img.src = signBase64;
-      await new Promise(resolve => { img.onload = resolve; });
+      await new Promise(resolve => (img.onload = resolve));
 
       const ratio = img.width / img.height;
       const width = 80;
@@ -326,9 +329,7 @@ export default function WorkOrderPage() {
         meses[hoje.getMonth()]
       } de ${hoje.getFullYear()}.`;
 
-      pdf.text(dataExtenso, pageWidth / 2, signY + height + 20, {
-        align: "center",
-      });
+      pdf.text(dataExtenso, pageWidth / 2, signY + height + 20, { align: "center" });
     }
 
     const totalPages = pdf.getNumberOfPages();
