@@ -34,7 +34,10 @@ export default function WorkOrderPage() {
   async function load() {
     const { data: wo } = await supabase
       .from("work_orders")
-      .select("*")
+      .select(`
+        *,
+        projects ( name )
+      `)
       .eq("id", workOrderId)
       .single();
 
@@ -129,18 +132,34 @@ export default function WorkOrderPage() {
     pdf.setFillColor(...verde);
     pdf.rect(0, 25, pageWidth, 3, "F");
 
+    /* Logo branco */
     try {
       const logoBase64 = await urlToBase64("/logo.png");
+
       const img = new Image();
       img.src = logoBase64;
       await new Promise(res => (img.onload = res));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+
+      // Aplica filtro branco
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const whiteLogo = canvas.toDataURL("image/png");
 
       const maxWidth = 28;
       const ratio = img.width / img.height;
       const width = maxWidth;
       const height = width / ratio;
 
-      pdf.addImage(logoBase64, "PNG", margin, 5, width, height);
+      pdf.addImage(whiteLogo, "PNG", margin, 5, width, height);
     } catch {}
 
     pdf.setTextColor(255, 255, 255);
@@ -169,7 +188,11 @@ export default function WorkOrderPage() {
     pdf.line(margin, 55, pageWidth - margin, 55);
 
     pdf.setFontSize(11);
-    pdf.text(`Projeto: ${workOrder.project_name ?? "-"}`, margin, 65);
+    pdf.text(
+      `Projeto: ${workOrder.projects?.name ?? "-"}`,
+      margin,
+      65
+    );
     pdf.text(`Work Order: ${workOrder.title}`, margin, 72);
     pdf.text(
       `Data de emissão: ${new Date().toLocaleDateString()}`,
@@ -179,9 +202,7 @@ export default function WorkOrderPage() {
 
     let currentY = 90;
 
-    /* Atividades */
     for (const act of activities) {
-
       const statusTexto =
         act.status === "concluído" ? "Concluída" : "Não Concluída";
 
@@ -237,61 +258,12 @@ export default function WorkOrderPage() {
       }
     }
 
-    /* Assinatura */
-    if (workOrder.signature_url) {
-      const signBase64 = await urlToBase64(workOrder.signature_url);
-      const img = new Image();
-      img.src = signBase64;
-      await new Promise(res => (img.onload = res));
-
-      const maxWidth = 70;
-      const ratio = img.width / img.height;
-      const width = maxWidth;
-      const height = width / ratio;
-      const x = (pageWidth - width) / 2;
-
-      pdf.addImage(signBase64, "PNG", x, currentY, width, height);
-
-      currentY += height + 15;
-    }
-
-    const meses = [
-      "janeiro","fevereiro","março","abril","maio","junho",
-      "julho","agosto","setembro","outubro","novembro","dezembro"
-    ];
-
-    const hoje = new Date();
-    const dataExtenso = `São Paulo, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}.`;
-
-    pdf.text(dataExtenso, pageWidth / 2, currentY + 10, {
-      align: "center"
-    });
-
-    /* Rodapé */
-    const totalPages = pdf.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      pdf.setPage(i);
-
-      pdf.setFillColor(...roxo);
-      pdf.rect(0, pageHeight - 15, pageWidth, 15, "F");
-
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(9);
-      pdf.text(
-        `Página ${i} de ${totalPages}`,
-        pageWidth - 20,
-        pageHeight - 6,
-        { align: "right" }
-      );
-    }
-
     pdf.save(`workorder_${workOrder.title}.pdf`);
   }
 
   return (
     <AdminShell>
       <div className="space-y-6">
-
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Atividades</h1>
 
@@ -345,7 +317,6 @@ export default function WorkOrderPage() {
             Finalizar Work Order
           </Button>
         )}
-
       </div>
     </AdminShell>
   );
