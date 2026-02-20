@@ -48,9 +48,9 @@ export default function SoloDetailPage() {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 20;
 
-    /* =====================================================
-       PÁGINA 1 – RELATÓRIO EXECUTIVO
-    ====================================================== */
+    /* ==============================
+       PÁGINA 1 – RELATÓRIO
+    ============================== */
 
     pdf.setFillColor(57, 30, 42);
     pdf.rect(0, 0, pageWidth, 25, "F");
@@ -76,9 +76,9 @@ export default function SoloDetailPage() {
     pdf.text(`Data: ${data.data}`, margin, 68);
     pdf.text(`Profundidade total: ${data.profundidade_total} m`, margin, 76);
 
-    /* =====================================================
+    /* ==============================
        PÁGINA 2 – PERFIL ESTRATIGRÁFICO
-    ====================================================== */
+    ============================== */
 
     pdf.addPage();
 
@@ -99,7 +99,7 @@ export default function SoloDetailPage() {
     const profundidadeTotal = parseFloat(data.profundidade_total || "1");
     const escala = alturaMax / profundidadeTotal;
 
-    /* ================= ESCALA ESQUERDA ================= */
+    /* ===== ESCALA ===== */
 
     pdf.setFontSize(8);
     for (let i = 0; i <= profundidadeTotal; i += 0.5) {
@@ -108,7 +108,7 @@ export default function SoloDetailPage() {
       pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
     }
 
-    /* ================= MAPA DE CORES RIGOROSO ================= */
+    /* ===== MAPA DE CORES RIGOROSO ===== */
 
     const mapaCores: Record<string, [number, number, number]> = {};
     let contadorCor = 0;
@@ -131,7 +131,7 @@ export default function SoloDetailPage() {
       return mapaCores[nome];
     }
 
-    /* ================= CAMADAS ================= */
+    /* ===== CAMADAS (SEM TEXTURA) ===== */
 
     let profundidadeAnterior = 0;
 
@@ -147,42 +147,73 @@ export default function SoloDetailPage() {
       pdf.setFillColor(r, g, b);
       pdf.rect(esquerdaPerfil, y, larguraPerfil, alturaCamada, "F");
 
-      pdf.setDrawColor(0, 0, 0);
-      for (let i = 0; i < alturaCamada; i += 4) {
-        pdf.line(esquerdaPerfil, y + i, direitaPerfil, y + i);
-      }
-
       profundidadeAnterior = profAtual;
     });
 
     pdf.setDrawColor(0);
     pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
 
-    /* ================= TUBO ================= */
+    /* ===== TUBO CENTRAL ===== */
 
     const larguraTubo = 12;
     const esquerdaTubo = centro - larguraTubo / 2;
 
-    pdf.setFillColor(180, 220, 255);
-    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(0);
+    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "FD");
+
+    /* ===== SEÇÃO FILTRANTE ===== */
 
     const alturaFiltro = alturaMax * 0.3;
-    pdf.setFillColor(120, 180, 220);
-    pdf.rect(
-      esquerdaTubo,
-      topo + alturaMax - alturaFiltro,
-      larguraTubo,
-      alturaFiltro,
-      "F"
-    );
+    const topoFiltro = topo + alturaMax - alturaFiltro;
 
-    /* ================= LEGENDA DIREITA ================= */
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(esquerdaTubo, topoFiltro, larguraTubo, alturaFiltro, "F");
+
+    pdf.setDrawColor(0);
+    for (let i = 2; i < larguraTubo; i += 2) {
+      pdf.line(
+        esquerdaTubo + i,
+        topoFiltro,
+        esquerdaTubo + i,
+        topoFiltro + alturaFiltro
+      );
+    }
+
+    pdf.rect(esquerdaTubo, topoFiltro, larguraTubo, alturaFiltro);
+
+    /* ===== NÍVEL D’ÁGUA ===== */
+
+    if (data.nivel_agua) {
+      const nivel = parseFloat(data.nivel_agua);
+
+      if (!isNaN(nivel) && nivel <= profundidadeTotal) {
+        const yNivel = topo + nivel * escala;
+
+        pdf.setDrawColor(0, 0, 255);
+        pdf.setLineWidth(1.2);
+
+        pdf.line(
+          esquerdaPerfil - 10,
+          yNivel,
+          direitaPerfil + 10,
+          yNivel
+        );
+
+        pdf.setFontSize(9);
+        pdf.setTextColor(0, 0, 255);
+        pdf.text("N.A.", direitaPerfil + 12, yNivel + 2);
+
+        pdf.setTextColor(0);
+      }
+    }
+
+    /* ===== LEGENDA ===== */
 
     let yLegenda = topo;
     profundidadeAnterior = 0;
 
     pdf.setFontSize(9);
-    pdf.setTextColor(0);
 
     layers.forEach((layer) => {
       const nomeChave = layer.tipo.trim();
@@ -193,6 +224,7 @@ export default function SoloDetailPage() {
       pdf.setFillColor(r, g, b);
       pdf.rect(direitaPerfil + 15, yLegenda, 8, 8, "F");
 
+      pdf.setTextColor(0);
       pdf.text(
         `${profundidadeAnterior} – ${profAtual} m : ${layer.tipo}`,
         direitaPerfil + 28,
