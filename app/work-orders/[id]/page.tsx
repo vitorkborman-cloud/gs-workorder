@@ -121,10 +121,10 @@ export default function WorkOrderPage() {
     }
 
     function addHeaderBase() {
-      pdf.setFillColor(...roxo);
+      pdf.setFillColor(57, 30, 42);
       pdf.rect(0, 0, pageWidth, 25, "F");
 
-      pdf.setFillColor(...verde);
+      pdf.setFillColor(128, 176, 45);
       pdf.rect(0, 25, pageWidth, 3, "F");
 
       pdf.setTextColor(255, 255, 255);
@@ -141,7 +141,7 @@ export default function WorkOrderPage() {
     }
 
     function addFooter(pageNumber: number, total: number) {
-      pdf.setFillColor(...roxo);
+      pdf.setFillColor(57, 30, 42);
       pdf.rect(0, pageHeight - 15, pageWidth, 15, "F");
 
       pdf.setTextColor(255, 255, 255);
@@ -204,12 +204,6 @@ export default function WorkOrderPage() {
     let currentY = 40;
 
     for (const act of activities) {
-      if (currentY > pageHeight - 40) {
-        pdf.addPage();
-        addHeaderBase();
-        currentY = 40;
-      }
-
       const statusTexto =
         act.status === "concluído" ? "Concluída" : "Não Concluída";
 
@@ -228,17 +222,11 @@ export default function WorkOrderPage() {
 
       currentY += 12;
 
-      /* ===== IMAGEM PROPORCIONAL ===== */
-
       if (act.images?.length) {
         const imgBase64 = await urlToBase64(act.images[0]);
-
         const img = new Image();
         img.src = imgBase64;
-
-        await new Promise(resolve => {
-          img.onload = resolve;
-        });
+        await new Promise(resolve => { img.onload = resolve; });
 
         const maxWidth = pageWidth - margin * 2;
         const maxHeight = pageHeight - currentY - 30;
@@ -257,17 +245,69 @@ export default function WorkOrderPage() {
           width = height * ratio;
         }
 
-        if (currentY + height > pageHeight - 30) {
-          pdf.addPage();
-          addHeaderBase();
-          currentY = 40;
+        const x = (pageWidth - width) / 2;
+        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
+        currentY += height + 10;
+      }
+
+      currentY += 10;
+    }
+
+    /* ================= INFORMAÇÕES ADICIONAIS ================= */
+
+    if (
+      workOrder.additional_info ||
+      (workOrder.additional_images?.length ?? 0) > 0
+    ) {
+      pdf.addPage();
+      addHeaderBase();
+      currentY = 40;
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(13);
+      pdf.text("Informações adicionais", margin, currentY);
+      currentY += 10;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.text(
+        workOrder.additional_info?.trim() ||
+          "Sem observações adicionais.",
+        margin,
+        currentY,
+        { maxWidth: pageWidth - margin * 2 }
+      );
+
+      currentY += 15;
+
+      if (workOrder.additional_images?.length) {
+        const imgBase64 = await urlToBase64(
+          workOrder.additional_images[0]
+        );
+
+        const img = new Image();
+        img.src = imgBase64;
+        await new Promise(resolve => { img.onload = resolve; });
+
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - currentY - 30;
+
+        let width = img.width;
+        let height = img.height;
+        const ratio = width / height;
+
+        if (width > maxWidth) {
+          width = maxWidth;
+          height = width / ratio;
+        }
+
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * ratio;
         }
 
         const x = (pageWidth - width) / 2;
-
         pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
-
-        currentY += height + 10;
       }
     }
 
@@ -285,13 +325,9 @@ export default function WorkOrderPage() {
       });
 
       const signBase64 = await urlToBase64(workOrder.signature_url);
-
       const img = new Image();
       img.src = signBase64;
-
-      await new Promise(resolve => {
-        img.onload = resolve;
-      });
+      await new Promise(resolve => { img.onload = resolve; });
 
       const ratio = img.width / img.height;
       const width = 80;
@@ -313,8 +349,6 @@ export default function WorkOrderPage() {
         align: "center",
       });
     }
-
-    /* ================= RODAPÉ ================= */
 
     const totalPages = pdf.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
