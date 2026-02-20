@@ -9,7 +9,6 @@ import { Card, CardContent } from "../../../components/ui/card";
 import { isMobileDevice } from "../../../lib/isMobile";
 
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 type Activity = {
   id: string;
@@ -96,7 +95,7 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF DEFINITIVO ================= */
+  /* ================= PDF RELATÓRIO TÉCNICO ================= */
 
   async function gerarPDF() {
     if (!workOrder) return;
@@ -114,110 +113,180 @@ export default function WorkOrderPage() {
       });
     }
 
-    /* LOGO */
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 20;
+
+    /* ================= LOGO PROPORCIONAL ================= */
+
     try {
       const logoBase64 = await urlToBase64("/logo.png");
-      pdf.addImage(logoBase64, "PNG", 14, 10, 35, 15);
+      const img = new Image();
+      img.src = logoBase64;
+      await new Promise(res => (img.onload = res));
+
+      const maxWidth = 35;
+      const ratio = img.width / img.height;
+      const width = maxWidth;
+      const height = width / ratio;
+
+      pdf.addImage(logoBase64, "PNG", margin, 15, width, height);
     } catch {}
 
-    /* TÍTULO */
-    pdf.setFontSize(18);
-    pdf.text("RELATÓRIO DE WORK ORDER", 105, 25, { align: "center" });
+    /* ================= TÍTULO ================= */
+
+    pdf.setFontSize(16);
+    pdf.text("RELATÓRIO TÉCNICO DE WORK ORDER", pageWidth / 2, 25, { align: "center" });
 
     pdf.setFontSize(11);
-    pdf.text(`Work Order: ${workOrder.title}`, 14, 40);
-    pdf.text(`Data: ${new Date().toLocaleDateString()}`, 14, 46);
+    pdf.text(`Work Order: ${workOrder.title}`, margin, 45);
+    pdf.text(`Data de emissão: ${new Date().toLocaleDateString()}`, margin, 52);
 
-    /* TABELA */
-    const rows = activities.map(a => [
-      a.description,
-      a.status === "concluído" ? "CONCLUÍDO" : "NÃO CONCLUÍDO",
-      a.note || "-"
-    ]);
+    let currentY = 65;
 
-    autoTable(pdf, {
-      startY: 55,
-      head: [["Atividade", "Status", "Observação"]],
-      body: rows,
-      theme: "grid",
-      headStyles: { fillColor: [57, 30, 42] },
-      styles: { fontSize: 10 },
-    });
+    /* ================= ATIVIDADES ================= */
 
-    /* ================= FOTOS COM ESCALA SEGURA ================= */
+    for (let i = 0; i < activities.length; i++) {
+      const act = activities[i];
 
-    for (const act of activities) {
-      if (!act.images || act.images.length === 0) continue;
+      pdf.setFontSize(12);
+      pdf.text(
+        `Atividade ${i + 1} - ${act.status === "concluído" ? "Concluída" : "Não concluída"}`,
+        margin,
+        currentY
+      );
 
-      for (const imgUrl of act.images) {
+      currentY += 8;
+
+      pdf.setFontSize(11);
+      pdf.text(
+        `Comentários: ${act.note?.trim() ? act.note : "Sem observações"}`,
+        margin,
+        currentY,
+        { maxWidth: pageWidth - margin * 2 }
+      );
+
+      currentY += 15;
+
+      /* FOTO */
+      if (act.images && act.images.length > 0) {
         pdf.addPage();
+        currentY = 20;
 
-        const imgBase64 = await urlToBase64(imgUrl);
-
+        const imgBase64 = await urlToBase64(act.images[0]);
         const img = new Image();
         img.src = imgBase64;
-
         await new Promise(res => (img.onload = res));
 
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-
-        const margin = 14;
         const maxWidth = pageWidth - margin * 2;
         const maxHeight = pageHeight - 40;
 
         let width = img.width;
         let height = img.height;
-
         const ratio = width / height;
 
-        // Reduz largura se necessário
         if (width > maxWidth) {
           width = maxWidth;
           height = width / ratio;
         }
 
-        // Reduz altura se necessário
         if (height > maxHeight) {
           height = maxHeight;
           width = height * ratio;
         }
 
-        pdf.text(`Evidência - ${act.description}`, margin, 20);
-        pdf.addImage(imgBase64, "JPEG", margin, 30, width, height);
+        const x = (pageWidth - width) / 2;
+        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
       }
+
+      pdf.addPage();
+      currentY = 20;
     }
 
-    /* ASSINATURA */
-    if (workOrder.signature_url) {
+    /* ================= INFORMAÇÕES ADICIONAIS ================= */
+
+    if (workOrder.additional_info || (workOrder.additional_images?.length ?? 0) > 0) {
+      pdf.setFontSize(12);
+      pdf.text("Informações adicionais", margin, currentY);
+      currentY += 8;
+
+      pdf.setFontSize(11);
+      pdf.text(
+        workOrder.additional_info?.trim() || "Sem observações adicionais.",
+        margin,
+        currentY,
+        { maxWidth: pageWidth - margin * 2 }
+      );
+
+      currentY += 15;
+
+      if (workOrder.additional_images?.length > 0) {
+        pdf.addPage();
+        currentY = 20;
+
+        const imgBase64 = await urlToBase64(workOrder.additional_images[0]);
+        const img = new Image();
+        img.src = imgBase64;
+        await new Promise(res => (img.onload = res));
+
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - 40;
+
+        let width = img.width;
+        let height = img.height;
+        const ratio = width / height;
+
+        if (width > maxWidth) {
+          width = maxWidth;
+          height = width / ratio;
+        }
+
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * ratio;
+        }
+
+        const x = (pageWidth - width) / 2;
+        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
+      }
+
       pdf.addPage();
-      pdf.setFontSize(14);
-      pdf.text("Assinatura do Responsável", 14, 20);
+      currentY = 40;
+    }
 
+    /* ================= ASSINATURA ================= */
+
+    if (workOrder.signature_url) {
       const signBase64 = await urlToBase64(workOrder.signature_url);
-
       const img = new Image();
       img.src = signBase64;
-
       await new Promise(res => (img.onload = res));
 
       const maxWidth = 80;
       const ratio = img.width / img.height;
-
       const width = maxWidth;
       const height = width / ratio;
 
-      pdf.addImage(signBase64, "PNG", 14, 30, width, height);
+      const x = (pageWidth - width) / 2;
+
+      pdf.addImage(signBase64, "PNG", x, currentY, width, height);
+
+      currentY += height + 15;
     }
 
-    pdf.save(`workorder_${workOrder.title}.pdf`);
-  }
+    /* ================= DATA FORMAL ================= */
 
-  function statusBadge(status: string | null) {
-    if (!status) return null;
-    return status === "concluído"
-      ? <span className="text-green-600 font-bold text-sm">✔ Concluído</span>
-      : <span className="text-red-600 font-bold text-sm">✖ Não concluído</span>;
+    const meses = [
+      "janeiro","fevereiro","março","abril","maio","junho",
+      "julho","agosto","setembro","outubro","novembro","dezembro"
+    ];
+
+    const hoje = new Date();
+    const dataExtenso = `São Paulo, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}.`;
+
+    pdf.text(dataExtenso, pageWidth / 2, currentY + 10, { align: "center" });
+
+    pdf.save(`workorder_${workOrder.title}.pdf`);
   }
 
   return (
@@ -241,7 +310,6 @@ export default function WorkOrderPage() {
 
                 <div className="flex justify-between items-center">
                   <p className="font-semibold">{act.description}</p>
-                  {finalized && statusBadge(act.status)}
                 </div>
 
                 {!finalized && (
