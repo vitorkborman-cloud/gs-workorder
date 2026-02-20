@@ -96,7 +96,7 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF PROFISSIONAL COM PROPORÇÃO REAL ================= */
+  /* ================= PDF DEFINITIVO ================= */
 
   async function gerarPDF() {
     if (!workOrder) return;
@@ -144,65 +144,70 @@ export default function WorkOrderPage() {
       styles: { fontSize: 10 },
     });
 
-    /* ================= FOTOS COM PROPORÇÃO REAL ================= */
+    /* ================= FOTOS COM ESCALA SEGURA ================= */
 
     for (const act of activities) {
       if (!act.images || act.images.length === 0) continue;
 
-      pdf.addPage();
-      pdf.setFontSize(14);
-      pdf.text(`Evidências - ${act.description}`, 14, 20);
-
-      let y = 30;
-
       for (const imgUrl of act.images) {
-        try {
-          const imgBase64 = await urlToBase64(imgUrl);
+        pdf.addPage();
 
-          const img = new Image();
-          img.src = imgBase64;
+        const imgBase64 = await urlToBase64(imgUrl);
 
-          await new Promise(res => (img.onload = res));
+        const img = new Image();
+        img.src = imgBase64;
 
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const maxWidth = pageWidth - 28; // margem lateral
-          const ratio = img.height / img.width;
+        await new Promise(res => (img.onload = res));
 
-          const width = maxWidth;
-          const height = width * ratio;
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
 
-          if (y + height > 280) {
-            pdf.addPage();
-            y = 20;
-          }
+        const margin = 14;
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - 40;
 
-          pdf.addImage(imgBase64, "JPEG", 14, y, width, height);
-          y += height + 10;
+        let width = img.width;
+        let height = img.height;
 
-        } catch {}
+        const ratio = width / height;
+
+        // Reduz largura se necessário
+        if (width > maxWidth) {
+          width = maxWidth;
+          height = width / ratio;
+        }
+
+        // Reduz altura se necessário
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * ratio;
+        }
+
+        pdf.text(`Evidência - ${act.description}`, margin, 20);
+        pdf.addImage(imgBase64, "JPEG", margin, 30, width, height);
       }
     }
 
     /* ASSINATURA */
     if (workOrder.signature_url) {
-      try {
-        pdf.addPage();
-        pdf.setFontSize(14);
-        pdf.text("Assinatura do Responsável", 14, 20);
+      pdf.addPage();
+      pdf.setFontSize(14);
+      pdf.text("Assinatura do Responsável", 14, 20);
 
-        const signBase64 = await urlToBase64(workOrder.signature_url);
+      const signBase64 = await urlToBase64(workOrder.signature_url);
 
-        const img = new Image();
-        img.src = signBase64;
+      const img = new Image();
+      img.src = signBase64;
 
-        await new Promise(res => (img.onload = res));
+      await new Promise(res => (img.onload = res));
 
-        const ratio = img.height / img.width;
-        const width = 80;
-        const height = width * ratio;
+      const maxWidth = 80;
+      const ratio = img.width / img.height;
 
-        pdf.addImage(signBase64, "PNG", 14, 30, width, height);
-      } catch {}
+      const width = maxWidth;
+      const height = width / ratio;
+
+      pdf.addImage(signBase64, "PNG", 14, 30, width, height);
     }
 
     pdf.save(`workorder_${workOrder.title}.pdf`);
@@ -230,7 +235,6 @@ export default function WorkOrderPage() {
         </div>
 
         <div className="bg-secondary rounded-2xl p-6 shadow-inner space-y-4">
-
           {activities.map(act => (
             <Card key={act.id} className="border-0 shadow bg-card">
               <CardContent className="p-5 space-y-4">
@@ -242,17 +246,13 @@ export default function WorkOrderPage() {
 
                 {!finalized && (
                   <div className="flex gap-3">
-                    <Button
-                      className="bg-green-600 text-white"
-                      onClick={() => updateStatus(act.id, "concluído")}
-                    >
+                    <Button className="bg-green-600 text-white"
+                      onClick={() => updateStatus(act.id, "concluído")}>
                       Concluído
                     </Button>
 
-                    <Button
-                      className="bg-red-600 text-white"
-                      onClick={() => updateStatus(act.id, "não concluído")}
-                    >
+                    <Button className="bg-red-600 text-white"
+                      onClick={() => updateStatus(act.id, "não concluído")}>
                       Não concluído
                     </Button>
                   </div>
@@ -269,7 +269,6 @@ export default function WorkOrderPage() {
               </CardContent>
             </Card>
           ))}
-
         </div>
 
         {finalized && (
