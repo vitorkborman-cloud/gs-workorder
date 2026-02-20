@@ -48,45 +48,87 @@ export default function SoloDetailPage() {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 20;
 
-    /* ==============================
-       PÁGINA 1 – RELATÓRIO
-    ============================== */
+    /* ================= PÁGINA 1 – RELATÓRIO COMPLETO ================= */
 
     pdf.setFillColor(57, 30, 42);
     pdf.rect(0, 0, pageWidth, 25, "F");
 
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(13);
-    pdf.text("GS WORK ORDER - RELATÓRIO TÉCNICO", pageWidth / 2, 15, {
-      align: "center",
-    });
+    pdf.text("GS WORK ORDER - RELATÓRIO TÉCNICO", pageWidth / 2, 15, { align: "center" });
 
     pdf.setTextColor(0, 0, 0);
-
     pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
-    pdf.text("PERFIL DESCRITIVO DE SOLO", pageWidth / 2, 40, {
-      align: "center",
-    });
+    pdf.text("PERFIL DESCRITIVO DE SOLO", pageWidth / 2, 40, { align: "center" });
 
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "normal");
 
-    pdf.text(`Sondagem: ${data.nome_sondagem}`, margin, 60);
-    pdf.text(`Data: ${data.data}`, margin, 68);
-    pdf.text(`Profundidade total: ${data.profundidade_total} m`, margin, 76);
+    let y = 60;
 
-    /* ==============================
-       PÁGINA 2 – PERFIL ESTRATIGRÁFICO
-    ============================== */
+    function campo(label: string, valor: any) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text(label, margin, y);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(String(valor ?? "-"), margin + 60, y);
+      y += 7;
+    }
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("1. Dados da Sondagem", margin, y);
+    y += 8;
+
+    campo("Sondagem:", data.nome_sondagem);
+    campo("Data:", data.data);
+    campo("Hora:", data.hora);
+    campo("Tipo:", data.tipo_sondagem);
+    campo("Nível d'água:", data.nivel_agua);
+    campo("Profundidade total:", data.profundidade_total);
+
+    y += 8;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("2. Construção do Poço", margin, y);
+    y += 8;
+
+    campo("Diâmetro sondagem:", data.diametro_sondagem);
+    campo("Diâmetro poço:", data.diametro_poco);
+    campo("Pré-filtro:", data.pre_filtro);
+    campo("Seção filtrante:", data.secao_filtrante);
+
+    y += 8;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("3. Coordenadas", margin, y);
+    y += 8;
+
+    campo("Coord X:", data.coord_x);
+    campo("Coord Y:", data.coord_y);
+
+    y += 10;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("4. Camadas Estratigráficas", margin, y);
+    y += 8;
+
+    pdf.setFont("helvetica", "normal");
+
+    let profAnterior = 0;
+    layers.forEach((l) => {
+      const profAtual = parseFloat(l.profundidade);
+      pdf.text(`${profAnterior} – ${profAtual} m : ${l.tipo}`, margin, y);
+      y += 6;
+      profAnterior = profAtual;
+    });
+
+    /* ================= PÁGINA 2 – PERFIL ================= */
 
     pdf.addPage();
 
     pdf.setFontSize(16);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Perfil Estratigráfico", pageWidth / 2, 20, {
-      align: "center",
-    });
+    pdf.text("Perfil Estratigráfico", pageWidth / 2, 20, { align: "center" });
 
     const topo = 30;
     const alturaMax = 170;
@@ -99,16 +141,12 @@ export default function SoloDetailPage() {
     const profundidadeTotal = parseFloat(data.profundidade_total || "1");
     const escala = alturaMax / profundidadeTotal;
 
-    /* ===== ESCALA ===== */
-
     pdf.setFontSize(8);
     for (let i = 0; i <= profundidadeTotal; i += 0.5) {
       const yEscala = topo + i * escala;
       pdf.line(esquerdaPerfil - 6, yEscala, esquerdaPerfil, yEscala);
       pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
     }
-
-    /* ===== MAPA DE CORES RIGOROSO ===== */
 
     const mapaCores: Record<string, [number, number, number]> = {};
     let contadorCor = 0;
@@ -123,7 +161,7 @@ export default function SoloDetailPage() {
       [140, 140, 140],
     ];
 
-    function gerarCorUnica(nome: string): [number, number, number] {
+    function gerarCor(nome: string): [number, number, number] {
       if (!mapaCores[nome]) {
         mapaCores[nome] = base[contadorCor % base.length];
         contadorCor++;
@@ -131,109 +169,62 @@ export default function SoloDetailPage() {
       return mapaCores[nome];
     }
 
-    /* ===== CAMADAS (SEM TEXTURA) ===== */
+    let profAnt = 0;
 
-    let profundidadeAnterior = 0;
+    layers.forEach((l) => {
+      const nome = l.tipo.trim();
+      const profAtual = parseFloat(l.profundidade);
 
-    layers.forEach((layer) => {
-      const nomeChave = layer.tipo.trim();
-      const profAtual = parseFloat(layer.profundidade);
+      const altura = (profAtual - profAnt) * escala;
+      const yCamada = topo + profAnt * escala;
 
-      const alturaCamada = (profAtual - profundidadeAnterior) * escala;
-      const y = topo + profundidadeAnterior * escala;
-
-      const [r, g, b] = gerarCorUnica(nomeChave);
-
+      const [r, g, b] = gerarCor(nome);
       pdf.setFillColor(r, g, b);
-      pdf.rect(esquerdaPerfil, y, larguraPerfil, alturaCamada, "F");
+      pdf.rect(esquerdaPerfil, yCamada, larguraPerfil, altura, "F");
 
-      profundidadeAnterior = profAtual;
+      profAnt = profAtual;
     });
 
     pdf.setDrawColor(0);
     pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
 
-    /* ===== TUBO CENTRAL ===== */
+    /* Tubo */
 
     const larguraTubo = 12;
     const esquerdaTubo = centro - larguraTubo / 2;
 
     pdf.setFillColor(255, 255, 255);
+    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
     pdf.setDrawColor(0);
-    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "FD");
+    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax);
 
-    /* ===== SEÇÃO FILTRANTE ===== */
+    /* Seção filtrante – ranhuras horizontais */
 
     const alturaFiltro = alturaMax * 0.3;
     const topoFiltro = topo + alturaMax - alturaFiltro;
 
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(esquerdaTubo, topoFiltro, larguraTubo, alturaFiltro, "F");
-
-    pdf.setDrawColor(0);
-    for (let i = 2; i < larguraTubo; i += 2) {
+    for (let i = 0; i < alturaFiltro; i += 3) {
       pdf.line(
-        esquerdaTubo + i,
-        topoFiltro,
-        esquerdaTubo + i,
-        topoFiltro + alturaFiltro
+        esquerdaTubo,
+        topoFiltro + i,
+        esquerdaTubo + larguraTubo,
+        topoFiltro + i
       );
     }
 
     pdf.rect(esquerdaTubo, topoFiltro, larguraTubo, alturaFiltro);
 
-    /* ===== NÍVEL D’ÁGUA ===== */
+    /* Nível d’água */
 
     if (data.nivel_agua) {
       const nivel = parseFloat(data.nivel_agua);
-
-      if (!isNaN(nivel) && nivel <= profundidadeTotal) {
+      if (!isNaN(nivel)) {
         const yNivel = topo + nivel * escala;
-
         pdf.setDrawColor(0, 0, 255);
         pdf.setLineWidth(1.2);
-
-        pdf.line(
-          esquerdaPerfil - 10,
-          yNivel,
-          direitaPerfil + 10,
-          yNivel
-        );
-
-        pdf.setFontSize(9);
-        pdf.setTextColor(0, 0, 255);
-        pdf.text("N.A.", direitaPerfil + 12, yNivel + 2);
-
-        pdf.setTextColor(0);
+        pdf.line(esquerdaPerfil - 10, yNivel, direitaPerfil + 10, yNivel);
       }
     }
-
-    /* ===== LEGENDA ===== */
-
-    let yLegenda = topo;
-    profundidadeAnterior = 0;
-
-    pdf.setFontSize(9);
-
-    layers.forEach((layer) => {
-      const nomeChave = layer.tipo.trim();
-      const profAtual = parseFloat(layer.profundidade);
-
-      const [r, g, b] = gerarCorUnica(nomeChave);
-
-      pdf.setFillColor(r, g, b);
-      pdf.rect(direitaPerfil + 15, yLegenda, 8, 8, "F");
-
-      pdf.setTextColor(0);
-      pdf.text(
-        `${profundidadeAnterior} – ${profAtual} m : ${layer.tipo}`,
-        direitaPerfil + 28,
-        yLegenda + 6
-      );
-
-      yLegenda += 12;
-      profundidadeAnterior = profAtual;
-    });
 
     pdf.save(`perfil_${data.nome_sondagem}.pdf`);
   }
@@ -267,6 +258,15 @@ export default function SoloDetailPage() {
             {Object.entries({
               Sondagem: data.nome_sondagem,
               Data: data.data,
+              Hora: data.hora,
+              "Nível d'água": data.nivel_agua,
+              Tipo: data.tipo_sondagem,
+              "Diâmetro sondagem": data.diametro_sondagem,
+              "Diâmetro poço": data.diametro_poco,
+              "Pré-filtro": data.pre_filtro,
+              "Seção filtrante": data.secao_filtrante,
+              "Coord X": data.coord_x,
+              "Coord Y": data.coord_y,
               "Profundidade total": data.profundidade_total,
             }).map(([label, value]) => (
               <div key={label}>
