@@ -124,10 +124,10 @@ export default function WorkOrderPage() {
     }
 
     function addHeaderCompleto() {
-      pdf.setFillColor(...roxo);
+      
       pdf.rect(0, 0, pageWidth, 25, "F");
-
-      pdf.setFillColor(...verde);
+      pdf.setFillColor(57, 30, 42);
+      pdf.setFillColor(128, 176, 45);
       pdf.rect(0, 25, pageWidth, 3, "F");
 
       pdf.setTextColor(255, 255, 255);
@@ -165,10 +165,10 @@ export default function WorkOrderPage() {
     }
 
     function addHeaderSimples() {
-      pdf.setFillColor(...roxo);
+      pdf.setFillColor(57, 30, 42);
       pdf.rect(0, 0, pageWidth, 15, "F");
 
-      pdf.setFillColor(...verde);
+      pdf.setFillColor(128, 176, 45);
       pdf.rect(0, 15, pageWidth, 3, "F");
     }
 
