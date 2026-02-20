@@ -40,29 +40,17 @@ export default function SoloDetailPage() {
     load();
   }, []);
 
-  function corPorTipo(tipo: string) {
-    const t = tipo.toLowerCase();
-
-    if (t.includes("areia")) return [240, 220, 130];
-    if (t.includes("argila")) return [180, 100, 80];
-    if (t.includes("silte")) return [170, 170, 170];
-    if (t.includes("cascalho")) return [200, 170, 120];
-    if (t.includes("rocha")) return [120, 120, 120];
-
-    return [150, 200, 150];
-  }
-
   async function gerarPDF() {
     if (!data) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
+
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 20;
 
-    /* ===============================
-       PÁGINA 1 – RELATÓRIO
-    =============================== */
+    /* =====================================================
+       PÁGINA 1 – RELATÓRIO EXECUTIVO
+    ====================================================== */
 
     pdf.setFillColor(57, 30, 42);
     pdf.rect(0, 0, pageWidth, 25, "F");
@@ -74,6 +62,7 @@ export default function SoloDetailPage() {
     });
 
     pdf.setTextColor(0, 0, 0);
+
     pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
     pdf.text("PERFIL DESCRITIVO DE SOLO", pageWidth / 2, 40, {
@@ -87,9 +76,9 @@ export default function SoloDetailPage() {
     pdf.text(`Data: ${data.data}`, margin, 68);
     pdf.text(`Profundidade total: ${data.profundidade_total} m`, margin, 76);
 
-    /* ===============================
+    /* =====================================================
        PÁGINA 2 – PERFIL ESTRATIGRÁFICO
-    =============================== */
+    ====================================================== */
 
     pdf.addPage();
 
@@ -100,61 +89,113 @@ export default function SoloDetailPage() {
     });
 
     const topo = 30;
-    const alturaMax = 160;
-    const largura = 40;
+    const alturaMax = 170;
+    const larguraPerfil = 40;
+
     const centro = pageWidth / 2;
+    const esquerdaPerfil = centro - larguraPerfil / 2;
+    const direitaPerfil = centro + larguraPerfil / 2;
 
     const profundidadeTotal = parseFloat(data.profundidade_total || "1");
     const escala = alturaMax / profundidadeTotal;
 
+    /* ================= ESCALA ESQUERDA ================= */
+
+    pdf.setFontSize(8);
+    for (let i = 0; i <= profundidadeTotal; i += 0.5) {
+      const yEscala = topo + i * escala;
+      pdf.line(esquerdaPerfil - 6, yEscala, esquerdaPerfil, yEscala);
+      pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
+    }
+
+    /* ================= MAPA DE CORES RIGOROSO ================= */
+
+    const mapaCores: Record<string, [number, number, number]> = {};
+    let contadorCor = 0;
+
+    const base: [number, number, number][] = [
+      [210, 180, 140],
+      [170, 170, 170],
+      [190, 110, 90],
+      [220, 200, 120],
+      [150, 150, 120],
+      [200, 160, 120],
+      [140, 140, 140],
+    ];
+
+    function gerarCorUnica(nome: string): [number, number, number] {
+      if (!mapaCores[nome]) {
+        mapaCores[nome] = base[contadorCor % base.length];
+        contadorCor++;
+      }
+      return mapaCores[nome];
+    }
+
+    /* ================= CAMADAS ================= */
+
     let profundidadeAnterior = 0;
 
     layers.forEach((layer) => {
+      const nomeChave = layer.tipo.trim();
       const profAtual = parseFloat(layer.profundidade);
-      const alturaCamada = (profAtual - profundidadeAnterior) * escala;
 
+      const alturaCamada = (profAtual - profundidadeAnterior) * escala;
       const y = topo + profundidadeAnterior * escala;
 
-      const [r, g, b] = corPorTipo(layer.tipo);
-      pdf.setFillColor(r, g, b);
+      const [r, g, b] = gerarCorUnica(nomeChave);
 
-      pdf.rect(centro - largura / 2, y, largura, alturaCamada, "F");
+      pdf.setFillColor(r, g, b);
+      pdf.rect(esquerdaPerfil, y, larguraPerfil, alturaCamada, "F");
+
+      pdf.setDrawColor(0, 0, 0);
+      for (let i = 0; i < alturaCamada; i += 4) {
+        pdf.line(esquerdaPerfil, y + i, direitaPerfil, y + i);
+      }
 
       profundidadeAnterior = profAtual;
     });
 
     pdf.setDrawColor(0);
-    pdf.rect(centro - largura / 2, topo, largura, alturaMax);
+    pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
 
-    /* ESCALA LATERAL */
+    /* ================= TUBO ================= */
 
-    pdf.setFontSize(9);
-    for (let i = 0; i <= profundidadeTotal; i += 0.5) {
-      const yEscala = topo + i * escala;
-      pdf.line(centro - largura / 2 - 5, yEscala, centro - largura / 2, yEscala);
-      pdf.text(`${i.toFixed(1)} m`, centro - largura / 2 - 25, yEscala + 2);
-    }
+    const larguraTubo = 12;
+    const esquerdaTubo = centro - larguraTubo / 2;
 
-    /* LEGENDA */
+    pdf.setFillColor(180, 220, 255);
+    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
+
+    const alturaFiltro = alturaMax * 0.3;
+    pdf.setFillColor(120, 180, 220);
+    pdf.rect(
+      esquerdaTubo,
+      topo + alturaMax - alturaFiltro,
+      larguraTubo,
+      alturaFiltro,
+      "F"
+    );
+
+    /* ================= LEGENDA DIREITA ================= */
 
     let yLegenda = topo;
-
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-
     profundidadeAnterior = 0;
 
+    pdf.setFontSize(9);
+    pdf.setTextColor(0);
+
     layers.forEach((layer) => {
+      const nomeChave = layer.tipo.trim();
       const profAtual = parseFloat(layer.profundidade);
-      const [r, g, b] = corPorTipo(layer.tipo);
+
+      const [r, g, b] = gerarCorUnica(nomeChave);
 
       pdf.setFillColor(r, g, b);
-      pdf.rect(30, yLegenda, 8, 8, "F");
+      pdf.rect(direitaPerfil + 15, yLegenda, 8, 8, "F");
 
-      pdf.setTextColor(0);
       pdf.text(
         `${profundidadeAnterior} – ${profAtual} m : ${layer.tipo}`,
-        42,
+        direitaPerfil + 28,
         yLegenda + 6
       );
 
