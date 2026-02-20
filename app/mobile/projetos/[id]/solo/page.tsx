@@ -30,7 +30,6 @@ export default function SoloPage() {
   const projectId = params.id as string;
 
   const [draftId, setDraftId] = useState<string | null>(null);
-
   const [layers, setLayers] = useState<Layer[]>([
     { profundidade: "", tipo: "" },
   ]);
@@ -163,100 +162,104 @@ export default function SoloPage() {
 
   return (
     <AppShell>
-      <div className="min-h-screen bg-gray-50 px-4 py-6 space-y-6">
+      <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-50">
 
-        {/* HEADER */}
-        <div className="bg-white rounded-2xl shadow-sm border p-4">
+        {/* TOP BAR EXECUTIVA */}
+        <div className="bg-[#391e2a] text-white px-4 py-4 shadow-md">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-lg font-bold text-[#391e2a]">
+              <h1 className="text-lg font-semibold tracking-wide">
                 Perfil Descritivo
               </h1>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-300">
                 Registro técnico de sondagem
               </p>
             </div>
 
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-yellow-100 text-yellow-700">
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#80b02d] text-white shadow">
               {draftId ? "Rascunho" : "Novo"}
             </span>
           </div>
         </div>
 
-        <Section title="Dados da Sondagem">
-          <Input label="Nome da Sondagem" value={form.nome_sondagem} onChange={(v) => setField("nome_sondagem", v)} />
+        <div className="px-4 py-6 space-y-6">
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Data" value={form.data} onChange={(v) => setField("data", v)} />
-            <Input label="Hora" value={form.hora} onChange={(v) => setField("hora", v)} />
-          </div>
+          <Section title="Dados da Sondagem">
+            <Input label="Nome da Sondagem" value={form.nome_sondagem} onChange={(v) => setField("nome_sondagem", v)} />
 
-          <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v) => setField("tipo_sondagem", v)} />
-          <Input label="Nível d’água" value={form.nivel_agua} onChange={(v) => setField("nivel_agua", v)} />
-          <Input label="Profundidade Total" value={form.profundidade_total} onChange={(v) => setField("profundidade_total", v)} />
-        </Section>
-
-        <Section title="Construção do Poço">
-          <Input label="Diâmetro da Sondagem" value={form.diametro_sondagem} onChange={(v) => setField("diametro_sondagem", v)} />
-          <Input label="Diâmetro do Poço" value={form.diametro_poco} onChange={(v) => setField("diametro_poco", v)} />
-          <Input label="Pré-filtro" value={form.pre_filtro} onChange={(v) => setField("pre_filtro", v)} />
-          <Input label="Seção Filtrante" value={form.secao_filtrante} onChange={(v) => setField("secao_filtrante", v)} />
-        </Section>
-
-        <Section title="Coordenadas">
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Coord. X" value={form.coord_x} onChange={(v) => setField("coord_x", v)} />
-            <Input label="Coord. Y" value={form.coord_y} onChange={(v) => setField("coord_y", v)} />
-          </div>
-        </Section>
-
-        <Section title="Camadas Estratigráficas">
-          {layers.map((layer, i) => (
-            <div key={i} className="grid grid-cols-2 gap-3">
-              <Input
-                label="Profundidade (m)"
-                value={layer.profundidade}
-                onChange={(v) => {
-                  const copy = [...layers];
-                  copy[i].profundidade = v;
-                  setLayers(copy);
-                }}
-              />
-              <Input
-                label="Tipo de Solo"
-                value={layer.tipo}
-                onChange={(v) => {
-                  const copy = [...layers];
-                  copy[i].tipo = v;
-                  setLayers(copy);
-                }}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Data" value={form.data} onChange={(v) => setField("data", v)} />
+              <Input label="Hora" value={form.hora} onChange={(v) => setField("hora", v)} />
             </div>
-          ))}
 
-          <button
-            onClick={addLayer}
-            className="w-full mt-2 bg-[#391e2a] text-white font-semibold py-2 rounded-lg"
-          >
-            + Adicionar Camada
-          </button>
-        </Section>
+            <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v) => setField("tipo_sondagem", v)} />
+            <Input label="Nível d’água" value={form.nivel_agua} onChange={(v) => setField("nivel_agua", v)} />
+            <Input label="Profundidade Total" value={form.profundidade_total} onChange={(v) => setField("profundidade_total", v)} />
+          </Section>
 
-        {/* BOTÕES PROFISSIONAIS */}
-        <div className="space-y-3 pt-2">
-          <button
-            onClick={salvar}
-            className="w-full border border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl"
-          >
-            Salvar Rascunho
-          </button>
+          <Section title="Construção do Poço">
+            <Input label="Diâmetro da Sondagem" value={form.diametro_sondagem} onChange={(v) => setField("diametro_sondagem", v)} />
+            <Input label="Diâmetro do Poço" value={form.diametro_poco} onChange={(v) => setField("diametro_poco", v)} />
+            <Input label="Pré-filtro" value={form.pre_filtro} onChange={(v) => setField("pre_filtro", v)} />
+            <Input label="Seção Filtrante" value={form.secao_filtrante} onChange={(v) => setField("secao_filtrante", v)} />
+          </Section>
 
-          <button
-            onClick={concluir}
-            className="w-full bg-[#80b02d] text-white font-bold py-3 rounded-xl shadow-md"
-          >
-            Concluir Perfil
-          </button>
+          <Section title="Coordenadas">
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Coord. X" value={form.coord_x} onChange={(v) => setField("coord_x", v)} />
+              <Input label="Coord. Y" value={form.coord_y} onChange={(v) => setField("coord_y", v)} />
+            </div>
+          </Section>
+
+          <Section title="Camadas Estratigráficas">
+            {layers.map((layer, i) => (
+              <div key={i} className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Profundidade (m)"
+                  value={layer.profundidade}
+                  onChange={(v) => {
+                    const copy = [...layers];
+                    copy[i].profundidade = v;
+                    setLayers(copy);
+                  }}
+                />
+                <Input
+                  label="Tipo de Solo"
+                  value={layer.tipo}
+                  onChange={(v) => {
+                    const copy = [...layers];
+                    copy[i].tipo = v;
+                    setLayers(copy);
+                  }}
+                />
+              </div>
+            ))}
+
+            <button
+              onClick={addLayer}
+              className="w-full mt-3 bg-[#391e2a] text-white font-semibold py-2 rounded-lg shadow hover:opacity-90 transition"
+            >
+              + Adicionar Camada
+            </button>
+          </Section>
+
+          {/* BOTÕES EXECUTIVOS */}
+          <div className="space-y-4 pt-4">
+            <button
+              onClick={salvar}
+              className="w-full bg-white border-2 border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl shadow-sm hover:bg-gray-100 transition"
+            >
+              Salvar Rascunho
+            </button>
+
+            <button
+              onClick={concluir}
+              className="w-full bg-[#80b02d] text-white font-bold py-3 rounded-xl shadow-lg hover:brightness-105 transition"
+            >
+              Concluir Perfil
+            </button>
+          </div>
+
         </div>
       </div>
     </AppShell>
@@ -273,8 +276,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-4">
-      <h2 className="text-sm font-semibold text-[#391e2a] border-l-4 border-[#80b02d] pl-2">
+    <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-[#391e2a] tracking-wide uppercase border-b pb-2">
         {title}
       </h2>
       {children}
@@ -293,11 +296,13 @@ function Input({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-gray-600">{label}</label>
+      <label className="text-xs font-semibold text-gray-600 tracking-wide">
+        {label}
+      </label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#80b02d]"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
       />
     </div>
   );
