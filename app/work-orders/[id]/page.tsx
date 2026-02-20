@@ -107,9 +107,6 @@ export default function WorkOrderPage() {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 20;
 
-    const roxo: [number, number, number] = [57, 30, 42];
-    const verde: [number, number, number] = [128, 176, 45];
-
     async function urlToBase64(url: string) {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -160,14 +157,10 @@ export default function WorkOrderPage() {
 
     pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
-    pdf.text("GreenSoil Group Ambiental LTDA", pageWidth / 2, 60, {
-      align: "center",
-    });
+    pdf.text("GreenSoil Group Ambiental LTDA", pageWidth / 2, 60, { align: "center" });
 
     pdf.setFontSize(12);
-    pdf.text("CNPJ: 29.088.151/0001-25", pageWidth / 2, 75, {
-      align: "center",
-    });
+    pdf.text("CNPJ: 29.088.151/0001-25", pageWidth / 2, 75, { align: "center" });
 
     pdf.text(
       "Avenida Brigadeiro Faria Lima, 1572, Conjunto 1601 - Jardim Paulistano, São Paulo/SP - 014151-001",
@@ -180,21 +173,12 @@ export default function WorkOrderPage() {
 
     pdf.setFontSize(14);
     pdf.setFont("helvetica", "bold");
-    pdf.text(`Projeto: ${workOrder.projects?.name ?? "-"}`, pageWidth / 2, 125, {
-      align: "center",
-    });
+    pdf.text(`Projeto: ${workOrder.projects?.name ?? "-"}`, pageWidth / 2, 125, { align: "center" });
 
-    pdf.text(`Work Order: ${workOrder.title}`, pageWidth / 2, 140, {
-      align: "center",
-    });
+    pdf.text(`Work Order: ${workOrder.title}`, pageWidth / 2, 140, { align: "center" });
 
     pdf.setFont("helvetica", "normal");
-    pdf.text(
-      `Data de emissão: ${new Date().toLocaleDateString()}`,
-      pageWidth / 2,
-      155,
-      { align: "center" }
-    );
+    pdf.text(`Data de emissão: ${new Date().toLocaleDateString()}`, pageWidth / 2, 155, { align: "center" });
 
     /* ================= ATIVIDADES ================= */
 
@@ -204,8 +188,16 @@ export default function WorkOrderPage() {
     let currentY = 40;
 
     for (const act of activities) {
+
       const statusTexto =
         act.status === "concluído" ? "Concluída" : "Não Concluída";
+
+      // 🔥 CORREÇÃO AQUI: quebra automática
+      if (currentY > pageHeight - 40) {
+        pdf.addPage();
+        addHeaderBase();
+        currentY = 40;
+      }
 
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(12);
@@ -223,10 +215,11 @@ export default function WorkOrderPage() {
       currentY += 12;
 
       if (act.images?.length) {
+
         const imgBase64 = await urlToBase64(act.images[0]);
         const img = new Image();
         img.src = imgBase64;
-        await new Promise(resolve => { img.onload = resolve; });
+        await new Promise(resolve => img.onload = resolve);
 
         const maxWidth = pageWidth - margin * 2;
         const maxHeight = pageHeight - currentY - 30;
@@ -243,6 +236,12 @@ export default function WorkOrderPage() {
         if (height > maxHeight) {
           height = maxHeight;
           width = height * ratio;
+        }
+
+        if (currentY + height > pageHeight - 30) {
+          pdf.addPage();
+          addHeaderBase();
+          currentY = 40;
         }
 
         const x = (pageWidth - width) / 2;
@@ -253,102 +252,7 @@ export default function WorkOrderPage() {
       currentY += 10;
     }
 
-    /* ================= INFORMAÇÕES ADICIONAIS ================= */
-
-    if (
-      workOrder.additional_info ||
-      (workOrder.additional_images?.length ?? 0) > 0
-    ) {
-      pdf.addPage();
-      addHeaderBase();
-      currentY = 40;
-
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(13);
-      pdf.text("Informações adicionais", margin, currentY);
-      currentY += 10;
-
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
-      pdf.text(
-        workOrder.additional_info?.trim() ||
-          "Sem observações adicionais.",
-        margin,
-        currentY,
-        { maxWidth: pageWidth - margin * 2 }
-      );
-
-      currentY += 15;
-
-      if (workOrder.additional_images?.length) {
-        const imgBase64 = await urlToBase64(
-          workOrder.additional_images[0]
-        );
-
-        const img = new Image();
-        img.src = imgBase64;
-        await new Promise(resolve => { img.onload = resolve; });
-
-        const maxWidth = pageWidth - margin * 2;
-        const maxHeight = pageHeight - currentY - 30;
-
-        let width = img.width;
-        let height = img.height;
-        const ratio = width / height;
-
-        if (width > maxWidth) {
-          width = maxWidth;
-          height = width / ratio;
-        }
-
-        if (height > maxHeight) {
-          height = maxHeight;
-          width = height * ratio;
-        }
-
-        const x = (pageWidth - width) / 2;
-        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
-      }
-    }
-
-    /* ================= ASSINATURA ================= */
-
-    if (workOrder.signature_url) {
-      pdf.addPage();
-      addHeaderBase();
-
-      let signY = 80;
-
-      pdf.setFontSize(12);
-      pdf.text("Assinatura do Responsável", pageWidth / 2, signY - 10, {
-        align: "center",
-      });
-
-      const signBase64 = await urlToBase64(workOrder.signature_url);
-      const img = new Image();
-      img.src = signBase64;
-      await new Promise(resolve => { img.onload = resolve; });
-
-      const ratio = img.width / img.height;
-      const width = 80;
-      const height = width / ratio;
-
-      pdf.addImage(signBase64, "PNG", pageWidth / 2 - width / 2, signY, width, height);
-
-      const hoje = new Date();
-      const meses = [
-        "janeiro","fevereiro","março","abril","maio","junho",
-        "julho","agosto","setembro","outubro","novembro","dezembro"
-      ];
-
-      const dataExtenso = `São Paulo, ${hoje.getDate()} de ${
-        meses[hoje.getMonth()]
-      } de ${hoje.getFullYear()}.`;
-
-      pdf.text(dataExtenso, pageWidth / 2, signY + height + 20, {
-        align: "center",
-      });
-    }
+    /* ================= RODAPÉ ================= */
 
     const totalPages = pdf.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
