@@ -24,6 +24,10 @@ export default function MobileWorkOrderPage() {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [openSign, setOpenSign] = useState(false);
 
+  // ✅ NOVOS STATES
+  const [additionalInfo, setAdditionalInfo] = useState<string>("");
+  const [additionalImages, setAdditionalImages] = useState<string[]>([]);
+
   const sigRef = useRef<SignatureCanvas | null>(null);
 
   /* ================= LOAD ================= */
@@ -31,12 +35,14 @@ export default function MobileWorkOrderPage() {
   async function load() {
     const { data: wo } = await supabase
       .from("work_orders")
-      .select("finalized, signature_url")
+      .select("finalized, signature_url, additional_info, additional_images")
       .eq("id", workOrderId)
       .single();
 
     setFinalized(!!wo?.finalized);
     setSignatureUrl(wo?.signature_url ?? null);
+    setAdditionalInfo(wo?.additional_info ?? "");
+    setAdditionalImages(wo?.additional_images ?? []);
 
     const { data } = await supabase
       .from("activities")
@@ -173,6 +179,69 @@ export default function MobileWorkOrderPage() {
     );
 
     await supabase.from("activities").update({ images: newImages }).eq("id", id);
+  }
+
+  /* ================= IMAGENS ADICIONAIS ================= */
+
+  async function uploadAdditionalImage(file: File) {
+    if (finalized) return;
+
+    if (additionalImages.length >= 3) {
+      alert("Máximo de 3 imagens.");
+      return;
+    }
+
+    const resized = await resizeImage(file);
+    const fileName = `additional/${workOrderId}/${Date.now()}.jpg`;
+
+    const { error } = await supabase.storage
+      .from("activity-images")
+      .upload(fileName, resized);
+
+    if (error) {
+      alert("Erro ao enviar imagem.");
+      return;
+    }
+
+    const { data } = supabase.storage
+      .from("activity-images")
+      .getPublicUrl(fileName);
+
+    const newImages = [...additionalImages, data.publicUrl];
+
+    setAdditionalImages(newImages);
+
+    await supabase
+      .from("work_orders")
+      .update({ additional_images: newImages })
+      .eq("id", workOrderId);
+  }
+
+  async function removeAdditionalImage(img: string) {
+    if (finalized) return;
+
+    const path = img.split("/activity-images/")[1];
+    await supabase.storage.from("activity-images").remove([path]);
+
+    const newImages = additionalImages.filter(i => i !== img);
+
+    setAdditionalImages(newImages);
+
+    await supabase
+      .from("work_orders")
+      .update({ additional_images: newImages })
+      .eq("id", workOrderId);
+  }
+
+  async function updateAdditionalInfo(text: string) {
+    if (finalized) return;
+
+    setAdditionalInfo(text);
+
+    await supabase
+      .from("work_orders")
+      .update({ additional_info: text })
+      .eq("id", workOrderId);
   }
 
   /* ================= ASSINATURA ================= */
@@ -345,6 +414,70 @@ export default function MobileWorkOrderPage() {
         {activities.map(act => (
           <SwipeCard key={act.id} act={act} />
         ))}
+      </div>
+
+      {/* ================= INFORMAÇÕES ADICIONAIS ================= */}
+
+      <div className="px-4 mt-6 space-y-3">
+        <div className="bg-white rounded-2xl p-4 border space-y-3">
+
+          <p className="font-semibold text-sm">
+            Informações adicionais
+          </p>
+
+          <textarea
+            value={additionalInfo}
+            disabled={finalized}
+            onChange={(e) => updateAdditionalInfo(e.target.value)}
+            placeholder="Observações não planejadas identificadas em campo..."
+            className="w-full rounded-xl border p-3 text-sm"
+          />
+
+          {!finalized && (
+            <>
+              <input
+                id="additional-file"
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = e.target.files;
+                  if (!files) return;
+                  Array.from(files).forEach(f => uploadAdditionalImage(f));
+                  e.target.value = "";
+                }}
+              />
+
+              <label
+                htmlFor="additional-file"
+                className="w-full block text-center py-3 rounded-2xl bg-[var(--purple)] text-white font-bold shadow-md"
+              >
+                📎 Anexar imagem
+              </label>
+            </>
+          )}
+
+          <div className="flex gap-2 flex-wrap">
+            {additionalImages.map((img, i) => (
+              <div key={i} className="relative">
+                <img
+                  src={img}
+                  className="w-20 h-20 object-cover rounded-lg border"
+                />
+                {!finalized && (
+                  <button
+                    onClick={() => removeAdditionalImage(img)}
+                    className="absolute -top-2 -right-2 bg-white border rounded-full px-2 text-xs"
+                  >
+                    X
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+        </div>
       </div>
 
       {!finalized && (
