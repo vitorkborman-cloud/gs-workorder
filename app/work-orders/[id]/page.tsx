@@ -127,7 +127,7 @@ export default function WorkOrderPage() {
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text("RELATÓRIO TÉCNICO DE WORK ORDER", pageWidth / 2, 15, { align: "center" });
+      pdf.text("RELATÓRIO WORK ORDER", pageWidth / 2, 15, { align: "center" });
 
       pdf.setTextColor(0, 0, 0);
     }
@@ -149,7 +149,7 @@ export default function WorkOrderPage() {
 
     pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
-    pdf.text("GreenSoil Group Ambiental LTDA", pageWidth / 2, 60, { align: "center" });
+    pdf.text("Greensoil do Brasil LTDA", pageWidth / 2, 60, { align: "center" });
 
     pdf.setFontSize(12);
     pdf.text("CNPJ: 29.088.151/0001-25", pageWidth / 2, 75, { align: "center" });
