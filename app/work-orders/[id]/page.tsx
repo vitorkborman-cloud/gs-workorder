@@ -101,7 +101,7 @@ export default function WorkOrderPage() {
     load();
   }
 
-  /* ================= PDF RELATÓRIO OFICIAL ================= */
+  /* ================= PDF OFICIAL COMPLETO ================= */
 
   async function gerarPDF() {
     if (!workOrder) return;
@@ -125,81 +125,62 @@ export default function WorkOrderPage() {
     const roxo: [number, number, number] = [57, 30, 42];
     const verde: [number, number, number] = [128, 176, 45];
 
-    /* Cabeçalho */
-    pdf.setFillColor(...roxo);
-    pdf.rect(0, 0, pageWidth, 25, "F");
+    function addHeader() {
+      pdf.setFillColor(...roxo);
+      pdf.rect(0, 0, pageWidth, 25, "F");
 
-    pdf.setFillColor(...verde);
-    pdf.rect(0, 25, pageWidth, 3, "F");
+      pdf.setFillColor(...verde);
+      pdf.rect(0, 25, pageWidth, 3, "F");
 
-    /* Logo branco */
-    try {
-      const logoBase64 = await urlToBase64("/logo.png");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(
+        "RELATÓRIO TÉCNICO DE WORK ORDER",
+        pageWidth / 2,
+        15,
+        { align: "center" }
+      );
 
-      const img = new Image();
-      img.src = logoBase64;
-      await new Promise(res => (img.onload = res));
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
 
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
+      pdf.text("GreenSoil Group Ambiental LTDA", margin, 38);
+      pdf.text("CNPJ: 29.088.151/0001-25", margin, 44);
+      pdf.text(
+        "Avenida Brigadeiro Faria Lima, 1572, Conjunto 1601 - Jardim Paulistano, São Paulo/SP - 014151-001",
+        margin,
+        50,
+        { maxWidth: pageWidth - margin * 2 }
+      );
 
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0);
+      pdf.line(margin, 55, pageWidth - margin, 55);
 
-      // Aplica filtro branco
-      ctx.globalCompositeOperation = "source-atop";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      pdf.text(`Projeto: ${workOrder.projects?.name ?? "-"}`, margin, 65);
+      pdf.text(`Work Order: ${workOrder.title}`, margin, 72);
+      pdf.text(
+        `Data de emissão: ${new Date().toLocaleDateString()}`,
+        margin,
+        79
+      );
+    }
 
-      const whiteLogo = canvas.toDataURL("image/png");
+    function addFooter(pageNumber: number, total: number) {
+      pdf.setFillColor(...roxo);
+      pdf.rect(0, pageHeight - 15, pageWidth, 15, "F");
 
-      const maxWidth = 28;
-      const ratio = img.width / img.height;
-      const width = maxWidth;
-      const height = width / ratio;
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(9);
+      pdf.text(
+        `Página ${pageNumber} de ${total}`,
+        pageWidth - margin,
+        pageHeight - 6,
+        { align: "right" }
+      );
+    }
 
-      pdf.addImage(whiteLogo, "PNG", margin, 5, width, height);
-    } catch {}
-
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(14);
-    pdf.text(
-      "RELATÓRIO TÉCNICO DE WORK ORDER",
-      pageWidth / 2,
-      15,
-      { align: "center" }
-    );
-
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-
-    pdf.text("GreenSoil Group Ambiental LTDA", margin, 38);
-    pdf.text("CNPJ: 29.088.151/0001-25", margin, 44);
-    pdf.text(
-      "Avenida Brigadeiro Faria Lima, 1572, Conjunto 1601 - Jardim Paulistano, São Paulo/SP - 014151-001",
-      margin,
-      50,
-      { maxWidth: pageWidth - margin * 2 }
-    );
-
-    pdf.line(margin, 55, pageWidth - margin, 55);
-
-    pdf.setFontSize(11);
-    pdf.text(
-      `Projeto: ${workOrder.projects?.name ?? "-"}`,
-      margin,
-      65
-    );
-    pdf.text(`Work Order: ${workOrder.title}`, margin, 72);
-    pdf.text(
-      `Data de emissão: ${new Date().toLocaleDateString()}`,
-      margin,
-      79
-    );
-
+    addHeader();
     let currentY = 90;
 
     for (const act of activities) {
@@ -213,7 +194,6 @@ export default function WorkOrderPage() {
       currentY += 8;
 
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
       pdf.text(
         `Comentário: ${act.note?.trim() ? act.note : "Sem observações"}`,
         margin,
@@ -252,10 +232,56 @@ export default function WorkOrderPage() {
         currentY += height + 15;
       }
 
-      if (currentY > pageHeight - 40) {
+      if (currentY > pageHeight - 60) {
         pdf.addPage();
-        currentY = 40;
+        addHeader();
+        currentY = 90;
       }
+    }
+
+    /* ASSINATURA */
+    if (workOrder.signature_url) {
+      pdf.addPage();
+      addHeader();
+      currentY = 100;
+
+      const signBase64 = await urlToBase64(workOrder.signature_url);
+      const img = new Image();
+      img.src = signBase64;
+      await new Promise(res => (img.onload = res));
+
+      const maxWidth = 80;
+      const ratio = img.width / img.height;
+      const width = maxWidth;
+      const height = width / ratio;
+
+      const x = (pageWidth - width) / 2;
+
+      pdf.setFontSize(12);
+      pdf.text("Assinatura do Responsável", pageWidth / 2, currentY - 10, {
+        align: "center",
+      });
+
+      pdf.addImage(signBase64, "PNG", x, currentY, width, height);
+
+      const meses = [
+        "janeiro","fevereiro","março","abril","maio","junho",
+        "julho","agosto","setembro","outubro","novembro","dezembro"
+      ];
+
+      const hoje = new Date();
+      const dataExtenso = `São Paulo, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}.`;
+
+      pdf.text(dataExtenso, pageWidth / 2, currentY + height + 20, {
+        align: "center",
+      });
+    }
+
+    /* Rodapé final */
+    const totalPages = pdf.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      addFooter(i, totalPages);
     }
 
     pdf.save(`workorder_${workOrder.title}.pdf`);
