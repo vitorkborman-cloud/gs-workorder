@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import AppShell from "../../../../../components/AppShell";
-import Button from "../../../../../components/Button";
 
 type Layer = {
   profundidade: string;
@@ -101,10 +100,7 @@ export default function SoloPage() {
     if (draftId) {
       await supabase
         .from("soil_descriptions")
-        .update({
-          ...form,
-          layers,
-        })
+        .update({ ...form, layers })
         .eq("id", draftId);
     } else {
       const { data } = await supabase
@@ -167,105 +163,53 @@ export default function SoloPage() {
 
   return (
     <AppShell>
-      <div className="px-4 py-6 space-y-6">
+      <div className="min-h-screen bg-gray-50 px-4 py-6 space-y-6">
 
         {/* HEADER */}
-        <div className="space-y-2">
-          <h1 className="text-xl font-bold text-[#391e2a]">
-            Perfil Descritivo
-          </h1>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Status:</span>
+        <div className="bg-white rounded-2xl shadow-sm border p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-lg font-bold text-[#391e2a]">
+                Perfil Descritivo
+              </h1>
+              <p className="text-xs text-gray-500">
+                Registro técnico de sondagem
+              </p>
+            </div>
+
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-yellow-100 text-yellow-700">
               {draftId ? "Rascunho" : "Novo"}
             </span>
           </div>
         </div>
 
-        {/* DADOS DA SONDAGEM */}
         <Section title="Dados da Sondagem">
-          <Input
-            label="Nome da Sondagem"
-            value={form.nome_sondagem}
-            onChange={(v) => setField("nome_sondagem", v)}
-          />
+          <Input label="Nome da Sondagem" value={form.nome_sondagem} onChange={(v) => setField("nome_sondagem", v)} />
 
           <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Data"
-              value={form.data}
-              onChange={(v) => setField("data", v)}
-            />
-            <Input
-              label="Hora"
-              value={form.hora}
-              onChange={(v) => setField("hora", v)}
-            />
+            <Input label="Data" value={form.data} onChange={(v) => setField("data", v)} />
+            <Input label="Hora" value={form.hora} onChange={(v) => setField("hora", v)} />
           </div>
 
-          <Input
-            label="Tipo de Sondagem"
-            value={form.tipo_sondagem}
-            onChange={(v) => setField("tipo_sondagem", v)}
-          />
-
-          <Input
-            label="Nível d’água"
-            value={form.nivel_agua}
-            onChange={(v) => setField("nivel_agua", v)}
-          />
-
-          <Input
-            label="Profundidade Total"
-            value={form.profundidade_total}
-            onChange={(v) => setField("profundidade_total", v)}
-          />
+          <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v) => setField("tipo_sondagem", v)} />
+          <Input label="Nível d’água" value={form.nivel_agua} onChange={(v) => setField("nivel_agua", v)} />
+          <Input label="Profundidade Total" value={form.profundidade_total} onChange={(v) => setField("profundidade_total", v)} />
         </Section>
 
-        {/* CONSTRUÇÃO */}
         <Section title="Construção do Poço">
-          <Input
-            label="Diâmetro da Sondagem"
-            value={form.diametro_sondagem}
-            onChange={(v) => setField("diametro_sondagem", v)}
-          />
-
-          <Input
-            label="Diâmetro do Poço"
-            value={form.diametro_poco}
-            onChange={(v) => setField("diametro_poco", v)}
-          />
-
-          <Input
-            label="Pré-filtro"
-            value={form.pre_filtro}
-            onChange={(v) => setField("pre_filtro", v)}
-          />
-
-          <Input
-            label="Seção Filtrante"
-            value={form.secao_filtrante}
-            onChange={(v) => setField("secao_filtrante", v)}
-          />
+          <Input label="Diâmetro da Sondagem" value={form.diametro_sondagem} onChange={(v) => setField("diametro_sondagem", v)} />
+          <Input label="Diâmetro do Poço" value={form.diametro_poco} onChange={(v) => setField("diametro_poco", v)} />
+          <Input label="Pré-filtro" value={form.pre_filtro} onChange={(v) => setField("pre_filtro", v)} />
+          <Input label="Seção Filtrante" value={form.secao_filtrante} onChange={(v) => setField("secao_filtrante", v)} />
         </Section>
 
-        {/* COORDENADAS */}
         <Section title="Coordenadas">
           <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Coord. X"
-              value={form.coord_x}
-              onChange={(v) => setField("coord_x", v)}
-            />
-            <Input
-              label="Coord. Y"
-              value={form.coord_y}
-              onChange={(v) => setField("coord_y", v)}
-            />
+            <Input label="Coord. X" value={form.coord_x} onChange={(v) => setField("coord_x", v)} />
+            <Input label="Coord. Y" value={form.coord_y} onChange={(v) => setField("coord_y", v)} />
           </div>
         </Section>
 
-        {/* CAMADAS */}
         <Section title="Camadas Estratigráficas">
           {layers.map((layer, i) => (
             <div key={i} className="grid grid-cols-2 gap-3">
@@ -292,23 +236,34 @@ export default function SoloPage() {
 
           <button
             onClick={addLayer}
-            className="w-full mt-2 border border-[#391e2a] text-[#391e2a] font-semibold py-2 rounded-lg"
+            className="w-full mt-2 bg-[#391e2a] text-white font-semibold py-2 rounded-lg"
           >
             + Adicionar Camada
           </button>
         </Section>
 
-        {/* BOTÕES */}
-        <div className="space-y-3 pt-4">
-          <Button text="Salvar Rascunho" onClick={salvar} />
-          <Button text="Concluir Perfil" onClick={concluir} />
+        {/* BOTÕES PROFISSIONAIS */}
+        <div className="space-y-3 pt-2">
+          <button
+            onClick={salvar}
+            className="w-full border border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl"
+          >
+            Salvar Rascunho
+          </button>
+
+          <button
+            onClick={concluir}
+            className="w-full bg-[#80b02d] text-white font-bold py-3 rounded-xl shadow-md"
+          >
+            Concluir Perfil
+          </button>
         </div>
       </div>
     </AppShell>
   );
 }
 
-/* COMPONENTES AUXILIARES */
+/* COMPONENTES */
 
 function Section({
   title,
@@ -319,7 +274,7 @@ function Section({
 }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-4">
-      <h2 className="text-sm font-semibold text-[#391e2a] uppercase tracking-wide border-b pb-2">
+      <h2 className="text-sm font-semibold text-[#391e2a] border-l-4 border-[#80b02d] pl-2">
         {title}
       </h2>
       {children}
