@@ -40,8 +40,6 @@ export default function SoloDetailPage() {
     load();
   }, []);
 
-  /* ================= PDF EXECUTIVO ================= */
-
   async function gerarPDF() {
     if (!data) return;
 
@@ -58,25 +56,14 @@ export default function SoloDetailPage() {
     pdf.setFillColor(...ROXO);
     pdf.rect(0, 0, pageWidth, 25, "F");
 
-    // Logo pequeno mantendo proporção
     const logo = new Image();
     logo.src = "/logo.png";
-
-    await new Promise((resolve) => {
-      logo.onload = resolve;
-    });
+    await new Promise((resolve) => (logo.onload = resolve));
 
     const logoWidth = 25;
     const logoHeight = (logo.height / logo.width) * logoWidth;
 
-    pdf.addImage(
-      logo,
-      "PNG",
-      margin,
-      6,
-      logoWidth,
-      logoHeight
-    );
+    pdf.addImage(logo, "PNG", margin, 6, logoWidth, logoHeight);
 
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(12);
@@ -161,7 +148,6 @@ export default function SoloDetailPage() {
     const colWidth2 = 30;
     const colWidth3 = pageWidth - margin * 2 - 60;
 
-    // Cabeçalho
     pdf.setFillColor(...VERDE);
     pdf.rect(col1, y, colWidth1, 8, "F");
     pdf.rect(col2, y, colWidth2, 8, "F");
@@ -197,20 +183,161 @@ export default function SoloDetailPage() {
       y += 8;
     });
 
-    /* ================= RODAPÉ ================= */
+    /* ================= RODAPÉ PÁGINA 1 ================= */
 
     const hoje = new Date().toLocaleDateString("pt-BR");
 
     pdf.setFontSize(8);
     pdf.setTextColor(100);
-    pdf.text(
-      `Emitido em ${hoje}`,
-      margin,
-      pageHeight - 10
+    pdf.text(`Emitido em ${hoje}`, margin, pageHeight - 10);
+    pdf.text(`Página 1`, pageWidth - margin, pageHeight - 10, {
+      align: "right",
+    });
+
+    /* ================= PÁGINA 2 – PERFIL ORIGINAL ================= */
+
+    pdf.addPage();
+
+    pdf.setFontSize(16);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Perfil Estratigráfico", pageWidth / 2, 20, {
+      align: "center",
+    });
+
+    const topo = 30;
+    const alturaMax = 170;
+    const larguraPerfil = 40;
+
+    const centro = pageWidth / 2;
+    const esquerdaPerfil = centro - larguraPerfil / 2;
+    const direitaPerfil = centro + larguraPerfil / 2;
+
+    const profundidadeTotal = parseFloat(
+      data.profundidade_total || "1"
+    );
+    const escala = alturaMax / profundidadeTotal;
+
+    pdf.setFontSize(8);
+    for (let i = 0; i <= profundidadeTotal; i += 0.5) {
+      const yEscala = topo + i * escala;
+      pdf.line(esquerdaPerfil - 6, yEscala, esquerdaPerfil, yEscala);
+      pdf.text(
+        `${i.toFixed(1)} m`,
+        esquerdaPerfil - 25,
+        yEscala + 2
+      );
+    }
+
+    const mapaCores: Record<string, [number, number, number]> =
+      {};
+    let contadorCor = 0;
+
+    const base: [number, number, number][] = [
+      [210, 180, 140],
+      [170, 170, 170],
+      [190, 110, 90],
+      [220, 200, 120],
+      [150, 150, 120],
+      [200, 160, 120],
+      [140, 140, 140],
+    ];
+
+    function gerarCor(nome: string): [number, number, number] {
+      if (!mapaCores[nome]) {
+        mapaCores[nome] =
+          base[contadorCor % base.length];
+        contadorCor++;
+      }
+      return mapaCores[nome];
+    }
+
+    let profAnt = 0;
+
+    layers.forEach((l) => {
+      const nome = l.tipo.trim();
+      const profAtual = parseFloat(l.profundidade);
+
+      const altura = (profAtual - profAnt) * escala;
+      const yCamada = topo + profAnt * escala;
+
+      const [r, g, b] = gerarCor(nome);
+      pdf.setFillColor(r, g, b);
+      pdf.rect(
+        esquerdaPerfil,
+        yCamada,
+        larguraPerfil,
+        altura,
+        "F"
+      );
+
+      profAnt = profAtual;
+    });
+
+    pdf.setDrawColor(0);
+    pdf.rect(
+      esquerdaPerfil,
+      topo,
+      larguraPerfil,
+      alturaMax
     );
 
+    const larguraTubo = 12;
+    const esquerdaTubo = centro - larguraTubo / 2;
+
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(
+      esquerdaTubo,
+      topo,
+      larguraTubo,
+      alturaMax,
+      "F"
+    );
+    pdf.setDrawColor(0);
+    pdf.rect(
+      esquerdaTubo,
+      topo,
+      larguraTubo,
+      alturaMax
+    );
+
+    const alturaFiltro = alturaMax * 0.3;
+    const topoFiltro = topo + alturaMax - alturaFiltro;
+
+    for (let i = 0; i < alturaFiltro; i += 3) {
+      pdf.line(
+        esquerdaTubo,
+        topoFiltro + i,
+        esquerdaTubo + larguraTubo,
+        topoFiltro + i
+      );
+    }
+
+    pdf.rect(
+      esquerdaTubo,
+      topoFiltro,
+      larguraTubo,
+      alturaFiltro
+    );
+
+    if (data.nivel_agua) {
+      const nivel = parseFloat(data.nivel_agua);
+      if (!isNaN(nivel)) {
+        const yNivel = topo + nivel * escala;
+        pdf.setDrawColor(0, 0, 255);
+        pdf.setLineWidth(1.2);
+        pdf.line(
+          esquerdaPerfil - 10,
+          yNivel,
+          direitaPerfil + 10,
+          yNivel
+        );
+      }
+    }
+
+    pdf.setFontSize(8);
+    pdf.setTextColor(100);
     pdf.text(
-      `Página 1`,
+      `Página 2`,
       pageWidth - margin,
       pageHeight - 10,
       { align: "right" }
@@ -218,8 +345,6 @@ export default function SoloDetailPage() {
 
     pdf.save(`perfil_${data.nome_sondagem}.pdf`);
   }
-
-  /* ================= DESKTOP EXECUTIVO ================= */
 
   if (loading)
     return (
@@ -242,12 +367,14 @@ export default function SoloDetailPage() {
           <h1 className="text-3xl font-bold text-primary">
             Perfil Descritivo
           </h1>
-          <Button onClick={gerarPDF} className="bg-primary text-white">
+          <Button
+            onClick={gerarPDF}
+            className="bg-primary text-white"
+          >
             Baixar PDF
           </Button>
         </div>
 
-        {/* CARD PRINCIPAL */}
         <Card className="shadow-lg border-0">
           <CardContent className="p-8 grid md:grid-cols-3 gap-6">
             {Object.entries({
@@ -256,24 +383,89 @@ export default function SoloDetailPage() {
               Hora: data.hora,
               "Nível d'água": data.nivel_agua,
               Tipo: data.tipo_sondagem,
-              "Diâmetro sondagem": data.diametro_sondagem,
+              "Diâmetro sondagem":
+                data.diametro_sondagem,
               "Diâmetro poço": data.diametro_poco,
               "Pré-filtro": data.pre_filtro,
-              "Seção filtrante": data.secao_filtrante,
+              "Seção filtrante":
+                data.secao_filtrante,
               "Coord X": data.coord_x,
               "Coord Y": data.coord_y,
-              "Profundidade total": data.profundidade_total,
+              "Profundidade total":
+                data.profundidade_total,
             }).map(([label, value]) => (
               <div
                 key={label}
                 className="bg-white p-4 rounded-2xl shadow-sm border"
               >
-                <p className="text-xs text-gray-500">{label}</p>
+                <p className="text-xs text-gray-500">
+                  {label}
+                </p>
                 <p className="text-lg font-semibold text-gray-800">
                   {value || "-"}
                 </p>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-0">
+          <CardContent className="p-8">
+            <h2 className="text-xl font-bold text-primary mb-6">
+              Camadas Estratigráficas
+            </h2>
+
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-primary text-white">
+                    <th className="p-3 text-left">
+                      De (m)
+                    </th>
+                    <th className="p-3 text-left">
+                      Até (m)
+                    </th>
+                    <th className="p-3 text-left">
+                      Descrição
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {layers.map((l, index) => {
+                    const profAnterior =
+                      index === 0
+                        ? 0
+                        : parseFloat(
+                            layers[index - 1]
+                              .profundidade
+                          );
+
+                    return (
+                      <tr
+                        key={index}
+                        className={
+                          index % 2 === 0
+                            ? "bg-gray-50"
+                            : "bg-white"
+                        }
+                      >
+                        <td className="p-3 border">
+                          {profAnterior.toFixed(2)}
+                        </td>
+                        <td className="p-3 border">
+                          {parseFloat(
+                            l.profundidade
+                          ).toFixed(2)}
+                        </td>
+                        <td className="p-3 border font-medium">
+                          {l.tipo}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       </div>
