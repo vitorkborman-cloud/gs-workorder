@@ -146,6 +146,7 @@ export default function SoloDetailPage() {
     const profundidadeTotal = parseFloat(data.profundidade_total || "1");
     const escala = alturaMax / profundidadeTotal;
 
+    /* ESCALA */
     pdf.setFontSize(8);
     for (let i = 0; i <= profundidadeTotal; i += 0.5) {
       const yEscala = topo + i * escala;
@@ -153,6 +154,7 @@ export default function SoloDetailPage() {
       pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
     }
 
+    /* CAMADAS */
     const mapaCores: Record<string, [number, number, number]> = {};
     let contadorCor = 0;
 
@@ -193,32 +195,43 @@ export default function SoloDetailPage() {
     pdf.setDrawColor(0);
     pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
 
+    /* TUBO */
     const larguraTubo = 12;
     const esquerdaTubo = centro - larguraTubo / 2;
 
     pdf.setFillColor(255, 255, 255);
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
-    pdf.setDrawColor(0);
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax);
 
-    const alturaFiltro = alturaMax * 0.3;
-    const topoFiltro = topo + alturaMax - alturaFiltro;
+    /* SEÇÃO FILTRANTE CORRIGIDA */
+    if (data.secao_filtrante) {
+      const comprimentoFiltro = parseFloat(data.secao_filtrante);
 
-    for (let i = 0; i < alturaFiltro; i += 3) {
-      pdf.line(
-        esquerdaTubo,
-        topoFiltro + i,
-        esquerdaTubo + larguraTubo,
-        topoFiltro + i
-      );
+      if (!isNaN(comprimentoFiltro)) {
+        const inicioFiltro = profundidadeTotal - comprimentoFiltro;
+        const yInicio = topo + inicioFiltro * escala;
+        const alturaFiltro = comprimentoFiltro * escala;
+
+        for (let i = 0; i < alturaFiltro; i += 3) {
+          pdf.line(
+            esquerdaTubo,
+            yInicio + i,
+            esquerdaTubo + larguraTubo,
+            yInicio + i
+          );
+        }
+
+        pdf.rect(esquerdaTubo, yInicio, larguraTubo, alturaFiltro);
+      }
     }
 
-    pdf.rect(esquerdaTubo, topoFiltro, larguraTubo, alturaFiltro);
-
+    /* NÍVEL D'ÁGUA EXATO */
     if (data.nivel_agua) {
       const nivel = parseFloat(data.nivel_agua);
+
       if (!isNaN(nivel)) {
         const yNivel = topo + nivel * escala;
+
         pdf.setDrawColor(0, 0, 255);
         pdf.setLineWidth(1.2);
         pdf.line(esquerdaPerfil - 10, yNivel, direitaPerfil + 10, yNivel);
@@ -263,7 +276,6 @@ export default function SoloDetailPage() {
 
         <div className="max-w-6xl mx-auto mt-10 space-y-8 px-6">
 
-          {/* DADOS DA SONDAGEM */}
           <Section title="Dados da Sondagem">
             <Grid>
               <Info label="Nome da Sondagem" value={data.nome_sondagem} />
@@ -334,11 +346,7 @@ function Section({ title, children }: any) {
 }
 
 function Grid({ children }: any) {
-  return (
-    <div className="grid md:grid-cols-2 gap-6 text-sm">
-      {children}
-    </div>
-  );
+  return <div className="grid md:grid-cols-2 gap-6 text-sm">{children}</div>;
 }
 
 function Info({ label, value }: { label: string; value: any }) {
