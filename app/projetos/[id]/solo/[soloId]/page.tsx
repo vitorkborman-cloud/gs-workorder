@@ -113,17 +113,53 @@ export default function SoloDetailPage() {
 
     pdf.setFont("helvetica", "bold");
     pdf.text("4. Camadas Estratigráficas", margin, y);
-    y += 8;
+    y += 10;
 
+    /* ===== TABELA ===== */
+
+    const col1 = margin;
+    const col2 = margin + 35;
+    const col3 = margin + 70;
+    const larguraTabela = pageWidth - margin * 2;
+    const alturaLinha = 8;
+
+    /* Cabeçalho */
+    pdf.setFillColor(128, 176, 45); // verde tema
+    pdf.rect(col1, y, larguraTabela, alturaLinha, "F");
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("De (m)", col1 + 3, y + 5.5);
+    pdf.text("Até (m)", col2 + 3, y + 5.5);
+    pdf.text("Tipo de Solo", col3 + 3, y + 5.5);
+
+    y += alturaLinha;
+
+    /* Linhas */
     pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(0, 0, 0);
 
     let profAnterior = 0;
-    layers.forEach((l) => {
-      const profAtual = parseFloat(l.profundidade);
-      pdf.text(`${profAnterior} – ${profAtual} m : ${l.tipo}`, margin, y);
-      y += 6;
-      profAnterior = profAtual;
-    });
+
+    layers.forEach((l, index) => {
+    const profAtual = parseFloat(l.profundidade);
+
+      // cor alternada suave
+      if (index % 2 === 0) {
+        pdf.setFillColor(230, 242, 214); // verde claro suave
+       pdf.rect(col1, y, larguraTabela, alturaLinha, "F");
+      }
+
+      pdf.text(String(profAnterior), col1 + 3, y + 5.5);
+      pdf.text(String(profAtual), col2 + 3, y + 5.5);
+     pdf.text(l.tipo, col3 + 3, y + 5.5);
+
+     // bordas
+     pdf.rect(col1, y, larguraTabela, alturaLinha);
+
+    y += alturaLinha;
+     profAnterior = profAtual;
+  });
 
     /* ================= PÁGINA 2 – PERFIL ================= */
 
