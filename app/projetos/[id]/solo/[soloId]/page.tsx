@@ -109,8 +109,6 @@ export default function SoloDetailPage() {
     campo("Coord X:", data.coord_x);
     campo("Coord Y:", data.coord_y);
 
-    y += 10;
-
     pdf.addPage();
     y = 30;
 
@@ -162,7 +160,6 @@ export default function SoloDetailPage() {
 
     y += alturaLinha;
      profAnterior = profAtual;
-     pdf.addPage();
   });
 
     /* ================= PÁGINA 2 – PERFIL ================= */
