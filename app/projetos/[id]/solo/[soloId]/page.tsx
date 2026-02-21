@@ -193,6 +193,33 @@ export default function SoloDetailPage() {
     pdf.setDrawColor(0);
     pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
 
+        /* ================= LEGENDA ================= */
+
+    let yLegenda = topo;
+    let profLegenda = 0;
+
+    pdf.setFontSize(9);
+    pdf.setTextColor(0);
+
+    layers.forEach((l) => {
+      const nome = l.tipo.trim();
+      const profAtual = parseFloat(l.profundidade);
+
+      const [r, g, b] = gerarCor(nome);
+
+      pdf.setFillColor(r, g, b);
+      pdf.rect(direitaPerfil + 20, yLegenda, 8, 8, "F");
+
+      pdf.text(
+        `${profLegenda} – ${profAtual} m : ${nome}`,
+        direitaPerfil + 32,
+        yLegenda + 6
+      );
+
+      yLegenda += 12;
+      profLegenda = profAtual;
+    });
+
     const larguraTubo = 12;
     const esquerdaTubo = centro - larguraTubo / 2;
 
