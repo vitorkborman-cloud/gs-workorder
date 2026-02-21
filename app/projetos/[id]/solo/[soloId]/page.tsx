@@ -40,6 +40,8 @@ export default function SoloDetailPage() {
     load();
   }, []);
 
+  /* ================= PDF (CONGELADO) ================= */
+
   async function gerarPDF() {
     if (!data) return;
 
@@ -50,8 +52,6 @@ export default function SoloDetailPage() {
 
     const ROXO: [number, number, number] = [57, 30, 42];
     const VERDE: [number, number, number] = [128, 176, 45];
-
-    /* ================= CABEÇALHO ================= */
 
     pdf.setFillColor(...ROXO);
     pdf.rect(0, 0, pageWidth, 25, "F");
@@ -76,8 +76,6 @@ export default function SoloDetailPage() {
 
     pdf.setTextColor(0, 0, 0);
 
-    /* ================= TÍTULO ================= */
-
     pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
     pdf.text(
@@ -99,8 +97,6 @@ export default function SoloDetailPage() {
       pdf.text(String(valor ?? "-"), margin + 65, y);
       y += 7;
     }
-
-    /* ================= DADOS ================= */
 
     pdf.setFont("helvetica", "bold");
     pdf.text("1. Dados da Sondagem", margin, y);
@@ -134,8 +130,6 @@ export default function SoloDetailPage() {
     campo("Coord Y:", data.coord_y);
 
     y += 12;
-
-    /* ================= TABELA ESTRATIGRAFIA ================= */
 
     pdf.setFont("helvetica", "bold");
     pdf.text("4. Camadas Estratigráficas", margin, y);
@@ -183,8 +177,6 @@ export default function SoloDetailPage() {
       y += 8;
     });
 
-    /* ================= RODAPÉ PÁGINA 1 ================= */
-
     const hoje = new Date().toLocaleDateString("pt-BR");
 
     pdf.setFontSize(8);
@@ -193,8 +185,6 @@ export default function SoloDetailPage() {
     pdf.text(`Página 1`, pageWidth - margin, pageHeight - 10, {
       align: "right",
     });
-
-    /* ================= PÁGINA 2 – PERFIL ORIGINAL ================= */
 
     pdf.addPage();
 
@@ -221,15 +211,10 @@ export default function SoloDetailPage() {
     for (let i = 0; i <= profundidadeTotal; i += 0.5) {
       const yEscala = topo + i * escala;
       pdf.line(esquerdaPerfil - 6, yEscala, esquerdaPerfil, yEscala);
-      pdf.text(
-        `${i.toFixed(1)} m`,
-        esquerdaPerfil - 25,
-        yEscala + 2
-      );
+      pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
     }
 
-    const mapaCores: Record<string, [number, number, number]> =
-      {};
+    const mapaCores: Record<string, [number, number, number]> = {};
     let contadorCor = 0;
 
     const base: [number, number, number][] = [
@@ -244,8 +229,7 @@ export default function SoloDetailPage() {
 
     function gerarCor(nome: string): [number, number, number] {
       if (!mapaCores[nome]) {
-        mapaCores[nome] =
-          base[contadorCor % base.length];
+        mapaCores[nome] = base[contadorCor % base.length];
         contadorCor++;
       }
       return mapaCores[nome];
@@ -262,43 +246,21 @@ export default function SoloDetailPage() {
 
       const [r, g, b] = gerarCor(nome);
       pdf.setFillColor(r, g, b);
-      pdf.rect(
-        esquerdaPerfil,
-        yCamada,
-        larguraPerfil,
-        altura,
-        "F"
-      );
+      pdf.rect(esquerdaPerfil, yCamada, larguraPerfil, altura, "F");
 
       profAnt = profAtual;
     });
 
     pdf.setDrawColor(0);
-    pdf.rect(
-      esquerdaPerfil,
-      topo,
-      larguraPerfil,
-      alturaMax
-    );
+    pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
 
     const larguraTubo = 12;
     const esquerdaTubo = centro - larguraTubo / 2;
 
     pdf.setFillColor(255, 255, 255);
-    pdf.rect(
-      esquerdaTubo,
-      topo,
-      larguraTubo,
-      alturaMax,
-      "F"
-    );
+    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
     pdf.setDrawColor(0);
-    pdf.rect(
-      esquerdaTubo,
-      topo,
-      larguraTubo,
-      alturaMax
-    );
+    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax);
 
     const alturaFiltro = alturaMax * 0.3;
     const topoFiltro = topo + alturaMax - alturaFiltro;
@@ -312,12 +274,7 @@ export default function SoloDetailPage() {
       );
     }
 
-    pdf.rect(
-      esquerdaTubo,
-      topoFiltro,
-      larguraTubo,
-      alturaFiltro
-    );
+    pdf.rect(esquerdaTubo, topoFiltro, larguraTubo, alturaFiltro);
 
     if (data.nivel_agua) {
       const nivel = parseFloat(data.nivel_agua);
@@ -360,13 +317,29 @@ export default function SoloDetailPage() {
       </AdminShell>
     );
 
+  function Info({ label, value }: { label: string; value: any }) {
+    return (
+      <div className="bg-white p-4 rounded-xl border shadow-sm">
+        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-base font-semibold">{value || "-"}</p>
+      </div>
+    );
+  }
+
   return (
     <AdminShell>
-      <div className="space-y-8">
+      <div className="space-y-10">
+
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-primary">
-            Perfil Descritivo
-          </h1>
+          <div>
+            <h1 className="text-3xl font-bold text-primary">
+              Perfil Descritivo
+            </h1>
+            <p className="text-gray-500 text-sm">
+              Visualização técnica executiva
+            </p>
+          </div>
+
           <Button
             onClick={gerarPDF}
             className="bg-primary text-white"
@@ -375,41 +348,44 @@ export default function SoloDetailPage() {
           </Button>
         </div>
 
-        <Card className="shadow-lg border-0">
-          <CardContent className="p-8 grid md:grid-cols-3 gap-6">
-            {Object.entries({
-              Sondagem: data.nome_sondagem,
-              Data: data.data,
-              Hora: data.hora,
-              "Nível d'água": data.nivel_agua,
-              Tipo: data.tipo_sondagem,
-              "Diâmetro sondagem":
-                data.diametro_sondagem,
-              "Diâmetro poço": data.diametro_poco,
-              "Pré-filtro": data.pre_filtro,
-              "Seção filtrante":
-                data.secao_filtrante,
-              "Coord X": data.coord_x,
-              "Coord Y": data.coord_y,
-              "Profundidade total":
-                data.profundidade_total,
-            }).map(([label, value]) => (
-              <div
-                key={label}
-                className="bg-white p-4 rounded-2xl shadow-sm border"
-              >
-                <p className="text-xs text-gray-500">
-                  {label}
-                </p>
-                <p className="text-lg font-semibold text-gray-800">
-                  {value || "-"}
-                </p>
-              </div>
-            ))}
+        <Card className="shadow-md border-0">
+          <CardContent className="p-8 grid md:grid-cols-4 gap-6">
+            <Info label="Sondagem" value={data.nome_sondagem} />
+            <Info label="Data" value={data.data} />
+            <Info label="Profundidade Total" value={data.profundidade_total} />
+            <Info label="Nível d'água" value={data.nivel_agua} />
           </CardContent>
         </Card>
 
-        <Card className="shadow-lg border-0">
+        <Card className="shadow-md border-0">
+          <CardContent className="p-8">
+            <h2 className="text-xl font-bold text-primary mb-6">
+              Construção do Poço
+            </h2>
+
+            <div className="grid md:grid-cols-4 gap-6">
+              <Info label="Diâmetro sondagem" value={data.diametro_sondagem} />
+              <Info label="Diâmetro poço" value={data.diametro_poco} />
+              <Info label="Pré-filtro" value={data.pre_filtro} />
+              <Info label="Seção filtrante" value={data.secao_filtrante} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md border-0">
+          <CardContent className="p-8">
+            <h2 className="text-xl font-bold text-primary mb-6">
+              Coordenadas
+            </h2>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <Info label="Coord X" value={data.coord_x} />
+              <Info label="Coord Y" value={data.coord_y} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md border-0">
           <CardContent className="p-8">
             <h2 className="text-xl font-bold text-primary mb-6">
               Camadas Estratigráficas
@@ -419,15 +395,9 @@ export default function SoloDetailPage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-primary text-white">
-                    <th className="p-3 text-left">
-                      De (m)
-                    </th>
-                    <th className="p-3 text-left">
-                      Até (m)
-                    </th>
-                    <th className="p-3 text-left">
-                      Descrição
-                    </th>
+                    <th className="p-3 text-left">De (m)</th>
+                    <th className="p-3 text-left">Até (m)</th>
+                    <th className="p-3 text-left">Descrição</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -436,8 +406,7 @@ export default function SoloDetailPage() {
                       index === 0
                         ? 0
                         : parseFloat(
-                            layers[index - 1]
-                              .profundidade
+                            layers[index - 1].profundidade
                           );
 
                     return (
@@ -453,9 +422,7 @@ export default function SoloDetailPage() {
                           {profAnterior.toFixed(2)}
                         </td>
                         <td className="p-3 border">
-                          {parseFloat(
-                            l.profundidade
-                          ).toFixed(2)}
+                          {parseFloat(l.profundidade).toFixed(2)}
                         </td>
                         <td className="p-3 border font-medium">
                           {l.tipo}
@@ -468,6 +435,7 @@ export default function SoloDetailPage() {
             </div>
           </CardContent>
         </Card>
+
       </div>
     </AdminShell>
   );
