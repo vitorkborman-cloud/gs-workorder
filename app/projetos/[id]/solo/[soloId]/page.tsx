@@ -40,159 +40,95 @@ export default function SoloDetailPage() {
     load();
   }, []);
 
-  /* ================= PDF ================= */
-
   async function gerarPDF() {
     if (!data) return;
 
     const pdf = new jsPDF("p", "mm", "a4");
+
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 20;
 
-    const ROXO: [number, number, number] = [57, 30, 42];
-    const VERDE: [number, number, number] = [128, 176, 45];
+    /* ================= PÁGINA 1 – RELATÓRIO COMPLETO ================= */
 
-    /* ---------- PÁGINA 1 - DADOS ---------- */
-
-    pdf.setFillColor(...ROXO);
+    pdf.setFillColor(57, 30, 42);
     pdf.rect(0, 0, pageWidth, 25, "F");
 
-    const logo = new Image();
-    logo.src = "/logo.png";
-    await new Promise((resolve) => (logo.onload = resolve));
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(13);
+    pdf.text("GS WORK ORDER - RELATÓRIO TÉCNICO", pageWidth / 2, 15, { align: "center" });
 
-    const logoWidth = 30;
-    const logoHeight = (logo.height / logo.width) * logoWidth;
-
-    pdf.addImage(logo, "PNG", margin, 5, logoWidth, logoHeight);
-
-    pdf.setGState(new (pdf as any).GState({ opacity: 0.85 }));
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(margin, 5, logoWidth, logoHeight, "F");
-    pdf.setGState(new (pdf as any).GState({ opacity: 1 }));
-
-    pdf.setTextColor(255);
-    pdf.setFontSize(16);
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
-    pdf.text("PERFIL DESCRITIVO", pageWidth / 2, 15, {
-      align: "center",
-    });
+    pdf.text("PERFIL DESCRITIVO DE SOLO", pageWidth / 2, 40, { align: "center" });
 
-    pdf.setTextColor(0);
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "normal");
 
-    let y = 45;
+    let y = 60;
 
-    function titulo(secao: string) {
-      pdf.setFontSize(13);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(secao, margin, y);
-      y += 6;
-      pdf.setDrawColor(...VERDE);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 10;
-    }
-
-    function linha(label: string, valor: any) {
+    function campo(label: string, valor: any) {
       pdf.setFont("helvetica", "bold");
       pdf.text(label, margin, y);
       pdf.setFont("helvetica", "normal");
-      pdf.text(String(valor ?? "-"), margin + 75, y);
-      y += 8;
+      pdf.text(String(valor ?? "-"), margin + 60, y);
+      y += 7;
     }
 
-    titulo("1. Dados da Sondagem");
-    linha("Sondagem:", data.nome_sondagem);
-    linha("Data:", data.data);
-    linha("Hora:", data.hora);
-    linha("Tipo:", data.tipo_sondagem);
-    linha("Nível d'água (m):", data.nivel_agua);
-    linha("Profundidade total (m):", data.profundidade_total);
-
-    y += 5;
-
-    titulo("2. Construção do Poço");
-    linha("Diâmetro sondagem:", data.diametro_sondagem);
-    linha("Diâmetro poço:", data.diametro_poco);
-    linha("Comprimento seção filtrante (m):", data.secao_filtrante);
-
-    y += 5;
-
-    titulo("3. Coordenadas");
-    linha("Coord X:", data.coord_x);
-    linha("Coord Y:", data.coord_y);
-
-    /* ---------- PÁGINA 2 - TABELA ---------- */
-
-    pdf.addPage();
-
-    pdf.setFontSize(14);
     pdf.setFont("helvetica", "bold");
-    pdf.text("4. Camadas Estratigráficas", margin, 20);
+    pdf.text("1. Dados da Sondagem", margin, y);
+    y += 8;
 
-    let yTable = 30;
+    campo("Sondagem:", data.nome_sondagem);
+    campo("Data:", data.data);
+    campo("Hora:", data.hora);
+    campo("Tipo:", data.tipo_sondagem);
+    campo("Nível d'água:", data.nivel_agua);
+    campo("Profundidade total:", data.profundidade_total);
 
-    const col1 = margin;
-    const col2 = margin + 30;
-    const col3 = margin + 60;
-    const colWidth1 = 30;
-    const colWidth2 = 30;
-    const colWidth3 = pageWidth - margin * 2 - 60;
+    y += 8;
 
-    function header() {
-      pdf.setFillColor(...VERDE);
-      pdf.rect(col1, yTable, colWidth1, 8, "F");
-      pdf.rect(col2, yTable, colWidth2, 8, "F");
-      pdf.rect(col3, yTable, colWidth3, 8, "F");
+    pdf.setFont("helvetica", "bold");
+    pdf.text("2. Construção do Poço", margin, y);
+    y += 8;
 
-      pdf.setTextColor(255);
-      pdf.text("De (m)", col1 + 5, yTable + 5);
-      pdf.text("Até (m)", col2 + 5, yTable + 5);
-      pdf.text("Descrição", col3 + 5, yTable + 5);
-      pdf.setTextColor(0);
+    campo("Diâmetro sondagem:", data.diametro_sondagem);
+    campo("Diâmetro poço:", data.diametro_poco);
+    campo("Pré-filtro:", data.pre_filtro);
+    campo("Seção filtrante:", data.secao_filtrante);
 
-      yTable += 8;
-    }
+    y += 8;
 
-    header();
+    pdf.setFont("helvetica", "bold");
+    pdf.text("3. Coordenadas", margin, y);
+    y += 8;
+
+    campo("Coord X:", data.coord_x);
+    campo("Coord Y:", data.coord_y);
+
+    y += 10;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("4. Camadas Estratigráficas", margin, y);
+    y += 8;
+
+    pdf.setFont("helvetica", "normal");
 
     let profAnterior = 0;
-
-    layers.forEach((l, index) => {
-      if (yTable > pageHeight - 15) {
-        pdf.addPage();
-        yTable = 20;
-        header();
-      }
-
+    layers.forEach((l) => {
       const profAtual = parseFloat(l.profundidade);
-
-      if (index % 2 === 0) {
-        pdf.setFillColor(245, 245, 245);
-        pdf.rect(col1, yTable, colWidth1 + colWidth2 + colWidth3, 8, "F");
-      }
-
-      pdf.rect(col1, yTable, colWidth1, 8);
-      pdf.rect(col2, yTable, colWidth2, 8);
-      pdf.rect(col3, yTable, colWidth3, 8);
-
-      pdf.text(profAnterior.toFixed(2), col1 + 5, yTable + 5);
-      pdf.text(profAtual.toFixed(2), col2 + 5, yTable + 5);
-      pdf.text(l.tipo, col3 + 5, yTable + 5);
-
+      pdf.text(`${profAnterior} – ${profAtual} m : ${l.tipo}`, margin, y);
+      y += 6;
       profAnterior = profAtual;
-      yTable += 8;
     });
 
-    /* ---------- PÁGINA 3 - PERFIL ---------- */
+    /* ================= PÁGINA 2 – PERFIL ================= */
 
     pdf.addPage();
 
     pdf.setFontSize(16);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Perfil Estratigráfico", pageWidth / 2, 20, {
-      align: "center",
-    });
+    pdf.text("Perfil Estratigráfico", pageWidth / 2, 20, { align: "center" });
 
     const topo = 30;
     const alturaMax = 170;
@@ -212,14 +148,38 @@ export default function SoloDetailPage() {
       pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
     }
 
+    const mapaCores: Record<string, [number, number, number]> = {};
+    let contadorCor = 0;
+
+    const base: [number, number, number][] = [
+      [210, 180, 140],
+      [170, 170, 170],
+      [190, 110, 90],
+      [220, 200, 120],
+      [150, 150, 120],
+      [200, 160, 120],
+      [140, 140, 140],
+    ];
+
+    function gerarCor(nome: string): [number, number, number] {
+      if (!mapaCores[nome]) {
+        mapaCores[nome] = base[contadorCor % base.length];
+        contadorCor++;
+      }
+      return mapaCores[nome];
+    }
+
     let profAnt = 0;
 
     layers.forEach((l) => {
+      const nome = l.tipo.trim();
       const profAtual = parseFloat(l.profundidade);
+
       const altura = (profAtual - profAnt) * escala;
       const yCamada = topo + profAnt * escala;
 
-      pdf.setFillColor(200, 180, 140);
+      const [r, g, b] = gerarCor(nome);
+      pdf.setFillColor(r, g, b);
       pdf.rect(esquerdaPerfil, yCamada, larguraPerfil, altura, "F");
 
       profAnt = profAtual;
@@ -228,29 +188,46 @@ export default function SoloDetailPage() {
     pdf.setDrawColor(0);
     pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
 
-    if (data.nivel_agua) {
-      const nivel = parseFloat(data.nivel_agua);
-      const yNivel = topo + nivel * escala;
-      pdf.setDrawColor(0, 0, 255);
-      pdf.setLineWidth(1);
-      pdf.line(esquerdaPerfil - 10, yNivel, direitaPerfil + 10, yNivel);
+    /* Tubo */
+
+    const larguraTubo = 12;
+    const esquerdaTubo = centro - larguraTubo / 2;
+
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
+    pdf.setDrawColor(0);
+    pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax);
+
+    /* Seção filtrante – ranhuras horizontais */
+
+    const alturaFiltro = alturaMax * 0.3;
+    const topoFiltro = topo + alturaMax - alturaFiltro;
+
+    for (let i = 0; i < alturaFiltro; i += 3) {
+      pdf.line(
+        esquerdaTubo,
+        topoFiltro + i,
+        esquerdaTubo + larguraTubo,
+        topoFiltro + i
+      );
     }
 
-    if (data.secao_filtrante) {
-      const comprimento = parseFloat(data.secao_filtrante);
-      const inicio = profundidadeTotal - comprimento;
-      const yInicio = topo + inicio * escala;
-      const yFim = topo + profundidadeTotal * escala;
+    pdf.rect(esquerdaTubo, topoFiltro, larguraTubo, alturaFiltro);
 
-      for (let i = yInicio; i < yFim; i += 3) {
-        pdf.line(centro - 6, i, centro + 6, i);
+    /* Nível d’água */
+
+    if (data.nivel_agua) {
+      const nivel = parseFloat(data.nivel_agua);
+      if (!isNaN(nivel)) {
+        const yNivel = topo + nivel * escala;
+        pdf.setDrawColor(0, 0, 255);
+        pdf.setLineWidth(1.2);
+        pdf.line(esquerdaPerfil - 10, yNivel, direitaPerfil + 10, yNivel);
       }
     }
 
     pdf.save(`perfil_${data.nome_sondagem}.pdf`);
   }
-
-  /* ================= DESKTOP (CONGELADO) ================= */
 
   if (loading)
     return (
@@ -266,112 +243,39 @@ export default function SoloDetailPage() {
       </AdminShell>
     );
 
-  function Info({ label, value }: { label: string; value: any }) {
-    return (
-      <div className="bg-white p-4 rounded-xl border shadow-sm">
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-base font-semibold">{value || "-"}</p>
-      </div>
-    );
-  }
-
   return (
     <AdminShell>
-      <div className="space-y-10">
-
+      <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-primary">
-              Perfil Descritivo
-            </h1>
-            <p className="text-gray-500 text-sm">
-              Visualização técnica executiva
-            </p>
-          </div>
-
+          <h1 className="text-2xl font-bold">Perfil descritivo</h1>
           <Button onClick={gerarPDF} className="bg-primary text-white">
             Baixar PDF
           </Button>
         </div>
 
-        <Card className="shadow-md border-0">
-          <CardContent className="p-8 grid md:grid-cols-4 gap-6">
-            <Info label="Sondagem" value={data.nome_sondagem} />
-            <Info label="Data" value={data.data} />
-            <Info label="Profundidade Total" value={data.profundidade_total} />
-            <Info label="Nível d'água" value={data.nivel_agua} />
+        <Card className="bg-secondary text-white border-0">
+          <CardContent className="p-6 grid md:grid-cols-2 gap-4">
+            {Object.entries({
+              Sondagem: data.nome_sondagem,
+              Data: data.data,
+              Hora: data.hora,
+              "Nível d'água": data.nivel_agua,
+              Tipo: data.tipo_sondagem,
+              "Diâmetro sondagem": data.diametro_sondagem,
+              "Diâmetro poço": data.diametro_poco,
+              "Pré-filtro": data.pre_filtro,
+              "Seção filtrante": data.secao_filtrante,
+              "Coord X": data.coord_x,
+              "Coord Y": data.coord_y,
+              "Profundidade total": data.profundidade_total,
+            }).map(([label, value]) => (
+              <div key={label}>
+                <p className="text-sm opacity-70">{label}</p>
+                <p className="font-semibold">{value || "-"}</p>
+              </div>
+            ))}
           </CardContent>
         </Card>
-
-        <Card className="shadow-md border-0">
-          <CardContent className="p-8">
-            <h2 className="text-xl font-bold text-primary mb-6">
-              Construção do Poço
-            </h2>
-            <div className="grid md:grid-cols-4 gap-6">
-              <Info label="Diâmetro sondagem" value={data.diametro_sondagem} />
-              <Info label="Diâmetro poço" value={data.diametro_poco} />
-              <Info label="Pré-filtro" value={data.pre_filtro} />
-              <Info label="Seção filtrante" value={data.secao_filtrante} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md border-0">
-          <CardContent className="p-8">
-            <h2 className="text-xl font-bold text-primary mb-6">
-              Coordenadas
-            </h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <Info label="Coord X" value={data.coord_x} />
-              <Info label="Coord Y" value={data.coord_y} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md border-0">
-          <CardContent className="p-8">
-            <h2 className="text-xl font-bold text-primary mb-6">
-              Camadas Estratigráficas
-            </h2>
-
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-primary text-white">
-                    <th className="p-3 text-left">De (m)</th>
-                    <th className="p-3 text-left">Até (m)</th>
-                    <th className="p-3 text-left">Descrição</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {layers.map((l, index) => {
-                    const profAnterior =
-                      index === 0
-                        ? 0
-                        : parseFloat(layers[index - 1].profundidade);
-
-                    return (
-                      <tr
-                        key={index}
-                        className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}
-                      >
-                        <td className="p-3 border">
-                          {profAnterior.toFixed(2)}
-                        </td>
-                        <td className="p-3 border">
-                          {parseFloat(l.profundidade).toFixed(2)}
-                        </td>
-                        <td className="p-3 border font-medium">{l.tipo}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-
       </div>
     </AdminShell>
   );
