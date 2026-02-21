@@ -111,6 +111,9 @@ export default function SoloDetailPage() {
 
     y += 10;
 
+    pdf.addPage();
+    y = 30;
+
     pdf.setFont("helvetica", "bold");
     pdf.text("4. Camadas Estratigráficas", margin, y);
     y += 10;
@@ -159,6 +162,7 @@ export default function SoloDetailPage() {
 
     y += alturaLinha;
      profAnterior = profAtual;
+     pdf.addPage();
   });
 
     /* ================= PÁGINA 2 – PERFIL ================= */
