@@ -26,6 +26,49 @@ type FormData = {
   profundidade_total: string;
 };
 
+const tiposSolo = [
+
+"Argila siltosa",
+"Argila siltosa pouco arenosa",
+"Argila silto arenosa",
+"Argila siltosa muito arenosa",
+
+"Silte argiloso",
+"Silte argilo arenoso",
+"Silte arenoso",
+"Silte areno argiloso",
+"Silte muito arenoso",
+
+"Areia fina argilosa",
+"Areia fina pouco argilosa",
+"Areia fina muito argilosa",
+"Areia fina siltosa",
+"Areia fina pouco siltosa",
+"Areia fina silto argilosa",
+
+"Areia fina e média argilosa",
+"Areia fina e média pouco argilosa",
+"Areia fina e média muito argilosa",
+"Areia fina e média siltosa",
+"Areia fina e média pouco siltosa",
+"Areia fina e média silto argilosa",
+
+"Areia grossa argilosa",
+"Areia grossa pouco argilosa",
+"Areia grossa muito argilosa",
+"Areia grossa siltosa",
+"Areia grossa pouco siltosa",
+"Areia grossa silto argilosa",
+
+"Areia de granulação variada argilosa",
+"Areia de granulação variada pouco argilosa",
+"Areia de granulação variada muito argilosa",
+"Areia de granulação variada siltosa",
+"Areia de granulação variada pouco siltosa",
+"Areia de granulação variada silto argilosa"
+
+];
+
 export default function SoloPage() {
   const params = useParams();
   const projectId = params.id as string;
@@ -230,6 +273,7 @@ export default function SoloPage() {
           <Section title="Camadas Estratigráficas">
             {layers.map((layer, i) => (
               <div key={i} className="grid grid-cols-2 gap-3">
+
                 <Input
                   label="Profundidade (m)"
                   value={layer.profundidade}
@@ -239,15 +283,18 @@ export default function SoloPage() {
                     setLayers(copy);
                   }}
                 />
-                <Input
+
+                <Select
                   label="Tipo de Solo"
                   value={layer.tipo}
+                  options={tiposSolo}
                   onChange={(v) => {
                     const copy = [...layers];
                     copy[i].tipo = v;
                     setLayers(copy);
                   }}
                 />
+
               </div>
             ))}
 
@@ -281,13 +328,7 @@ export default function SoloPage() {
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-5 space-y-4">
       <h2 className="text-sm font-semibold text-[#391e2a] tracking-wide uppercase border-b pb-2">
@@ -298,15 +339,7 @@ function Section({
   );
 }
 
-function Input({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
+function Input({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-xs font-semibold text-gray-600 tracking-wide">
@@ -317,6 +350,40 @@ function Input({
         onChange={(e) => onChange(e.target.value)}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
       />
+    </div>
+  );
+}
+
+function Select({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-semibold text-gray-600 tracking-wide">
+        {label}
+      </label>
+
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
+      >
+        <option value="">Selecionar</option>
+
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
