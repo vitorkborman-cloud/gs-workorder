@@ -264,7 +264,7 @@ export default function SoloDetailPage() {
 
     if (!isNaN(topoPrefiltro)) {
 
-      const larguraPrefiltro = larguraPerfil * 0.25;
+      const larguraPrefiltro = larguraPerfil * 0.07;
 
       const yInicioPrefiltro = topo + topoPrefiltro * escala;
       const alturaPrefiltro = (profundidadeTotal - topoPrefiltro) * escala;
