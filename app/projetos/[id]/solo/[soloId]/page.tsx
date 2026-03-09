@@ -47,8 +47,6 @@ export default function SoloDetailPage() {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 20;
 
-    /* ================= PÁGINA 1 – RELATÓRIO COMPLETO ================= */
-
     pdf.setFillColor(57, 30, 42);
     pdf.rect(0, 0, pageWidth, 25, "F");
 
@@ -98,8 +96,6 @@ export default function SoloDetailPage() {
     campo("Diâmetro sondagem:", data.diametro_sondagem);
     campo("Diâmetro poço:", data.diametro_poco);
     campo("Pré-filtro:", data.pre_filtro);
-
-    /* SEÇÃO FILTRANTE AJUSTADA */
     campo(
       "Seção filtrante:",
       `${data.secao_filtrante_topo ?? "-"} - ${data.secao_filtrante_base ?? "-"}`
@@ -161,13 +157,13 @@ export default function SoloDetailPage() {
       profAnterior = profAtual;
     });
 
-    /* ================= PERFIL ================= */
-
     pdf.addPage();
 
     pdf.setFontSize(16);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Perfil Estratigráfico", pageWidth / 2, 20, { align: "center" });
+    pdf.text("Perfil Estratigráfico", pageWidth / 2, 20, {
+      align: "center",
+    });
 
     const topo = 30;
     const alturaMax = 170;
@@ -187,30 +183,25 @@ export default function SoloDetailPage() {
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax);
 
-    /* SEÇÃO FILTRANTE AJUSTADA */
+    /* SEÇÃO FILTRANTE */
 
-    if (
-      data.secao_filtrante_topo !== null &&
-      data.secao_filtrante_base !== null
-    ) {
-      const topoFiltro = parseFloat(data.secao_filtrante_topo);
-      const baseFiltro = parseFloat(data.secao_filtrante_base);
+    const topoFiltro = parseFloat(data.secao_filtrante_topo);
+    const baseFiltro = parseFloat(data.secao_filtrante_base);
 
-      if (!isNaN(topoFiltro) && !isNaN(baseFiltro)) {
-        const yInicio = topo + topoFiltro * escala;
-        const alturaFiltro = (baseFiltro - topoFiltro) * escala;
+    if (!isNaN(topoFiltro) && !isNaN(baseFiltro)) {
+      const yInicio = topo + topoFiltro * escala;
+      const alturaFiltro = (baseFiltro - topoFiltro) * escala;
 
-        for (let i = 0; i < alturaFiltro; i += 3) {
-          pdf.line(
-            esquerdaTubo,
-            yInicio + i,
-            esquerdaTubo + larguraTubo,
-            yInicio + i
-          );
-        }
-
-        pdf.rect(esquerdaTubo, yInicio, larguraTubo, alturaFiltro);
+      for (let i = 0; i < alturaFiltro; i += 3) {
+        pdf.line(
+          esquerdaTubo,
+          yInicio + i,
+          esquerdaTubo + larguraTubo,
+          yInicio + i
+        );
       }
+
+      pdf.rect(esquerdaTubo, yInicio, larguraTubo, alturaFiltro);
     }
 
     if (data.nivel_agua) {
@@ -279,8 +270,6 @@ export default function SoloDetailPage() {
               <Info label="Diâmetro da Sondagem" value={data.diametro_sondagem} />
               <Info label="Diâmetro do Poço" value={data.diametro_poco} />
               <Info label="Pré-filtro" value={data.pre_filtro} />
-
-              {/* SEÇÃO FILTRANTE AJUSTADA */}
               <Info
                 label="Seção Filtrante"
                 value={`${data.secao_filtrante_topo ?? "-"} - ${data.secao_filtrante_base ?? "-"}`}
