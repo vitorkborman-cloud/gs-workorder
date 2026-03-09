@@ -8,6 +8,7 @@ import AppShell from "../../../../../components/AppShell";
 type Layer = {
   profundidade: string;
   tipo: string;
+  cor: string;
 };
 
 type FormData = {
@@ -28,17 +29,20 @@ type FormData = {
 
 const tiposSolo = [
 
+"Argila plástica",
 "Argila siltosa",
 "Argila siltosa pouco arenosa",
 "Argila silto arenosa",
 "Argila siltosa muito arenosa",
 
+"Silte",
 "Silte argiloso",
 "Silte argilo arenoso",
 "Silte arenoso",
 "Silte areno argiloso",
 "Silte muito arenoso",
 
+"Areia",
 "Areia fina argilosa",
 "Areia fina pouco argilosa",
 "Areia fina muito argilosa",
@@ -74,8 +78,9 @@ export default function SoloPage() {
   const projectId = params.id as string;
 
   const [draftId, setDraftId] = useState<string | null>(null);
+
   const [layers, setLayers] = useState<Layer[]>([
-    { profundidade: "", tipo: "" },
+    { profundidade: "", tipo: "", cor: "" },
   ]);
 
   const [form, setForm] = useState<FormData>({
@@ -125,7 +130,7 @@ export default function SoloPage() {
     setLayers(
       data.layers && data.layers.length > 0
         ? data.layers
-        : [{ profundidade: "", tipo: "" }]
+        : [{ profundidade: "", tipo: "", cor: "" }]
     );
   }
 
@@ -138,7 +143,7 @@ export default function SoloPage() {
   }
 
   function addLayer() {
-    setLayers((prev) => [...prev, { profundidade: "", tipo: "" }]);
+    setLayers((prev) => [...prev, { profundidade: "", tipo: "", cor: "" }]);
   }
 
   async function salvar() {
@@ -202,7 +207,8 @@ export default function SoloPage() {
       coord_y: "",
       profundidade_total: "",
     });
-    setLayers([{ profundidade: "", tipo: "" }]);
+
+    setLayers([{ profundidade: "", tipo: "", cor: "" }]);
 
     alert("Descrição concluída e enviada para o desktop.");
   }
@@ -249,17 +255,8 @@ export default function SoloPage() {
             <Input label="Pré-filtro" value={form.pre_filtro} onChange={(v) => setField("pre_filtro", v)} />
 
             <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Seção Filtrante Base (m)"
-                value={form.secao_filtrante_base}
-                onChange={(v) => setField("secao_filtrante_base", v)}
-              />
-
-              <Input
-                label="Seção Filtrante Topo (m)"
-                value={form.secao_filtrante_topo}
-                onChange={(v) => setField("secao_filtrante_topo", v)}
-              />
+              <Input label="Seção Filtrante Base (m)" value={form.secao_filtrante_base} onChange={(v) => setField("secao_filtrante_base", v)} />
+              <Input label="Seção Filtrante Topo (m)" value={form.secao_filtrante_topo} onChange={(v) => setField("secao_filtrante_topo", v)} />
             </div>
           </Section>
 
@@ -272,7 +269,7 @@ export default function SoloPage() {
 
           <Section title="Camadas Estratigráficas">
             {layers.map((layer, i) => (
-              <div key={i} className="grid grid-cols-2 gap-3">
+              <div key={i} className="grid grid-cols-3 gap-3">
 
                 <Input
                   label="Profundidade (m)"
@@ -291,6 +288,16 @@ export default function SoloPage() {
                   onChange={(v) => {
                     const copy = [...layers];
                     copy[i].tipo = v;
+                    setLayers(copy);
+                  }}
+                />
+
+                <Input
+                  label="Coloração"
+                  value={layer.cor}
+                  onChange={(v) => {
+                    const copy = [...layers];
+                    copy[i].cor = v;
                     setLayers(copy);
                   }}
                 />
