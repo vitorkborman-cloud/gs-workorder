@@ -47,6 +47,8 @@ export default function SoloDetailPage() {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 20;
 
+    /* ================= PÁGINA 1 – RELATÓRIO COMPLETO ================= */
+
     pdf.setFillColor(57, 30, 42);
     pdf.rect(0, 0, pageWidth, 25, "F");
 
@@ -96,12 +98,76 @@ export default function SoloDetailPage() {
     campo("Diâmetro sondagem:", data.diametro_sondagem);
     campo("Diâmetro poço:", data.diametro_poco);
     campo("Pré-filtro:", data.pre_filtro);
+
+    /* SEÇÃO FILTRANTE AJUSTADA */
     campo(
       "Seção filtrante:",
-      `${data.secao_filtrante_topo || "-"} – ${data.secao_filtrante_base || "-"}`
+      `${data.secao_filtrante_topo ?? "-"} - ${data.secao_filtrante_base ?? "-"}`
     );
 
+    y += 8;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("3. Coordenadas", margin, y);
+    y += 8;
+
+    campo("Coord X:", data.coord_x);
+    campo("Coord Y:", data.coord_y);
+
     pdf.addPage();
+    y = 30;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("4. Camadas Estratigráficas", margin, y);
+    y += 10;
+
+    const col1 = margin;
+    const col2 = margin + 35;
+    const col3 = margin + 70;
+    const larguraTabela = pageWidth - margin * 2;
+    const alturaLinha = 8;
+
+    pdf.setFillColor(128, 176, 45);
+    pdf.rect(col1, y, larguraTabela, alturaLinha, "F");
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("De (m)", col1 + 3, y + 5.5);
+    pdf.text("Até (m)", col2 + 3, y + 5.5);
+    pdf.text("Tipo de Solo", col3 + 3, y + 5.5);
+
+    y += alturaLinha;
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(0, 0, 0);
+
+    let profAnterior = 0;
+
+    layers.forEach((l, index) => {
+      const profAtual = parseFloat(l.profundidade);
+
+      if (index % 2 === 0) {
+        pdf.setFillColor(230, 242, 214);
+        pdf.rect(col1, y, larguraTabela, alturaLinha, "F");
+      }
+
+      pdf.text(String(profAnterior), col1 + 3, y + 5.5);
+      pdf.text(String(profAtual), col2 + 3, y + 5.5);
+      pdf.text(l.tipo, col3 + 3, y + 5.5);
+
+      pdf.rect(col1, y, larguraTabela, alturaLinha);
+
+      y += alturaLinha;
+      profAnterior = profAtual;
+    });
+
+    /* ================= PERFIL ================= */
+
+    pdf.addPage();
+
+    pdf.setFontSize(16);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Perfil Estratigráfico", pageWidth / 2, 20, { align: "center" });
 
     const topo = 30;
     const alturaMax = 170;
@@ -121,46 +187,29 @@ export default function SoloDetailPage() {
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax);
 
-    const topoFiltro = parseFloat(data.secao_filtrante_topo);
-    const baseFiltro = parseFloat(data.secao_filtrante_base);
+    /* SEÇÃO FILTRANTE AJUSTADA */
 
-    if (!isNaN(topoFiltro) && !isNaN(baseFiltro)) {
+    if (
+      data.secao_filtrante_topo !== null &&
+      data.secao_filtrante_base !== null
+    ) {
+      const topoFiltro = parseFloat(data.secao_filtrante_topo);
+      const baseFiltro = parseFloat(data.secao_filtrante_base);
 
-      const yInicioFiltro = topo + topoFiltro * escala;
-      const alturaFiltro = (baseFiltro - topoFiltro) * escala;
+      if (!isNaN(topoFiltro) && !isNaN(baseFiltro)) {
+        const yInicio = topo + topoFiltro * escala;
+        const alturaFiltro = (baseFiltro - topoFiltro) * escala;
 
-      /* FILTRO */
-      for (let i = 0; i < alturaFiltro; i += 3) {
-        pdf.line(
-          esquerdaTubo,
-          yInicioFiltro + i,
-          esquerdaTubo + larguraTubo,
-          yInicioFiltro + i
-        );
-      }
-
-      pdf.rect(esquerdaTubo, yInicioFiltro, larguraTubo, alturaFiltro);
-
-      /* TUBO LISO INFERIOR */
-
-      const yInicioLiso = topo + baseFiltro * escala;
-      const alturaLiso = (profundidadeTotal - baseFiltro) * escala;
-
-      if (alturaLiso > 0) {
-
-        pdf.setDrawColor(120);
-
-        for (let i = 0; i < alturaLiso; i += 4) {
+        for (let i = 0; i < alturaFiltro; i += 3) {
           pdf.line(
             esquerdaTubo,
-            yInicioLiso + i,
+            yInicio + i,
             esquerdaTubo + larguraTubo,
-            yInicioLiso + i
+            yInicio + i
           );
         }
 
-        pdf.rect(esquerdaTubo, yInicioLiso, larguraTubo, alturaLiso);
-
+        pdf.rect(esquerdaTubo, yInicio, larguraTubo, alturaFiltro);
       }
     }
 
@@ -230,11 +279,44 @@ export default function SoloDetailPage() {
               <Info label="Diâmetro da Sondagem" value={data.diametro_sondagem} />
               <Info label="Diâmetro do Poço" value={data.diametro_poco} />
               <Info label="Pré-filtro" value={data.pre_filtro} />
+
+              {/* SEÇÃO FILTRANTE AJUSTADA */}
               <Info
                 label="Seção Filtrante"
-                value={`${data.secao_filtrante_topo || "-"} – ${data.secao_filtrante_base || "-"}`}
+                value={`${data.secao_filtrante_topo ?? "-"} - ${data.secao_filtrante_base ?? "-"}`}
               />
             </Grid>
+          </Section>
+
+          <Section title="Coordenadas">
+            <Grid>
+              <Info label="Coord. X" value={data.coord_x} />
+              <Info label="Coord. Y" value={data.coord_y} />
+            </Grid>
+          </Section>
+
+          <Section title="Camadas Estratigráficas">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="border p-3 text-left">De (m)</th>
+                  <th className="border p-3 text-left">Até (m)</th>
+                  <th className="border p-3 text-left">Tipo de Solo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {layers.map((layer, index) => {
+                  const de = index === 0 ? 0 : layers[index - 1].profundidade;
+                  return (
+                    <tr key={index}>
+                      <td className="border p-3">{de}</td>
+                      <td className="border p-3">{layer.profundidade}</td>
+                      <td className="border p-3">{layer.tipo}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </Section>
 
         </div>
