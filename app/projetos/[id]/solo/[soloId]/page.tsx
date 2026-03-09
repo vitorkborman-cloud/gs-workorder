@@ -264,13 +264,31 @@ export default function SoloDetailPage() {
 
     if (!isNaN(topoPrefiltro)) {
 
-      const larguraPrefiltro = larguraPerfil / 3;
+      const larguraPrefiltro = larguraPerfil * 0.25;
 
       const yInicioPrefiltro = topo + topoPrefiltro * escala;
       const alturaPrefiltro = (profundidadeTotal - topoPrefiltro) * escala;
 
       const esquerdaPrefiltro = esquerdaTubo - larguraPrefiltro;
       const direitaPrefiltro = esquerdaTubo + larguraTubo;
+
+      pdf.setFillColor(245,222,179);
+
+      pdf.rect(
+        esquerdaPrefiltro,
+        topo,
+        larguraPrefiltro,
+        yInicioPrefiltro - topo,
+        "F"
+      );
+
+      pdf.rect(
+        direitaPrefiltro,
+        topo,
+        larguraPrefiltro,
+        yInicioPrefiltro - topo,
+        "F"
+      );
 
       pdf.setFillColor(210,180,140);
 
