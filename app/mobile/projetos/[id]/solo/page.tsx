@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import AppShell from "../../../../../components/AppShell";
@@ -100,7 +100,12 @@ export default function SoloPage() {
   }
 
   function gerarDescricao(layer: Layer) {
-    return [layer.textura, layer.cor, layer.genese, layer.complemento]
+    return [
+      layer.textura,
+      layer.cor,
+      layer.genese,
+      layer.complemento,
+    ]
       .filter(Boolean)
       .join(" ");
   }
@@ -155,10 +160,10 @@ export default function SoloPage() {
       <div className="px-4 py-6 space-y-6">
 
         <Section title="Dados da Sondagem">
-          <Input label="Nome da Sondagem" value={form.nome_sondagem} onChange={(value) => setField("nome_sondagem", value)} />
-          <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(value) => setField("tipo_sondagem", value)} />
-          <Input label="Nível d’água" value={form.nivel_agua} onChange={(value) => setField("nivel_agua", value)} />
-          <Input label="Profundidade Total" value={form.profundidade_total} onChange={(value) => setField("profundidade_total", value)} />
+          <Input label="Nome da Sondagem" value={form.nome_sondagem} onChange={(v) => setField("nome_sondagem", v)} />
+          <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v) => setField("tipo_sondagem", v)} />
+          <Input label="Nível d’água" value={form.nivel_agua} onChange={(v) => setField("nivel_agua", v)} />
+          <Input label="Profundidade Total" value={form.profundidade_total} onChange={(v) => setField("profundidade_total", v)} />
         </Section>
 
         <Section title="Camadas Estratigráficas">
@@ -169,9 +174,9 @@ export default function SoloPage() {
               <Input
                 label="Profundidade (m)"
                 value={layer.profundidade}
-                onChange={(value) => {
+                onChange={(v) => {
                   const copy = [...layers];
-                  copy[i].profundidade = value;
+                  copy[i].profundidade = v;
                   setLayers(copy);
                 }}
               />
@@ -180,9 +185,9 @@ export default function SoloPage() {
                 label="Textura"
                 value={layer.textura}
                 options={TEXTURAS}
-                onChange={(value) => {
+                onChange={(v) => {
                   const copy = [...layers];
-                  copy[i].textura = value;
+                  copy[i].textura = v;
                   setLayers(copy);
                 }}
               />
@@ -190,9 +195,9 @@ export default function SoloPage() {
               <Input
                 label="Cor"
                 value={layer.cor}
-                onChange={(value) => {
+                onChange={(v) => {
                   const copy = [...layers];
-                  copy[i].cor = value;
+                  copy[i].cor = v;
                   setLayers(copy);
                 }}
               />
@@ -201,9 +206,9 @@ export default function SoloPage() {
                 label="Gênese (opcional)"
                 value={layer.genese}
                 options={GENESES}
-                onChange={(value) => {
+                onChange={(v) => {
                   const copy = [...layers];
-                  copy[i].genese = value;
+                  copy[i].genese = v;
                   setLayers(copy);
                 }}
               />
@@ -212,9 +217,9 @@ export default function SoloPage() {
                 label="Complemento (opcional)"
                 value={layer.complemento}
                 options={COMPLEMENTOS}
-                onChange={(value) => {
+                onChange={(v) => {
                   const copy = [...layers];
-                  copy[i].complemento = value;
+                  copy[i].complemento = v;
                   setLayers(copy);
                 }}
               />
@@ -249,7 +254,7 @@ export default function SoloPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: any) {
   return (
     <div className="bg-white p-4 rounded-xl shadow space-y-3">
       <h2 className="font-semibold text-[#391e2a]">{title}</h2>
@@ -258,15 +263,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Input({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
+function Input({ label, value, onChange }: any) {
   return (
     <div>
       <label className="text-xs">{label}</label>
@@ -279,17 +276,7 @@ function Input({
   );
 }
 
-function Select({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-}) {
+function Select({ label, value, options, onChange }: any) {
   return (
     <div>
       <label className="text-xs">{label}</label>
@@ -298,7 +285,7 @@ function Select({
         onChange={(e) => onChange(e.target.value)}
         className="w-full border rounded p-2"
       >
-        {options.map((o) => (
+        {options.map((o: string) => (
           <option key={o} value={o}>
             {o}
           </option>
