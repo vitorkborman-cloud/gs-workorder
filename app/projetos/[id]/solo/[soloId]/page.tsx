@@ -324,34 +324,96 @@ export default function SoloDetailPage() {
 
     }
 
-    /* ================= SEÇÃO FILTRANTE ================= */
+    /* ================= TUBO + SEÇÃO FILTRANTE ================= */
 
     const topoFiltro = parseFloat(data.secao_filtrante_topo);
     const baseFiltro = parseFloat(data.secao_filtrante_base);
 
     if (!isNaN(topoFiltro) && !isNaN(baseFiltro)) {
 
-      const yInicioFiltro = topo + topoFiltro * escala;
-      const alturaFiltro = (baseFiltro - topoFiltro) * escala;
+      const yTopoFiltro = topo + topoFiltro * escala;
+      const yBaseFiltro = topo + baseFiltro * escala;
 
-      for (let i = 0; i < alturaFiltro; i += 3) {
-        pdf.line(
+      /* TUBO LISO SUPERIOR */
+
+      const alturaLisoSuperior = yTopoFiltro - topo;
+
+      if (alturaLisoSuperior > 0) {
+
+        pdf.setFillColor(255,255,255);
+
+        pdf.rect(
           esquerdaTubo,
-          yInicioFiltro + i,
-          esquerdaTubo + larguraTubo,
-          yInicioFiltro + i
+          topo,
+          larguraTubo,
+          alturaLisoSuperior,
+          "F"
         );
+
+        pdf.rect(
+          esquerdaTubo,
+          topo,
+          larguraTubo,
+          alturaLisoSuperior
+        );
+
       }
 
-      pdf.rect(esquerdaTubo, yInicioFiltro, larguraTubo, alturaFiltro);
+      /* SEÇÃO FILTRANTE */
 
-      const alturaLiso = (profundidadeTotal - baseFiltro) * escala;
-      const yInicioLiso = topo + baseFiltro * escala;
+      const alturaFiltro = yBaseFiltro - yTopoFiltro;
 
-      if (alturaLiso > 0) {
+      pdf.setFillColor(255,255,255);
+
+      pdf.rect(
+        esquerdaTubo,
+        yTopoFiltro,
+        larguraTubo,
+        alturaFiltro,
+        "F"
+      );
+
+      pdf.rect(
+        esquerdaTubo,
+        yTopoFiltro,
+        larguraTubo,
+        alturaFiltro
+      );
+
+      for (let i = 3; i < alturaFiltro; i += 3) {
+
+        pdf.line(
+          esquerdaTubo + 0.5,
+          yTopoFiltro + i,
+          esquerdaTubo + larguraTubo - 0.5,
+          yTopoFiltro + i
+        );
+
+      }
+
+      /* TUBO LISO INFERIOR */
+
+      const alturaLisoInferior = topo + alturaMax - yBaseFiltro;
+
+      if (alturaLisoInferior > 0) {
+
         pdf.setFillColor(255,255,255);
-        pdf.rect(esquerdaTubo, yInicioLiso, larguraTubo, alturaLiso, "F");
-        pdf.rect(esquerdaTubo, yInicioLiso, larguraTubo, alturaLiso);
+
+        pdf.rect(
+          esquerdaTubo,
+          yBaseFiltro,
+          larguraTubo,
+          alturaLisoInferior,
+          "F"
+        );
+
+        pdf.rect(
+          esquerdaTubo,
+          yBaseFiltro,
+          larguraTubo,
+          alturaLisoInferior
+        );
+
       }
 
     }
