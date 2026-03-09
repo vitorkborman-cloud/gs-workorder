@@ -96,6 +96,7 @@ export default function SoloDetailPage() {
     campo("Diâmetro sondagem:", data.diametro_sondagem);
     campo("Diâmetro poço:", data.diametro_poco);
     campo("Pré-filtro:", data.pre_filtro);
+
     campo(
       "Seção filtrante:",
       `${data.secao_filtrante_topo ?? "-"} - ${data.secao_filtrante_base ?? "-"}`
@@ -176,6 +177,80 @@ export default function SoloDetailPage() {
     const profundidadeTotal = parseFloat(data.profundidade_total || "1");
     const escala = alturaMax / profundidadeTotal;
 
+    pdf.setFontSize(8);
+    for (let i = 0; i <= profundidadeTotal; i += 0.5) {
+      const yEscala = topo + i * escala;
+      pdf.line(esquerdaPerfil - 6, yEscala, esquerdaPerfil, yEscala);
+      pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
+    }
+
+    const mapaCores: Record<string, [number, number, number]> = {};
+    let contadorCor = 0;
+
+    const base: [number, number, number][] = [
+      [210, 180, 140],
+      [170, 170, 170],
+      [190, 110, 90],
+      [220, 200, 120],
+      [150, 150, 120],
+      [200, 160, 120],
+      [140, 140, 140],
+    ];
+
+    function gerarCor(nome: string): [number, number, number] {
+      if (!mapaCores[nome]) {
+        mapaCores[nome] = base[contadorCor % base.length];
+        contadorCor++;
+      }
+      return mapaCores[nome];
+    }
+
+    let profAnt = 0;
+
+    layers.forEach((l) => {
+      const nome = l.tipo.trim();
+      const profAtual = parseFloat(l.profundidade);
+
+      const altura = (profAtual - profAnt) * escala;
+      const yCamada = topo + profAnt * escala;
+
+      const [r, g, b] = gerarCor(nome);
+      pdf.setFillColor(r, g, b);
+      pdf.rect(esquerdaPerfil, yCamada, larguraPerfil, altura, "F");
+
+      profAnt = profAtual;
+    });
+
+    pdf.setDrawColor(0);
+    pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
+
+    /* ================= LEGENDA ================= */
+
+    let yLegenda = topo;
+    let profLegenda = 0;
+
+    pdf.setFontSize(9);
+    pdf.setTextColor(0);
+
+    layers.forEach((l) => {
+      const nome = l.tipo.trim();
+      const profAtual = parseFloat(l.profundidade);
+
+      const [r, g, b] = gerarCor(nome);
+
+      pdf.setFillColor(r, g, b);
+      pdf.rect(direitaPerfil + 20, yLegenda, 8, 8, "F");
+
+      pdf.text(
+        `${profLegenda} – ${profAtual} m : ${nome}`,
+        direitaPerfil + 32,
+        yLegenda + 6
+      );
+
+      yLegenda += 12;
+      profLegenda = profAtual;
+    });
+
     const larguraTubo = 12;
     const esquerdaTubo = centro - larguraTubo / 2;
 
@@ -183,29 +258,42 @@ export default function SoloDetailPage() {
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax);
 
-    /* SEÇÃO FILTRANTE */
+    /* ================= SEÇÃO FILTRANTE ================= */
 
     const topoFiltro = parseFloat(data.secao_filtrante_topo);
     const baseFiltro = parseFloat(data.secao_filtrante_base);
 
     if (!isNaN(topoFiltro) && !isNaN(baseFiltro)) {
-      const yInicio = topo + topoFiltro * escala;
+
+      const yInicioFiltro = topo + topoFiltro * escala;
       const alturaFiltro = (baseFiltro - topoFiltro) * escala;
 
       for (let i = 0; i < alturaFiltro; i += 3) {
         pdf.line(
           esquerdaTubo,
-          yInicio + i,
+          yInicioFiltro + i,
           esquerdaTubo + larguraTubo,
-          yInicio + i
+          yInicioFiltro + i
         );
       }
 
-      pdf.rect(esquerdaTubo, yInicio, larguraTubo, alturaFiltro);
+      pdf.rect(esquerdaTubo, yInicioFiltro, larguraTubo, alturaFiltro);
+
+      const alturaLiso = (profundidadeTotal - baseFiltro) * escala;
+      const yInicioLiso = topo + baseFiltro * escala;
+
+      if (alturaLiso > 0) {
+        pdf.setFillColor(255,255,255);
+        pdf.rect(esquerdaTubo, yInicioLiso, larguraTubo, alturaLiso, "F");
+        pdf.rect(esquerdaTubo, yInicioLiso, larguraTubo, alturaLiso);
+      }
+
     }
 
     if (data.nivel_agua) {
-      const nivel = Number(String(data.nivel_agua).replace(",", "."));
+      const nivel = Number(
+        String(data.nivel_agua).replace(",", ".")
+      );
 
       if (!isNaN(nivel)) {
         const yNivel = topo + nivel * escala;
@@ -270,10 +358,7 @@ export default function SoloDetailPage() {
               <Info label="Diâmetro da Sondagem" value={data.diametro_sondagem} />
               <Info label="Diâmetro do Poço" value={data.diametro_poco} />
               <Info label="Pré-filtro" value={data.pre_filtro} />
-              <Info
-                label="Seção Filtrante"
-                value={`${data.secao_filtrante_topo ?? "-"} - ${data.secao_filtrante_base ?? "-"}`}
-              />
+              <Info label="Seção Filtrante" value={`${data.secao_filtrante_topo ?? "-"} - ${data.secao_filtrante_base ?? "-"}`} />
             </Grid>
           </Section>
 
