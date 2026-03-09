@@ -29,6 +29,7 @@ type FormData = {
 
 const tiposSolo = [
 
+"Argila orgânica",
 "Argila plástica",
 "Argila siltosa",
 "Argila siltosa pouco arenosa",
@@ -63,6 +64,9 @@ const tiposSolo = [
 "Areia grossa siltosa",
 "Areia grossa pouco siltosa",
 "Areia grossa silto argilosa",
+
+"Britas",
+"Rachão",
 
 "Areia de granulação variada argilosa",
 "Areia de granulação variada pouco argilosa",
