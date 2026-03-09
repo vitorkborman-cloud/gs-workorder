@@ -47,8 +47,6 @@ export default function SoloDetailPage() {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 20;
 
-    /* ================= PÁGINA 1 – RELATÓRIO COMPLETO ================= */
-
     pdf.setFillColor(57, 30, 42);
     pdf.rect(0, 0, pageWidth, 25, "F");
 
@@ -98,79 +96,12 @@ export default function SoloDetailPage() {
     campo("Diâmetro sondagem:", data.diametro_sondagem);
     campo("Diâmetro poço:", data.diametro_poco);
     campo("Pré-filtro:", data.pre_filtro);
-    campo("Seção filtrante:", data.secao_filtrante);
-
-    y += 8;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.text("3. Coordenadas", margin, y);
-    y += 8;
-
-    campo("Coord X:", data.coord_x);
-    campo("Coord Y:", data.coord_y);
+    campo(
+      "Seção filtrante:",
+      `${data.secao_filtrante_topo || "-"} – ${data.secao_filtrante_base || "-"}`
+    );
 
     pdf.addPage();
-    y = 30;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.text("4. Camadas Estratigráficas", margin, y);
-    y += 10;
-
-    /* ===== TABELA ===== */
-
-    const col1 = margin;
-    const col2 = margin + 35;
-    const col3 = margin + 70;
-    const larguraTabela = pageWidth - margin * 2;
-    const alturaLinha = 8;
-
-    /* Cabeçalho */
-    pdf.setFillColor(128, 176, 45); // verde tema
-    pdf.rect(col1, y, larguraTabela, alturaLinha, "F");
-
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("De (m)", col1 + 3, y + 5.5);
-    pdf.text("Até (m)", col2 + 3, y + 5.5);
-    pdf.text("Tipo de Solo", col3 + 3, y + 5.5);
-
-    y += alturaLinha;
-
-    /* Linhas */
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(0, 0, 0);
-
-    let profAnterior = 0;
-
-    layers.forEach((l, index) => {
-    const profAtual = parseFloat(l.profundidade);
-
-      // cor alternada suave
-      if (index % 2 === 0) {
-        pdf.setFillColor(230, 242, 214); // verde claro suave
-       pdf.rect(col1, y, larguraTabela, alturaLinha, "F");
-      }
-
-      pdf.text(String(profAnterior), col1 + 3, y + 5.5);
-      pdf.text(String(profAtual), col2 + 3, y + 5.5);
-     pdf.text(l.tipo, col3 + 3, y + 5.5);
-
-     // bordas
-     pdf.rect(col1, y, larguraTabela, alturaLinha);
-
-    y += alturaLinha;
-     profAnterior = profAtual;
-  });
-
-    /* ================= PÁGINA 2 – PERFIL ================= */
-
-    pdf.addPage();
-
-    pdf.setFontSize(16);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Perfil Estratigráfico", pageWidth / 2, 20, {
-      align: "center",
-    });
 
     const topo = 30;
     const alturaMax = 170;
@@ -183,80 +114,6 @@ export default function SoloDetailPage() {
     const profundidadeTotal = parseFloat(data.profundidade_total || "1");
     const escala = alturaMax / profundidadeTotal;
 
-    pdf.setFontSize(8);
-    for (let i = 0; i <= profundidadeTotal; i += 0.5) {
-      const yEscala = topo + i * escala;
-      pdf.line(esquerdaPerfil - 6, yEscala, esquerdaPerfil, yEscala);
-      pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
-    }
-
-    const mapaCores: Record<string, [number, number, number]> = {};
-    let contadorCor = 0;
-
-    const base: [number, number, number][] = [
-      [210, 180, 140],
-      [170, 170, 170],
-      [190, 110, 90],
-      [220, 200, 120],
-      [150, 150, 120],
-      [200, 160, 120],
-      [140, 140, 140],
-    ];
-
-    function gerarCor(nome: string): [number, number, number] {
-      if (!mapaCores[nome]) {
-        mapaCores[nome] = base[contadorCor % base.length];
-        contadorCor++;
-      }
-      return mapaCores[nome];
-    }
-
-    let profAnt = 0;
-
-    layers.forEach((l) => {
-      const nome = l.tipo.trim();
-      const profAtual = parseFloat(l.profundidade);
-
-      const altura = (profAtual - profAnt) * escala;
-      const yCamada = topo + profAnt * escala;
-
-      const [r, g, b] = gerarCor(nome);
-      pdf.setFillColor(r, g, b);
-      pdf.rect(esquerdaPerfil, yCamada, larguraPerfil, altura, "F");
-
-      profAnt = profAtual;
-    });
-
-    pdf.setDrawColor(0);
-    pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
-
-        /* ================= LEGENDA ================= */
-
-    let yLegenda = topo;
-    let profLegenda = 0;
-
-    pdf.setFontSize(9);
-    pdf.setTextColor(0);
-
-    layers.forEach((l) => {
-      const nome = l.tipo.trim();
-      const profAtual = parseFloat(l.profundidade);
-
-      const [r, g, b] = gerarCor(nome);
-
-      pdf.setFillColor(r, g, b);
-      pdf.rect(direitaPerfil + 20, yLegenda, 8, 8, "F");
-
-      pdf.text(
-        `${profLegenda} – ${profAtual} m : ${nome}`,
-        direitaPerfil + 32,
-        yLegenda + 6
-      );
-
-      yLegenda += 12;
-      profLegenda = profAtual;
-    });
-
     const larguraTubo = 12;
     const esquerdaTubo = centro - larguraTubo / 2;
 
@@ -264,33 +121,51 @@ export default function SoloDetailPage() {
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax);
 
-    /* SEÇÃO FILTRANTE */
-    if (data.secao_filtrante) {
-      const comprimentoFiltro = parseFloat(data.secao_filtrante);
+    const topoFiltro = parseFloat(data.secao_filtrante_topo);
+    const baseFiltro = parseFloat(data.secao_filtrante_base);
 
-      if (!isNaN(comprimentoFiltro)) {
-        const inicioFiltro = profundidadeTotal - comprimentoFiltro;
-        const yInicio = topo + inicioFiltro * escala;
-        const alturaFiltro = comprimentoFiltro * escala;
+    if (!isNaN(topoFiltro) && !isNaN(baseFiltro)) {
 
-        for (let i = 0; i < alturaFiltro; i += 3) {
+      const yInicioFiltro = topo + topoFiltro * escala;
+      const alturaFiltro = (baseFiltro - topoFiltro) * escala;
+
+      /* FILTRO */
+      for (let i = 0; i < alturaFiltro; i += 3) {
+        pdf.line(
+          esquerdaTubo,
+          yInicioFiltro + i,
+          esquerdaTubo + larguraTubo,
+          yInicioFiltro + i
+        );
+      }
+
+      pdf.rect(esquerdaTubo, yInicioFiltro, larguraTubo, alturaFiltro);
+
+      /* TUBO LISO INFERIOR */
+
+      const yInicioLiso = topo + baseFiltro * escala;
+      const alturaLiso = (profundidadeTotal - baseFiltro) * escala;
+
+      if (alturaLiso > 0) {
+
+        pdf.setDrawColor(120);
+
+        for (let i = 0; i < alturaLiso; i += 4) {
           pdf.line(
             esquerdaTubo,
-            yInicio + i,
+            yInicioLiso + i,
             esquerdaTubo + larguraTubo,
-            yInicio + i
+            yInicioLiso + i
           );
         }
 
-        pdf.rect(esquerdaTubo, yInicio, larguraTubo, alturaFiltro);
+        pdf.rect(esquerdaTubo, yInicioLiso, larguraTubo, alturaLiso);
+
       }
     }
 
-    /* 🔵 AJUSTE CORRETO DO NÍVEL D'ÁGUA (CASAS DECIMAIS) */
     if (data.nivel_agua) {
-      const nivel = Number(
-        String(data.nivel_agua).replace(",", ".")
-      );
+      const nivel = Number(String(data.nivel_agua).replace(",", "."));
 
       if (!isNaN(nivel)) {
         const yNivel = topo + nivel * escala;
@@ -355,39 +230,11 @@ export default function SoloDetailPage() {
               <Info label="Diâmetro da Sondagem" value={data.diametro_sondagem} />
               <Info label="Diâmetro do Poço" value={data.diametro_poco} />
               <Info label="Pré-filtro" value={data.pre_filtro} />
-              <Info label="Seção Filtrante" value={data.secao_filtrante} />
+              <Info
+                label="Seção Filtrante"
+                value={`${data.secao_filtrante_topo || "-"} – ${data.secao_filtrante_base || "-"}`}
+              />
             </Grid>
-          </Section>
-
-          <Section title="Coordenadas">
-            <Grid>
-              <Info label="Coord. X" value={data.coord_x} />
-              <Info label="Coord. Y" value={data.coord_y} />
-            </Grid>
-          </Section>
-
-          <Section title="Camadas Estratigráficas">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border p-3 text-left">De (m)</th>
-                  <th className="border p-3 text-left">Até (m)</th>
-                  <th className="border p-3 text-left">Tipo de Solo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {layers.map((layer, index) => {
-                  const de = index === 0 ? 0 : layers[index - 1].profundidade;
-                  return (
-                    <tr key={index}>
-                      <td className="border p-3">{de}</td>
-                      <td className="border p-3">{layer.profundidade}</td>
-                      <td className="border p-3">{layer.tipo}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           </Section>
 
         </div>
