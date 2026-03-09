@@ -192,6 +192,7 @@ export default function SoloPage() {
     }
 
     setDraftId(null);
+
     setForm({
       nome_sondagem: "",
       data: "",
@@ -269,7 +270,7 @@ export default function SoloPage() {
 
           <Section title="Camadas Estratigráficas">
             {layers.map((layer, i) => (
-              <div key={i} className="grid grid-cols-3 gap-3">
+              <div key={i} className="grid grid-cols-3 gap-3 items-end">
 
                 <Input
                   label="Profundidade (m)"
@@ -355,7 +356,7 @@ function Input({ label, value, onChange }: { label: string; value: string; onCha
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
+        className="w-full h-[38px] border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
       />
     </div>
   );
@@ -381,7 +382,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
+        className="w-full h-[38px] border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
       >
         <option value="">Selecionar</option>
 
