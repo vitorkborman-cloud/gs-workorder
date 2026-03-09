@@ -19,7 +19,8 @@ type FormData = {
   diametro_sondagem: string;
   diametro_poco: string;
   pre_filtro: string;
-  secao_filtrante: string;
+  secao_filtrante_base: string;
+  secao_filtrante_topo: string;
   coord_x: string;
   coord_y: string;
   profundidade_total: string;
@@ -43,7 +44,8 @@ export default function SoloPage() {
     diametro_sondagem: "",
     diametro_poco: "",
     pre_filtro: "",
-    secao_filtrante: "",
+    secao_filtrante_base: "",
+    secao_filtrante_topo: "",
     coord_x: "",
     coord_y: "",
     profundidade_total: "",
@@ -70,7 +72,8 @@ export default function SoloPage() {
       diametro_sondagem: data.diametro_sondagem ?? "",
       diametro_poco: data.diametro_poco ?? "",
       pre_filtro: data.pre_filtro ?? "",
-      secao_filtrante: data.secao_filtrante ?? "",
+      secao_filtrante_base: data.secao_filtrante_base ?? "",
+      secao_filtrante_topo: data.secao_filtrante_topo ?? "",
       coord_x: data.coord_x ?? "",
       coord_y: data.coord_y ?? "",
       profundidade_total: data.profundidade_total ?? "",
@@ -150,7 +153,8 @@ export default function SoloPage() {
       diametro_sondagem: "",
       diametro_poco: "",
       pre_filtro: "",
-      secao_filtrante: "",
+      secao_filtrante_base: "",
+      secao_filtrante_topo: "",
       coord_x: "",
       coord_y: "",
       profundidade_total: "",
@@ -164,7 +168,6 @@ export default function SoloPage() {
     <AppShell>
       <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-50">
 
-        {/* TOP BAR EXECUTIVA */}
         <div className="bg-[#391e2a] text-white px-4 py-4 shadow-md">
           <div className="flex justify-between items-center">
             <div>
@@ -201,7 +204,20 @@ export default function SoloPage() {
             <Input label="Diâmetro da Sondagem" value={form.diametro_sondagem} onChange={(v) => setField("diametro_sondagem", v)} />
             <Input label="Diâmetro do Poço" value={form.diametro_poco} onChange={(v) => setField("diametro_poco", v)} />
             <Input label="Pré-filtro" value={form.pre_filtro} onChange={(v) => setField("pre_filtro", v)} />
-            <Input label="Seção Filtrante" value={form.secao_filtrante} onChange={(v) => setField("secao_filtrante", v)} />
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Seção Filtrante Base (m)"
+                value={form.secao_filtrante_base}
+                onChange={(v) => setField("secao_filtrante_base", v)}
+              />
+
+              <Input
+                label="Seção Filtrante Topo (m)"
+                value={form.secao_filtrante_topo}
+                onChange={(v) => setField("secao_filtrante_topo", v)}
+              />
+            </div>
           </Section>
 
           <Section title="Coordenadas">
@@ -243,7 +259,6 @@ export default function SoloPage() {
             </button>
           </Section>
 
-          {/* BOTÕES EXECUTIVOS */}
           <div className="space-y-4 pt-4">
             <button
               onClick={salvar}
@@ -265,8 +280,6 @@ export default function SoloPage() {
     </AppShell>
   );
 }
-
-/* COMPONENTES */
 
 function Section({
   title,
