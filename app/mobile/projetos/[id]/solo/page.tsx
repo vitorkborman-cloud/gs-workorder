@@ -7,10 +7,7 @@ import AppShell from "../../../../../components/AppShell";
 
 type Layer = {
   profundidade: string;
-  textura: string;
-  cor: string;
-  genese: string;
-  complemento: string;
+  tipo: string;
 };
 
 type FormData = {
@@ -29,47 +26,13 @@ type FormData = {
   profundidade_total: string;
 };
 
-const TEXTURAS = [
-  "Areia fina",
-  "Areia média",
-  "Areia grossa",
-  "Areia siltosa",
-  "Areia argilosa",
-  "Silte",
-  "Silte arenoso",
-  "Silte argiloso",
-  "Argila",
-  "Argila siltosa",
-  "Argila arenosa",
-];
-
-const GENESES = [
-  "",
-  "Residual",
-  "Aluvial",
-  "Coluvial",
-  "Eluvial",
-  "Orgânico",
-  "Laterítico",
-];
-
-const COMPLEMENTOS = [
-  "",
-  "Com cascalho",
-  "Com matéria orgânica",
-  "Micáceo",
-  "Muito compacto",
-  "Pouco compacto",
-];
-
 export default function SoloPage() {
   const params = useParams();
   const projectId = params.id as string;
 
   const [draftId, setDraftId] = useState<string | null>(null);
-
   const [layers, setLayers] = useState<Layer[]>([
-    { profundidade: "", textura: "", cor: "", genese: "", complemento: "" },
+    { profundidade: "", tipo: "" },
   ]);
 
   const [form, setForm] = useState<FormData>({
@@ -88,38 +51,58 @@ export default function SoloPage() {
     profundidade_total: "",
   });
 
+  async function loadDraft() {
+    const { data } = await supabase
+      .from("soil_descriptions")
+      .select("*")
+      .eq("project_id", projectId)
+      .eq("finalized", false)
+      .maybeSingle();
+
+    if (!data) return;
+
+    setDraftId(data.id);
+
+    setForm({
+      nome_sondagem: data.nome_sondagem ?? "",
+      data: data.data ?? "",
+      hora: data.hora ?? "",
+      nivel_agua: data.nivel_agua ?? "",
+      tipo_sondagem: data.tipo_sondagem ?? "",
+      diametro_sondagem: data.diametro_sondagem ?? "",
+      diametro_poco: data.diametro_poco ?? "",
+      pre_filtro: data.pre_filtro ?? "",
+      secao_filtrante_base: data.secao_filtrante_base ?? "",
+      secao_filtrante_topo: data.secao_filtrante_topo ?? "",
+      coord_x: data.coord_x ?? "",
+      coord_y: data.coord_y ?? "",
+      profundidade_total: data.profundidade_total ?? "",
+    });
+
+    setLayers(
+      data.layers && data.layers.length > 0
+        ? data.layers
+        : [{ profundidade: "", tipo: "" }]
+    );
+  }
+
+  useEffect(() => {
+    loadDraft();
+  }, []);
+
   function setField(key: keyof FormData, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
   function addLayer() {
-    setLayers((prev) => [
-      ...prev,
-      { profundidade: "", textura: "", cor: "", genese: "", complemento: "" },
-    ]);
-  }
-
-  function gerarDescricao(layer: Layer) {
-    return [
-      layer.textura,
-      layer.cor,
-      layer.genese,
-      layer.complemento,
-    ]
-      .filter(Boolean)
-      .join(" ");
+    setLayers((prev) => [...prev, { profundidade: "", tipo: "" }]);
   }
 
   async function salvar() {
-    const layersComDescricao = layers.map((l) => ({
-      profundidade: l.profundidade,
-      tipo: gerarDescricao(l),
-    }));
-
     if (draftId) {
       await supabase
         .from("soil_descriptions")
-        .update({ ...form, layers: layersComDescricao })
+        .update({ ...form, layers })
         .eq("id", draftId);
     } else {
       const { data } = await supabase
@@ -127,7 +110,7 @@ export default function SoloPage() {
         .insert({
           project_id: projectId,
           ...form,
-          layers: layersComDescricao,
+          layers,
           finalized: false,
         })
         .select("id")
@@ -136,161 +119,204 @@ export default function SoloPage() {
       if (data) setDraftId(data.id);
     }
 
+    await loadDraft();
     alert("Rascunho salvo.");
   }
 
   async function concluir() {
-    const layersComDescricao = layers.map((l) => ({
-      profundidade: l.profundidade,
-      tipo: gerarDescricao(l),
-    }));
+    const ok = confirm(
+      "Concluir descrição de solo? Após isso não será possível editar."
+    );
+    if (!ok) return;
 
     await supabase.from("soil_descriptions").insert({
       project_id: projectId,
       ...form,
-      layers: layersComDescricao,
+      layers,
       finalized: true,
     });
 
-    alert("Perfil enviado para o desktop.");
+    if (draftId) {
+      await supabase
+        .from("soil_descriptions")
+        .delete()
+        .eq("id", draftId);
+    }
+
+    setDraftId(null);
+    setForm({
+      nome_sondagem: "",
+      data: "",
+      hora: "",
+      nivel_agua: "",
+      tipo_sondagem: "",
+      diametro_sondagem: "",
+      diametro_poco: "",
+      pre_filtro: "",
+      secao_filtrante_base: "",
+      secao_filtrante_topo: "",
+      coord_x: "",
+      coord_y: "",
+      profundidade_total: "",
+    });
+    setLayers([{ profundidade: "", tipo: "" }]);
+
+    alert("Descrição concluída e enviada para o desktop.");
   }
 
   return (
     <AppShell>
-      <div className="px-4 py-6 space-y-6">
+      <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-50">
 
-        <Section title="Dados da Sondagem">
-          <Input label="Nome da Sondagem" value={form.nome_sondagem} onChange={(v) => setField("nome_sondagem", v)} />
-          <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v) => setField("tipo_sondagem", v)} />
-          <Input label="Nível d’água" value={form.nivel_agua} onChange={(v) => setField("nivel_agua", v)} />
-          <Input label="Profundidade Total" value={form.profundidade_total} onChange={(v) => setField("profundidade_total", v)} />
-        </Section>
-
-        <Section title="Camadas Estratigráficas">
-
-          {layers.map((layer, i) => (
-            <div key={i} className="space-y-3 border p-3 rounded-lg">
-
-              <Input
-                label="Profundidade (m)"
-                value={layer.profundidade}
-                onChange={(v) => {
-                  const copy = [...layers];
-                  copy[i].profundidade = v;
-                  setLayers(copy);
-                }}
-              />
-
-              <Select
-                label="Textura"
-                value={layer.textura}
-                options={TEXTURAS}
-                onChange={(v) => {
-                  const copy = [...layers];
-                  copy[i].textura = v;
-                  setLayers(copy);
-                }}
-              />
-
-              <Input
-                label="Cor"
-                value={layer.cor}
-                onChange={(v) => {
-                  const copy = [...layers];
-                  copy[i].cor = v;
-                  setLayers(copy);
-                }}
-              />
-
-              <Select
-                label="Gênese (opcional)"
-                value={layer.genese}
-                options={GENESES}
-                onChange={(v) => {
-                  const copy = [...layers];
-                  copy[i].genese = v;
-                  setLayers(copy);
-                }}
-              />
-
-              <Select
-                label="Complemento (opcional)"
-                value={layer.complemento}
-                options={COMPLEMENTOS}
-                onChange={(v) => {
-                  const copy = [...layers];
-                  copy[i].complemento = v;
-                  setLayers(copy);
-                }}
-              />
-
+        <div className="bg-[#391e2a] text-white px-4 py-4 shadow-md">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-lg font-semibold tracking-wide">
+                Perfil Descritivo
+              </h1>
+              <p className="text-xs text-gray-300">
+                Registro técnico de sondagem
+              </p>
             </div>
-          ))}
 
-          <button
-            onClick={addLayer}
-            className="w-full bg-[#391e2a] text-white py-2 rounded-lg"
-          >
-            + Adicionar Camada
-          </button>
-        </Section>
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#80b02d] text-white shadow">
+              {draftId ? "Rascunho" : "Novo"}
+            </span>
+          </div>
+        </div>
 
-        <button
-          onClick={salvar}
-          className="w-full bg-white border py-3 rounded-lg"
-        >
-          Salvar Rascunho
-        </button>
+        <div className="px-4 py-6 space-y-6">
 
-        <button
-          onClick={concluir}
-          className="w-full bg-[#80b02d] text-white py-3 rounded-lg"
-        >
-          Concluir Perfil
-        </button>
+          <Section title="Dados da Sondagem">
+            <Input label="Nome da Sondagem" value={form.nome_sondagem} onChange={(v) => setField("nome_sondagem", v)} />
 
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Data" value={form.data} onChange={(v) => setField("data", v)} />
+              <Input label="Hora" value={form.hora} onChange={(v) => setField("hora", v)} />
+            </div>
+
+            <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v) => setField("tipo_sondagem", v)} />
+            <Input label="Nível d’água" value={form.nivel_agua} onChange={(v) => setField("nivel_agua", v)} />
+            <Input label="Profundidade Total" value={form.profundidade_total} onChange={(v) => setField("profundidade_total", v)} />
+          </Section>
+
+          <Section title="Construção do Poço">
+            <Input label="Diâmetro da Sondagem" value={form.diametro_sondagem} onChange={(v) => setField("diametro_sondagem", v)} />
+            <Input label="Diâmetro do Poço" value={form.diametro_poco} onChange={(v) => setField("diametro_poco", v)} />
+            <Input label="Pré-filtro" value={form.pre_filtro} onChange={(v) => setField("pre_filtro", v)} />
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Seção Filtrante Base (m)"
+                value={form.secao_filtrante_base}
+                onChange={(v) => setField("secao_filtrante_base", v)}
+              />
+
+              <Input
+                label="Seção Filtrante Topo (m)"
+                value={form.secao_filtrante_topo}
+                onChange={(v) => setField("secao_filtrante_topo", v)}
+              />
+            </div>
+          </Section>
+
+          <Section title="Coordenadas">
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Coord. X" value={form.coord_x} onChange={(v) => setField("coord_x", v)} />
+              <Input label="Coord. Y" value={form.coord_y} onChange={(v) => setField("coord_y", v)} />
+            </div>
+          </Section>
+
+          <Section title="Camadas Estratigráficas">
+            {layers.map((layer, i) => (
+              <div key={i} className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Profundidade (m)"
+                  value={layer.profundidade}
+                  onChange={(v) => {
+                    const copy = [...layers];
+                    copy[i].profundidade = v;
+                    setLayers(copy);
+                  }}
+                />
+                <Input
+                  label="Tipo de Solo"
+                  value={layer.tipo}
+                  onChange={(v) => {
+                    const copy = [...layers];
+                    copy[i].tipo = v;
+                    setLayers(copy);
+                  }}
+                />
+              </div>
+            ))}
+
+            <button
+              onClick={addLayer}
+              className="w-full mt-3 bg-[#391e2a] text-white font-semibold py-2 rounded-lg shadow hover:opacity-90 transition"
+            >
+              + Adicionar Camada
+            </button>
+          </Section>
+
+          <div className="space-y-4 pt-4">
+            <button
+              onClick={salvar}
+              className="w-full bg-white border-2 border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl shadow-sm hover:bg-gray-100 transition"
+            >
+              Salvar Rascunho
+            </button>
+
+            <button
+              onClick={concluir}
+              className="w-full bg-[#80b02d] text-white font-bold py-3 rounded-xl shadow-lg hover:brightness-105 transition"
+            >
+              Concluir Perfil
+            </button>
+          </div>
+
+        </div>
       </div>
     </AppShell>
   );
 }
 
-function Section({ title, children }: any) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="bg-white p-4 rounded-xl shadow space-y-3">
-      <h2 className="font-semibold text-[#391e2a]">{title}</h2>
+    <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-[#391e2a] tracking-wide uppercase border-b pb-2">
+        {title}
+      </h2>
       {children}
     </div>
   );
 }
 
-function Input({ label, value, onChange }: any) {
+function Input({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
-    <div>
-      <label className="text-xs">{label}</label>
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-semibold text-gray-600 tracking-wide">
+        {label}
+      </label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full border rounded p-2"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
       />
-    </div>
-  );
-}
-
-function Select({ label, value, options, onChange }: any) {
-  return (
-    <div>
-      <label className="text-xs">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full border rounded p-2"
-      >
-        {options.map((o: string) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
     </div>
   );
 }
