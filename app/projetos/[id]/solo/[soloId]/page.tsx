@@ -258,6 +258,54 @@ export default function SoloDetailPage() {
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax, "F");
     pdf.rect(esquerdaTubo, topo, larguraTubo, alturaMax);
 
+    /* ================= PRÉ-FILTRO ================= */
+
+    const topoPrefiltro = parseFloat(data.pre_filtro);
+
+    if (!isNaN(topoPrefiltro)) {
+
+      const larguraPrefiltro = larguraPerfil / 3;
+
+      const yInicioPrefiltro = topo + topoPrefiltro * escala;
+      const alturaPrefiltro = (profundidadeTotal - topoPrefiltro) * escala;
+
+      const esquerdaPrefiltro = esquerdaTubo - larguraPrefiltro;
+      const direitaPrefiltro = esquerdaTubo + larguraTubo;
+
+      pdf.setFillColor(210,180,140);
+
+      pdf.rect(
+        esquerdaPrefiltro,
+        yInicioPrefiltro,
+        larguraPrefiltro,
+        alturaPrefiltro,
+        "F"
+      );
+
+      pdf.rect(
+        direitaPrefiltro,
+        yInicioPrefiltro,
+        larguraPrefiltro,
+        alturaPrefiltro,
+        "F"
+      );
+
+      pdf.setFillColor(0, 0, 0);
+
+      for (let yDot = yInicioPrefiltro + 1; yDot < yInicioPrefiltro + alturaPrefiltro; yDot += 3) {
+
+        for (let xDot = esquerdaPrefiltro + 1; xDot < esquerdaPrefiltro + larguraPrefiltro; xDot += 3) {
+          pdf.circle(xDot, yDot, 0.3, "F");
+        }
+
+        for (let xDot = direitaPrefiltro + 1; xDot < direitaPrefiltro + larguraPrefiltro; xDot += 3) {
+          pdf.circle(xDot, yDot, 0.3, "F");
+        }
+
+      }
+
+    }
+
     /* ================= SEÇÃO FILTRANTE ================= */
 
     const topoFiltro = parseFloat(data.secao_filtrante_topo);
