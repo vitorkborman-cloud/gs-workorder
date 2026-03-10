@@ -426,20 +426,31 @@ pdf.rect(
 
 pdf.setFillColor(0,0,0);
 
-const centroEsquerda = esquerdaPrefiltro + larguraPrefiltro / 2;
-const centroDireita = direitaPrefiltro + larguraPrefiltro / 2;
+const margem = 0.8;       // distância da borda
+const espacamento = 1.2;  // densidade
+const raio = 0.18;        // tamanho das bolinhas
 
 for (
-  let yDot = yInicioPrefiltro + 1;
+  let yDot = yInicioPrefiltro + margem;
   yDot < yInicioPrefiltro + alturaPrefiltro;
-  yDot += 1.5
+  yDot += espacamento
 ) {
 
-  pdf.circle(centroEsquerda - 1, yDot, 0.2, "F");
-  pdf.circle(centroEsquerda + 1, yDot, 0.2, "F");
+  for (
+    let xDot = esquerdaPrefiltro + margem;
+    xDot < esquerdaPrefiltro + larguraPrefiltro - margem;
+    xDot += espacamento
+  ) {
+    pdf.circle(xDot, yDot, raio, "F");
+  }
 
-  pdf.circle(centroDireita - 1, yDot, 0.2, "F");
-  pdf.circle(centroDireita + 1, yDot, 0.2, "F");
+  for (
+    let xDot = direitaPrefiltro + margem;
+    xDot < direitaPrefiltro + larguraPrefiltro - margem;
+    xDot += espacamento
+  ) {
+    pdf.circle(xDot, yDot, raio, "F");
+  }
 
 }
 
