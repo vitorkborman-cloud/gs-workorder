@@ -409,7 +409,7 @@ if (tipo.includes("rachão") || tipo.includes("rachao")) {
 if (tipo.includes("siltosa")) {
 
   const espacamento = 2;
-  const tamanhoX = 0.33;
+  const tamanhoX = 0.6;
 
   for (let yDot = yLegenda + 1; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
 
