@@ -6,9 +6,9 @@ import { supabase } from "../../../../../lib/supabase";
 import AppShell from "../../../../../components/AppShell";
 
 type Layer = {
-  profundidade: string;
+  de: string;
+  ate: string;
   tipo: string;
-  cor: string;
 };
 
 type FormData = {
@@ -88,7 +88,7 @@ export default function SoloPage() {
   const [draftId, setDraftId] = useState<string | null>(null);
 
   const [layers, setLayers] = useState<Layer[]>([
-    { profundidade: "", tipo: "", cor: "" },
+    { de: "", ate: "", tipo: "" },
   ]);
 
   const [form, setForm] = useState<FormData>({
@@ -138,7 +138,7 @@ export default function SoloPage() {
     setLayers(
       data.layers && data.layers.length > 0
         ? data.layers
-        : [{ profundidade: "", tipo: "", cor: "" }]
+        : [{ de: "", ate: "", tipo: "" }]
     );
   }
 
@@ -151,7 +151,7 @@ export default function SoloPage() {
   }
 
   function addLayer() {
-    setLayers((prev) => [...prev, { profundidade: "", tipo: "", cor: "" }]);
+    setLayers((prev) => [...prev, { de: "", ate: "", tipo: "" }]);
   }
 
   async function salvar() {
@@ -217,9 +217,9 @@ export default function SoloPage() {
       profundidade_total: "",
     });
 
-    setLayers([{ profundidade: "", tipo: "", cor: "" }]);
+    setLayers([{ de: "", ate: "", tipo: "" }]);
 
-    alert("Descrição concluída e enviada para o desktop.");
+    alert("Descrição concluída.");
   }
 
   return (
@@ -245,47 +245,27 @@ export default function SoloPage() {
 
         <div className="px-4 py-6 space-y-6">
 
-          <Section title="Dados da Sondagem">
-            <Input label="Nome da Sondagem" value={form.nome_sondagem} onChange={(v) => setField("nome_sondagem", v)} />
-
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Data" value={form.data} onChange={(v) => setField("data", v)} />
-              <Input label="Hora" value={form.hora} onChange={(v) => setField("hora", v)} />
-            </div>
-
-            <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v) => setField("tipo_sondagem", v)} />
-            <Input label="Nível d’água" value={form.nivel_agua} onChange={(v) => setField("nivel_agua", v)} />
-            <Input label="Profundidade Total" value={form.profundidade_total} onChange={(v) => setField("profundidade_total", v)} />
-          </Section>
-
-          <Section title="Construção do Poço">
-            <Input label="Diâmetro da Sondagem" value={form.diametro_sondagem} onChange={(v) => setField("diametro_sondagem", v)} />
-            <Input label="Diâmetro do Poço" value={form.diametro_poco} onChange={(v) => setField("diametro_poco", v)} />
-            <Input label="Pré-filtro" value={form.pre_filtro} onChange={(v) => setField("pre_filtro", v)} />
-
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Seção Filtrante Base (m)" value={form.secao_filtrante_base} onChange={(v) => setField("secao_filtrante_base", v)} />
-              <Input label="Seção Filtrante Topo (m)" value={form.secao_filtrante_topo} onChange={(v) => setField("secao_filtrante_topo", v)} />
-            </div>
-          </Section>
-
-          <Section title="Coordenadas">
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Coord. X" value={form.coord_x} onChange={(v) => setField("coord_x", v)} />
-              <Input label="Coord. Y" value={form.coord_y} onChange={(v) => setField("coord_y", v)} />
-            </div>
-          </Section>
-
           <Section title="Camadas Estratigráficas">
+
             {layers.map((layer, i) => (
               <div key={i} className="grid grid-cols-3 gap-3 items-end">
 
                 <Input
-                  label="Profundidade (m)"
-                  value={layer.profundidade}
+                  label="De (m)"
+                  value={layer.de}
                   onChange={(v) => {
                     const copy = [...layers];
-                    copy[i].profundidade = v;
+                    copy[i].de = v;
+                    setLayers(copy);
+                  }}
+                />
+
+                <Input
+                  label="Até (m)"
+                  value={layer.ate}
+                  onChange={(v) => {
+                    const copy = [...layers];
+                    copy[i].ate = v;
                     setLayers(copy);
                   }}
                 />
@@ -301,16 +281,6 @@ export default function SoloPage() {
                   }}
                 />
 
-                <Input
-                  label="Coloração"
-                  value={layer.cor}
-                  onChange={(v) => {
-                    const copy = [...layers];
-                    copy[i].cor = v;
-                    setLayers(copy);
-                  }}
-                />
-
               </div>
             ))}
 
@@ -320,23 +290,8 @@ export default function SoloPage() {
             >
               + Adicionar Camada
             </button>
+
           </Section>
-
-          <div className="space-y-4 pt-4">
-            <button
-              onClick={salvar}
-              className="w-full bg-white border-2 border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl shadow-sm hover:bg-gray-100 transition"
-            >
-              Salvar Rascunho
-            </button>
-
-            <button
-              onClick={concluir}
-              className="w-full bg-[#80b02d] text-white font-bold py-3 rounded-xl shadow-lg hover:brightness-105 transition"
-            >
-              Concluir Perfil
-            </button>
-          </div>
 
         </div>
       </div>
@@ -399,6 +354,7 @@ function Select({
             {o}
           </option>
         ))}
+
       </select>
     </div>
   );
