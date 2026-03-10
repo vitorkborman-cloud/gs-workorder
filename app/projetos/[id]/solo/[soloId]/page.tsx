@@ -426,14 +426,14 @@ const centroDireita = direitaPrefiltro + larguraPrefiltro / 2;
 for (
   let yDot = yInicioPrefiltro + 1;
   yDot < yInicioPrefiltro + alturaPrefiltro;
-  yDot += 3
+  yDot += 1.5
 ) {
 
-  pdf.circle(centroEsquerda - 1, yDot, 0.3, "F");
-  pdf.circle(centroEsquerda + 1, yDot, 0.3, "F");
+  pdf.circle(centroEsquerda - 1, yDot, 0.2, "F");
+  pdf.circle(centroEsquerda + 1, yDot, 0.2, "F");
 
-  pdf.circle(centroDireita - 1, yDot, 0.3, "F");
-  pdf.circle(centroDireita + 1, yDot, 0.3, "F");
+  pdf.circle(centroDireita - 1, yDot, 0.2, "F");
+  pdf.circle(centroDireita + 1, yDot, 0.2, "F");
 
 }
 
