@@ -39,35 +39,50 @@ export default function SoloDetailPage() {
     load();
   }, []);
 
-  /* ================= CORES AUTOMÁTICAS ================= */
+/* ================= CORES AUTOMÁTICAS ================= */
 
-  function gerarCor(nome: string): [number, number, number] {
-    const n = nome.toLowerCase();
+function gerarCor(nome: string): [number, number, number] {
 
-    if (n.includes("argila")) {
-      if (n.includes("silt")) return [185, 120, 95];
-      if (n.includes("aren")) return [200, 140, 90];
-      return [170, 95, 70];
-    }
+  const n = nome.toLowerCase();
 
-    if (n.includes("silte")) {
-      if (n.includes("aren")) return [175, 175, 175];
-      if (n.includes("argil")) return [155, 155, 155];
-      return [165, 165, 165];
-    }
+  /* MATERIAIS GROSSEIROS */
 
-    if (n.includes("areia")) {
-      if (n.includes("fina")) return [235, 210, 140];
-      if (n.includes("grossa")) return [220, 190, 110];
-      return [230, 200, 120];
-    }
+  if (n.includes("rachão") || n.includes("rachao")) return [100, 100, 100]; // cinza escuro
+  if (n.includes("brita")) return [140, 140, 140]; // cinza médio
+  if (n.includes("cascalho")) return [120, 120, 120];
 
-    if (n.includes("orgânica")) return [60, 60, 60];
-    if (n.includes("turfa")) return [40, 40, 40];
-    if (n.includes("cascalho")) return [120, 120, 120];
+  /* ARGILAS */
 
-    return [200, 180, 140];
+  if (n.includes("argila")) {
+    if (n.includes("silt")) return [185, 120, 95];
+    if (n.includes("aren")) return [200, 140, 90];
+    return [170, 95, 70];
   }
+
+  /* SILTES */
+
+  if (n.includes("silte")) {
+    if (n.includes("aren")) return [175, 175, 175];
+    if (n.includes("argil")) return [155, 155, 155];
+    return [165, 165, 165];
+  }
+
+  /* AREIAS */
+
+  if (n.includes("areia")) {
+    if (n.includes("fina")) return [235, 210, 140];
+    if (n.includes("grossa")) return [220, 190, 110];
+    return [230, 200, 120];
+  }
+
+  /* ORGÂNICOS */
+
+  if (n.includes("orgânica") || n.includes("organica")) return [60, 60, 60];
+  if (n.includes("turfa")) return [40, 40, 40];
+
+  return [200, 180, 140];
+
+}
 
   async function gerarPDF() {
     if (!data) return;
@@ -234,12 +249,50 @@ export default function SoloDetailPage() {
 
      const tipo = l.tipo.toLowerCase();
 
+     if (tipo.includes("brita")) {
+
+  const espacamento = 3;
+  const raio = 0.6;
+
+  pdf.setDrawColor(0);
+
+  for (let yDot = yCamada + 2; yDot < yCamada + altura; yDot += espacamento) {
+
+    for (let xDot = esquerdaPerfil + 2; xDot < esquerdaPerfil + larguraPerfil; xDot += espacamento) {
+
+      pdf.circle(xDot, yDot, raio);
+
+    }
+
+  }
+
+}
+
+if (tipo.includes("rachão") || tipo.includes("rachao")) {
+
+  const espacamento = 4;
+  const raio = 1;
+
+  pdf.setDrawColor(0);
+
+  for (let yDot = yCamada + 2; yDot < yCamada + altura; yDot += espacamento) {
+
+    for (let xDot = esquerdaPerfil + 2; xDot < esquerdaPerfil + larguraPerfil; xDot += espacamento) {
+
+      pdf.circle(xDot, yDot, raio);
+
+    }
+
+  }
+
+}
+
      /* TEXTURA SILTOSA (X) */
 
 if (tipo.includes("siltosa")) {
 
   const espacamento = 2;
-  const tamanhoX = 0.5;
+  const tamanhoX = 0.33;
 
   pdf.setDrawColor(0);
 
@@ -262,7 +315,7 @@ if (
   tipo.includes("arenosa")
 ) {
 
-  let espacamento = 1.5;
+  let espacamento = 1;
   let raio = 0.15;
 
   if (l.tipo.toLowerCase().includes("fina")) {
@@ -271,7 +324,7 @@ if (
   }
 
   if (l.tipo.toLowerCase().includes("grossa")) {
-    espacamento = 1.5;
+    espacamento = 1;
     raio = 0.3;
   }
 
