@@ -8,7 +8,14 @@ import { isMobileDevice } from "../../lib/isMobile";
 import AdminShell from "../../components/layout/AdminShell";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "../../components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 
@@ -34,15 +41,16 @@ export default function DashboardPage() {
   async function load() {
     const { data: p } = await supabase.from("projects").select("*");
 
-const sortedProjects =
-  p?.sort((a, b) =>
-    a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
-  ) || [];
+    const sortedProjects =
+      p?.sort((a, b) =>
+        a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
+      ) || [];
 
-setProjects(sortedProjects);
-setTotalProjects(sortedProjects.length);
+    setProjects(sortedProjects);
+    setTotalProjects(sortedProjects.length);
 
     const { data: a } = await supabase.from("activities").select("status");
+
     if (a) {
       setTotalActivities(a.length);
       setDoneActivities(a.filter((x) => x.status === "concluído").length);
@@ -51,110 +59,146 @@ setTotalProjects(sortedProjects.length);
 
   async function createProject() {
     if (!name) return;
+
     await supabase.from("projects").insert({ name });
+
     setName("");
     setOpen(false);
+
     load();
   }
 
   async function deleteProject(id: string, name: string) {
     const ok = confirm(`Excluir o projeto "${name}" permanentemente?`);
+
     if (!ok) return;
 
     await supabase.from("projects").delete().eq("id", id);
+
     load();
   }
 
   return (
     <AdminShell>
-      <div className="space-y-6">
+      <div className="space-y-8">
 
         {/* HEADER */}
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Painel</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Painel</h1>
 
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:opacity-90 text-white font-semibold">
+
+              <Button className="bg-gradient-to-r from-[#391e2a] to-[#80b02d] hover:opacity-90 text-white font-semibold px-6 shadow-lg">
                 Novo Projeto
               </Button>
+
             </DialogTrigger>
 
-            <DialogContent>
+            <DialogContent className="rounded-2xl">
               <DialogHeader>
                 <DialogTitle>Criar projeto</DialogTitle>
               </DialogHeader>
 
               <div className="space-y-2">
                 <Label>Nome do projeto</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
+
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
               </div>
 
               <DialogFooter>
-                <Button onClick={createProject} className="bg-primary text-white">
+
+                <Button
+                  onClick={createProject}
+                  className="bg-gradient-to-r from-[#391e2a] to-[#80b02d] text-white"
+                >
                   Criar
                 </Button>
+
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
 
-        {/* CARDS */}
-        <div className="grid md:grid-cols-3 gap-4">
-          <Card className="bg-primary text-white border-0 shadow-md">
+        {/* CARDS KPI */}
+        <div className="grid md:grid-cols-3 gap-6">
+
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-[#391e2a] to-[#5c3046] text-white rounded-2xl hover:scale-[1.02] transition">
             <CardContent className="p-6">
               <p className="text-sm opacity-80">Projetos</p>
-              <p className="text-3xl font-bold mt-2">{totalProjects}</p>
+              <p className="text-4xl font-bold mt-2">{totalProjects}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-primary text-white border-0 shadow-md">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-[#80b02d] to-[#5e8420] text-white rounded-2xl hover:scale-[1.02] transition">
             <CardContent className="p-6">
               <p className="text-sm opacity-80">Atividades</p>
-              <p className="text-3xl font-bold mt-2">{totalActivities}</p>
+              <p className="text-4xl font-bold mt-2">{totalActivities}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-primary text-white border-0 shadow-md">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-[#391e2a] to-[#80b02d] text-white rounded-2xl hover:scale-[1.02] transition">
             <CardContent className="p-6">
               <p className="text-sm opacity-80">Concluídas</p>
-              <p className="text-3xl font-bold mt-2">{doneActivities}</p>
+              <p className="text-4xl font-bold mt-2">{doneActivities}</p>
             </CardContent>
           </Card>
+
         </div>
 
-        {/* LOUSA ROXA */}
-        <div className="bg-secondary rounded-2xl p-6 space-y-4 shadow-inner">
-          <h2 className="text-white text-lg font-semibold">Projetos</h2>
+        {/* ÁREA PROJETOS */}
+        <div className="bg-gradient-to-br from-[#391e2a] to-[#2a1420] rounded-3xl p-8 shadow-inner space-y-6">
 
-          <div className="grid md:grid-cols-3 gap-4">
+          <h2 className="text-white text-lg font-semibold tracking-wide">
+            Projetos
+          </h2>
+
+          <div className="grid md:grid-cols-3 xl:grid-cols-4 gap-6">
+
             {projects.map((project) => (
-              <div key={project.id} className="relative">
+              <div key={project.id} className="relative group">
 
-                {/* BOTÃO X */}
+                {/* BOTÃO DELETE */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteProject(project.id, project.name);
                   }}
-                  className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 z-10"
+                  className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 opacity-0 group-hover:opacity-100 transition"
                 >
                   ✕
                 </button>
 
-                {/* CARD DO PROJETO */}
+                {/* CARD PROJETO */}
                 <button
                   onClick={() => router.push(`/projetos/${project.id}`)}
-                  className="w-full bg-primary text-white font-semibold rounded-xl p-6 text-left shadow hover:scale-[1.02] transition"
+                  className="
+                  w-full
+                  bg-gradient-to-br
+                  from-[#80b02d]
+                  to-[#5e8420]
+                  text-white
+                  font-semibold
+                  rounded-2xl
+                  p-6
+                  text-left
+                  shadow-xl
+                  hover:shadow-2xl
+                  hover:-translate-y-1
+                  transition
+                "
                 >
                   {project.name}
                 </button>
 
               </div>
             ))}
+
           </div>
         </div>
-
       </div>
     </AdminShell>
   );
