@@ -365,7 +365,7 @@ if (
 
       pdf.setFillColor(r, g, b);
       const xLegenda = direitaPerfil + 20;
-const tamanhoLegenda = 20;
+const tamanhoLegenda = 8;
 
 pdf.setFillColor(r, g, b);
 pdf.rect(xLegenda, yLegenda, tamanhoLegenda, tamanhoLegenda, "F");
@@ -430,18 +430,13 @@ if (
   tipo.includes("arenosa")
 ) {
 
-  const espacamento = 2;
-  const raio = 0.5;
+  const raio = 0.35;
 
-  for (let yDot = yLegenda + 1; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
+  pdf.circle(xLegenda + 2, yLegenda + 2, raio, "F");
+  pdf.circle(xLegenda + 6, yLegenda + 2, raio, "F");
 
-    for (let xDot = xLegenda + 1; xDot < xLegenda + tamanhoLegenda; xDot += espacamento) {
-
-      pdf.circle(xDot, yDot, raio, "F");
-
-    }
-
-  }
+  pdf.circle(xLegenda + 2, yLegenda + 6, raio, "F");
+  pdf.circle(xLegenda + 6, yLegenda + 6, raio, "F");
 
 }
 
