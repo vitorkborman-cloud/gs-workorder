@@ -365,7 +365,7 @@ if (
 
       pdf.setFillColor(r, g, b);
       const xLegenda = direitaPerfil + 20;
-const tamanhoLegenda = 8;
+const tamanhoLegenda = 10;
 
 pdf.setFillColor(r, g, b);
 pdf.rect(xLegenda, yLegenda, tamanhoLegenda, tamanhoLegenda, "F");
