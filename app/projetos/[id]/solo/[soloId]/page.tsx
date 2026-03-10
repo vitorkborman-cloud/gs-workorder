@@ -684,7 +684,7 @@ pdf.line(esquerdaCotaPoco, yCota1, direitaCotaPoco, yCota1);
 
 pdf.setFontSize(9);
 pdf.text(
-  `Ø ${diametroPoco} in`,
+  `Ø ${diametroPoco} `,
   (esquerdaCotaPoco + direitaCotaPoco) / 2,
   yCota1 + 4,
   { align: "center" }
@@ -709,7 +709,7 @@ pdf.line(esquerdaCotaSondagem, yCota2, direitaCotaSondagem, yCota2);
 /* texto */
 
 pdf.text(
-  `Ø ${diametroSondagem} in`,
+  `Ø ${diametroSondagem} `,
   (esquerdaCotaSondagem + direitaCotaSondagem) / 2,
   yCota2 + 4,
   { align: "center" }
