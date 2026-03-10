@@ -100,14 +100,14 @@ function gerarCor(nome: string): [number, number, number] {
 
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(13);
-    pdf.text("GS WORK ORDER - RELATÓRIO TÉCNICO", pageWidth / 2, 15, {
+    pdf.text("GREENSOIL - Perfil Descritivo de Solo", pageWidth / 2, 15, {
       align: "center",
     });
 
     pdf.setTextColor(0, 0, 0);
     pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
-    pdf.text("PERFIL DESCRITIVO DE SOLO", pageWidth / 2, 40, {
+    pdf.text("Dados de execução", pageWidth / 2, 40, {
       align: "center",
     });
 
