@@ -31,31 +31,65 @@ export default function MobileHome() {
     <MobileShell title="Projetos" subtitle="Selecione um projeto para continuar">
 
       {projects.length === 0 ? (
-        <div className="text-center text-gray-500 mt-10">
-          Nenhum projeto disponível
+        <div className="flex flex-col items-center justify-center mt-16 text-gray-400">
+
+          <div className="text-4xl mb-3">📁</div>
+
+          <p className="text-sm">
+            Nenhum projeto disponível
+          </p>
+
         </div>
       ) : (
-        <div className="space-y-3">
+
+        <div className="space-y-4">
+
           {projects.map((project) => (
+
             <button
               key={project.id}
               onClick={() => router.push(`/mobile/projetos/${project.id}`)}
               className="
-                w-full text-left p-4 rounded-2xl
-                bg-[var(--green)] text-white
-                shadow-sm active:scale-[0.98]
-                transition-transform
+              w-full
+              text-left
+              p-5
+              rounded-2xl
+              bg-gradient-to-br
+              from-[var(--green)]
+              to-[#5e8420]
+              text-white
+              shadow-lg
+              active:scale-[0.97]
+              transition-all
+              duration-200
+              flex
+              items-center
+              justify-between
               "
             >
-              <div className="font-semibold text-base">
-                {project.name}
+
+              <div>
+
+                <div className="font-semibold text-base tracking-tight">
+                  {project.name}
+                </div>
+
+                <div className="text-xs opacity-80 mt-1">
+                  Abrir projeto
+                </div>
+
               </div>
-              <div className="text-xs opacity-90 mt-1">
-                Abrir projeto
+
+              <div className="text-white/80 text-lg">
+                →
               </div>
+
             </button>
+
           ))}
+
         </div>
+
       )}
 
     </MobileShell>
