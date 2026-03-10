@@ -71,6 +71,7 @@ const tiposSolo = [
 
 "Britas",
 "Rachão",
+"Concreto",
 
 "Areia de granulação variada argilosa",
 "Areia de granulação variada pouco argilosa",
