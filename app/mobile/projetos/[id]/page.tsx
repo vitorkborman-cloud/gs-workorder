@@ -45,6 +45,7 @@ export default function MobileProjetoPage() {
             w-full
             rounded-2xl
             p-5
+            min-h-[90px]
             bg-gradient-to-br
             from-[var(--green)]
             to-[#5e8420]
@@ -54,7 +55,7 @@ export default function MobileProjetoPage() {
             transition
           "
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between h-full">
 
             <div>
               <div className="text-lg font-semibold tracking-tight">
@@ -82,6 +83,7 @@ export default function MobileProjetoPage() {
             w-full
             rounded-2xl
             p-5
+            min-h-[90px]
             bg-gradient-to-br
             from-[var(--purple)]
             to-[#2a1420]
@@ -91,7 +93,7 @@ export default function MobileProjetoPage() {
             transition
           "
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between h-full">
 
             <div>
               <div className="text-lg font-semibold tracking-tight">
@@ -119,6 +121,7 @@ export default function MobileProjetoPage() {
             w-full
             rounded-2xl
             p-5
+            min-h-[90px]
             bg-gradient-to-br
             from-[#2f7ea1]
             to-[#1f5c78]
@@ -128,7 +131,7 @@ export default function MobileProjetoPage() {
             transition
           "
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between h-full">
 
             <div>
               <div className="text-lg font-semibold tracking-tight">
@@ -136,7 +139,7 @@ export default function MobileProjetoPage() {
               </div>
 
               <div className="text-sm opacity-90 mt-1">
-                EM CONSTRUÇÃO
+                Em construção
               </div>
             </div>
 
