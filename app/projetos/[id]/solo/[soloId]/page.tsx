@@ -8,7 +8,8 @@ import { Button } from "../../../../../components/ui/button";
 import jsPDF from "jspdf";
 
 type Layer = {
-  profundidade: string;
+  de: string;
+  ate: string;
   tipo: string;
 };
 
@@ -29,7 +30,7 @@ export default function SoloDetailPage() {
 
     if (data) {
       setData(data);
-      setLayers(data.layers || []);
+      setLayers((data.layers as Layer[]) || []);
     }
 
     setLoading(false);
@@ -189,25 +190,25 @@ function gerarCor(nome: string): [number, number, number] {
 
     pdf.setTextColor(0);
 
-    let profAnterior = 0;
+layers.forEach((l, index) => {
 
-    layers.forEach((l, index) => {
-      const profAtual = parseFloat(l.profundidade);
+  const de = parseFloat(l.de);
+  const ate = parseFloat(l.ate);
 
-      if (index % 2 === 0) {
-        pdf.setFillColor(230, 242, 214);
-        pdf.rect(col1, y, larguraTabela, alturaLinha, "F");
-      }
+  if (index % 2 === 0) {
+    pdf.setFillColor(230, 242, 214);
+    pdf.rect(col1, y, larguraTabela, alturaLinha, "F");
+  }
 
-      pdf.text(String(profAnterior), col1 + 3, y + 5.5);
-      pdf.text(String(profAtual), col2 + 3, y + 5.5);
-      pdf.text(l.tipo, col3 + 3, y + 5.5);
+  pdf.text(String(de), col1 + 3, y + 5.5);
+  pdf.text(String(ate), col2 + 3, y + 5.5);
+  pdf.text(l.tipo, col3 + 3, y + 5.5);
 
-      pdf.rect(col1, y, larguraTabela, alturaLinha);
+  pdf.rect(col1, y, larguraTabela, alturaLinha);
 
-      y += alturaLinha;
-      profAnterior = profAtual;
-    });
+  y += alturaLinha;
+
+});
 
     /* ================= PERFIL ================= */
 
@@ -237,12 +238,13 @@ function gerarCor(nome: string): [number, number, number] {
       pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
     }
 
-    let profAnt = 0;
+layers.forEach((l) => {
 
-    layers.forEach((l) => {
-      const profAtual = parseFloat(l.profundidade);
-      const altura = (profAtual - profAnt) * escala;
-      const yCamada = topo + profAnt * escala;
+  const de = parseFloat(l.de);
+  const ate = parseFloat(l.ate);
+
+  const altura = (ate - de) * escala;
+  const yCamada = topo + de * escala;
 
       const [r, g, b] = gerarCor(l.tipo);
 
@@ -348,7 +350,6 @@ if (
 
 }
 
-      profAnt = profAtual;
     });
 
     pdf.setDrawColor(0);
@@ -361,8 +362,10 @@ if (
 
     pdf.setFontSize(9);
 
-    layers.forEach((l) => {
-      const profAtual = parseFloat(l.profundidade);
+layers.forEach((l) => {
+
+  const de = parseFloat(l.de);
+  const ate = parseFloat(l.ate);
       const [r, g, b] = gerarCor(l.tipo);
 
       pdf.setFillColor(r, g, b);
@@ -444,13 +447,13 @@ pdf.circle(xLegenda + 6, yLegenda + 6, raio, "F");
 }
 
       pdf.text(
-        `${profLegenda} – ${profAtual} m : ${l.tipo}`,
+        `${de} – ${ate} m : ${l.tipo}`,
         direitaPerfil + 32,
         yLegenda + 6
       );
 
       yLegenda += 12;
-      profLegenda = profAtual;
+      profLegenda = ate;
     });
 
     /* ================= TUBO ================= */
@@ -727,18 +730,15 @@ pdf.triangle(
                   <th className="border p-3 text-left">Tipo de Solo</th>
                 </tr>
               </thead>
-              <tbody>
-                {layers.map((layer, index) => {
-                  const de = index === 0 ? 0 : layers[index - 1].profundidade;
-                  return (
-                    <tr key={index}>
-                      <td className="border p-3">{de}</td>
-                      <td className="border p-3">{layer.profundidade}</td>
-                      <td className="border p-3">{layer.tipo}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+<tbody>
+  {layers.map((layer, index) => (
+    <tr key={index}>
+      <td className="border p-3">{layer.de}</td>
+      <td className="border p-3">{layer.ate}</td>
+      <td className="border p-3">{layer.tipo}</td>
+    </tr>
+  ))}
+</tbody>
             </table>
           </Section>
 
