@@ -11,14 +11,8 @@ type Project = {
   favorite?: boolean;
 };
 
-type Activity = {
-  project_id: string;
-  status: string;
-};
-
 export default function MobileHome() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
   const [search, setSearch] = useState("");
 
   const router = useRouter();
@@ -28,10 +22,6 @@ export default function MobileHome() {
       .from("projects")
       .select("*");
 
-    const { data: a } = await supabase
-      .from("activities")
-      .select("project_id,status");
-
     if (p) {
       const sorted = p.sort((a, b) =>
         a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
@@ -39,8 +29,6 @@ export default function MobileHome() {
 
       setProjects(sorted);
     }
-
-    if (a) setActivities(a);
   }
 
   useEffect(() => {
@@ -54,29 +42,6 @@ export default function MobileHome() {
       )
     );
   }
-
-function getProjectStats(projectId: string) {
-
-  const acts = activities.filter(
-    (a: any) =>
-      a.project_id === projectId ||
-      a.project === projectId ||
-      a.projectId === projectId
-  );
-
-  const total = acts.length;
-
-  const done = acts.filter(
-    (a: any) =>
-      a.status === "concluído" ||
-      a.status === "concluido" ||
-      a.status === "done"
-  ).length;
-
-  const progress = total === 0 ? 0 : Math.round((done / total) * 100);
-
-  return { total, done, progress };
-}
 
   const filteredProjects = projects
     .filter((p) =>
@@ -129,7 +94,6 @@ function getProjectStats(projectId: string) {
         <div className="space-y-4">
 
           {filteredProjects.map((project) => {
-            const stats = getProjectStats(project.id);
 
             return (
               <div key={project.id} className="relative">
@@ -171,16 +135,8 @@ function getProjectStats(projectId: string) {
 
                   <div className="flex items-center justify-between">
 
-                    <div>
-
-                      <div className="font-semibold text-base">
-                        {project.name}
-                      </div>
-
-                      <div className="text-xs opacity-80 mt-1">
-                        {stats.done} de {stats.total} atividades concluídas
-                      </div>
-
+                    <div className="font-semibold text-base">
+                      {project.name}
                     </div>
 
                     <div className="text-lg opacity-80">
@@ -189,18 +145,8 @@ function getProjectStats(projectId: string) {
 
                   </div>
 
-                  {/* PROGRESS BAR */}
-
-                  <div className="mt-3 h-2 w-full bg-white/30 rounded-full overflow-hidden">
-
-                    <div
-                      className="h-full bg-white transition-all"
-                      style={{ width: `${stats.progress}%` }}
-                    />
-
-                  </div>
-
                 </button>
+
               </div>
             );
           })}
