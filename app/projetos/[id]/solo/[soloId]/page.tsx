@@ -365,7 +365,7 @@ if (
 
       pdf.setFillColor(r, g, b);
       const xLegenda = direitaPerfil + 20;
-const tamanhoLegenda = 10;
+const tamanhoLegenda = 6;
 
 pdf.setFillColor(r, g, b);
 pdf.rect(xLegenda, yLegenda, tamanhoLegenda, tamanhoLegenda, "F");
@@ -431,7 +431,7 @@ if (
 ) {
 
   const espacamento = 2;
-  const raio = 0.2;
+  const raio = 0.5;
 
   for (let yDot = yLegenda + 1; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
 
