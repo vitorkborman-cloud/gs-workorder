@@ -96,58 +96,55 @@ export default function MobileHome() {
           {filteredProjects.map((project) => {
 
             return (
-              <div key={project.id} className="relative">
+              <button
+                key={project.id}
+                onClick={() =>
+                  router.push(`/mobile/projetos/${project.id}`)
+                }
+                className="
+                relative
+                w-full
+                text-left
+                p-5
+                rounded-2xl
+                bg-gradient-to-br
+                from-[var(--green)]
+                to-[#5e8420]
+                text-white
+                shadow-lg
+                active:scale-[0.97]
+                transition-all
+                duration-200
+                "
+              >
 
-                {/* FAVORITE */}
-                <button
-                  onClick={() => toggleFavorite(project.id)}
-                  className="
-                  absolute
-                  right-3
-                  top-3
-                  text-yellow-400
-                  text-lg
-                  z-10
-                  "
-                >
-                  {project.favorite ? "★" : "☆"}
-                </button>
+                {/* COLUNA DIREITA */}
+                <div className="absolute right-4 top-0 bottom-0 flex flex-col justify-between items-center py-3">
 
-                <button
-                  onClick={() =>
-                    router.push(`/mobile/projetos/${project.id}`)
-                  }
-                  className="
-                  w-full
-                  text-left
-                  p-5
-                  rounded-2xl
-                  bg-gradient-to-br
-                  from-[var(--green)]
-                  to-[#5e8420]
-                  text-white
-                  shadow-lg
-                  active:scale-[0.97]
-                  transition-all
-                  duration-200
-                  "
-                >
-
-                  <div className="flex items-center justify-between">
-
-                    <div className="font-semibold text-base">
-                      {project.name}
-                    </div>
-
-                    <div className="text-lg opacity-80">
-                      →
-                    </div>
-
+                  {/* FAVORITE */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(project.id);
+                    }}
+                    className="text-yellow-400 text-lg"
+                  >
+                    {project.favorite ? "★" : "☆"}
                   </div>
 
-                </button>
+                  {/* SETA */}
+                  <div className="text-lg opacity-80">
+                    →
+                  </div>
 
-              </div>
+                </div>
+
+                {/* TEXTO */}
+                <div className="pr-8 font-semibold text-base">
+                  {project.name}
+                </div>
+
+              </button>
             );
           })}
         </div>
