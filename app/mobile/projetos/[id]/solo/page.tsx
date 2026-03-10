@@ -11,11 +11,6 @@ type Layer = {
   tipo: string;
 };
 
-type Photo = {
-  id: string;
-  url: string;
-};
-
 type FormData = {
   nome_sondagem: string;
   data: string;
@@ -87,9 +82,6 @@ export default function SoloPage() {
   const projectId = params.id as string;
 
   const [draftId, setDraftId] = useState<string | null>(null);
-
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [uploading, setUploading] = useState(false);
 
   const [layers, setLayers] = useState<Layer[]>([
     { de: "", ate: "", tipo: "" }
@@ -238,53 +230,11 @@ export default function SoloPage() {
 
     setLayers([{ de: "", ate: "", tipo: "" }]);
 
-  alert("Descrição concluída.");
+    alert("Descrição concluída.");
 
-}
-
-async function uploadPhoto(file: File) {
-
-  if (!draftId) {
-    alert("Salve o rascunho antes de anexar fotos.");
-    return;
   }
 
-  setUploading(true);
-
-  const fileName = `${Date.now()}_${file.name}`;
-
-  const filePath = `${projectId}/${draftId}/${fileName}`;
-
-  const { error } = await supabase.storage
-    .from("soil-photos")
-    .upload(filePath, file);
-
-if (error) {
-  console.error(error);
-  alert(error.message);
-  setUploading(false);
-  return;
-}
-
-  const { data } = supabase.storage
-    .from("soil-photos")
-    .getPublicUrl(filePath);
-
-  const publicUrl = data.publicUrl;
-
-  setPhotos((prev) => [
-    ...prev,
-    {
-      id: fileName,
-      url: publicUrl
-    }
-  ]);
-
-  setUploading(false);
-
-}
-
-return (
+  return (
 
     <AppShell>
 
@@ -397,51 +347,6 @@ return (
             >
               + Adicionar Camada
             </button>
-
-          </Section>
-
-          <Section title="Fotos da Sondagem">
-
-            <div className="space-y-3">
-
-              <label className="text-xs font-semibold text-gray-600 tracking-wide">
-                Tirar foto da sondagem
-              </label>
-
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-
-                  uploadPhoto(file);
-                }}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50"
-              />
-
-              {uploading && (
-                <p className="text-xs text-gray-500">
-                  Enviando foto...
-                </p>
-              )}
-
-              <div className="grid grid-cols-3 gap-3">
-
-                {photos.map((p) => (
-
-                  <img
-                    key={p.id}
-                    src={p.url}
-                    className="rounded-lg shadow border object-cover h-24 w-full"
-                  />
-
-                ))}
-
-              </div>
-
-            </div>
 
           </Section>
 
