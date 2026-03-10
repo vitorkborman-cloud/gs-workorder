@@ -232,19 +232,38 @@ export default function SoloDetailPage() {
       pdf.setFillColor(r, g, b);
       pdf.rect(esquerdaPerfil, yCamada, larguraPerfil, altura, "F");
 
-      if (l.tipo.toLowerCase().includes("areia")) {
-        pdf.setFillColor(0, 0, 0);
+     if (l.tipo.toLowerCase().includes("areia")) {
 
-        for (let yDot = yCamada + 1; yDot < yCamada + altura; yDot += 3) {
-          for (
-            let xDot = esquerdaPerfil + 1;
-            xDot < esquerdaPerfil + larguraPerfil;
-            xDot += 3
-          ) {
-            pdf.circle(xDot, yDot, 0.3, "F");
-          }
-        }
-      }
+  let espacamento = 1.5;
+  let raio = 0.15;
+
+  if (l.tipo.toLowerCase().includes("fina")) {
+    espacamento = 1;
+    raio = 0.1;
+  }
+
+  if (l.tipo.toLowerCase().includes("grossa")) {
+    espacamento = 1.5;
+    raio = 0.3;
+  }
+
+  pdf.setFillColor(0,0,0);
+
+  for (let yDot = yCamada + 1; yDot < yCamada + altura; yDot += espacamento) {
+
+    for (
+      let xDot = esquerdaPerfil + 1;
+      xDot < esquerdaPerfil + larguraPerfil;
+      xDot += espacamento
+    ) {
+
+      pdf.circle(xDot, yDot, raio, "F");
+
+    }
+
+  }
+
+}
 
       profAnt = profAtual;
     });
