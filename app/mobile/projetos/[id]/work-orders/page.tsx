@@ -42,7 +42,7 @@ export default function MobileWorkOrders() {
 
         {workOrders.length === 0 && (
           <div className="text-center text-sm text-gray-500 mt-10">
-            Nenhuma Work Order disponível
+            Nenhum Work Order disponível
           </div>
         )}
 

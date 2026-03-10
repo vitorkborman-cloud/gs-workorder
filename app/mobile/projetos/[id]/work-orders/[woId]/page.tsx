@@ -275,7 +275,7 @@ export default function MobileWorkOrderPage() {
 
   async function finalize() {
     if (!signatureUrl) {
-      alert("É obrigatório assinar antes de finalizar.");
+      alert("Assine antes de finalizar.");
       return;
     }
 
@@ -396,7 +396,7 @@ export default function MobileWorkOrderPage() {
             onClick={() => setOpenSign(true)}
             className="w-full py-4 rounded-2xl font-bold text-white bg-[var(--purple)]"
           >
-            {signatureUrl ? "Refazer assinatura" : "Assinar responsável"}
+            {signatureUrl ? "Refazer assinatura" : "Assinatura do responsável"}
           </button>
         </div>
       )}
