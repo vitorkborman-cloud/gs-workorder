@@ -409,7 +409,7 @@ if (tipo.includes("rachão") || tipo.includes("rachao")) {
 if (tipo.includes("siltosa")) {
 
   const espacamento = 2;
-  const tamanhoX = 0.6;
+  const tamanhoX = 0.4;
 
   for (let yDot = yLegenda + 1; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
 
@@ -432,11 +432,13 @@ if (
 
   const raio = 0.35;
 
-  pdf.circle(xLegenda + 2, yLegenda + 2, raio, "F");
-  pdf.circle(xLegenda + 6, yLegenda + 2, raio, "F");
+const centro = tamanhoLegenda / 2;
 
-  pdf.circle(xLegenda + 2, yLegenda + 6, raio, "F");
-  pdf.circle(xLegenda + 6, yLegenda + 6, raio, "F");
+pdf.circle(xLegenda + centro - 2, yLegenda + centro - 2, raio, "F");
+pdf.circle(xLegenda + centro + 2, yLegenda + centro - 2, raio, "F");
+
+pdf.circle(xLegenda + centro - 2, yLegenda + centro + 2, raio, "F");
+pdf.circle(xLegenda + centro + 2, yLegenda + centro + 2, raio, "F");
 
 }
 
