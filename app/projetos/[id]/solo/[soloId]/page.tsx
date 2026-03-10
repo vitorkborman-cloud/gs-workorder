@@ -416,33 +416,26 @@ pdf.rect(
   alturaPrefiltro
 );
 
-  /* TEXTURA DO PRÉ FILTRO */
+/* TEXTURA DO PRÉ FILTRO */
 
-  pdf.setFillColor(0,0,0);
+pdf.setFillColor(0,0,0);
 
-  for (
-    let yDot = yInicioPrefiltro + 1;
-    yDot < yInicioPrefiltro + alturaPrefiltro;
-    yDot += 1.5
-  ) {
+const centroEsquerda = esquerdaPrefiltro + larguraPrefiltro / 2;
+const centroDireita = direitaPrefiltro + larguraPrefiltro / 2;
 
-    for (
-      let xDot = esquerdaPrefiltro + 1;
-      xDot < esquerdaPrefiltro + larguraPrefiltro;
-      xDot += 1.5
-    ) {
-      pdf.circle(xDot, yDot, 0.2, "F");
-    }
+for (
+  let yDot = yInicioPrefiltro + 1;
+  yDot < yInicioPrefiltro + alturaPrefiltro;
+  yDot += 3
+) {
 
-    for (
-      let xDot = direitaPrefiltro + 1;
-      xDot < direitaPrefiltro + larguraPrefiltro;
-      xDot += 1.5
-    ) {
-      pdf.circle(xDot, yDot, 0.2, "F");
-    }
+  pdf.circle(centroEsquerda - 1, yDot, 0.3, "F");
+  pdf.circle(centroEsquerda + 1, yDot, 0.3, "F");
 
-  }
+  pdf.circle(centroDireita - 1, yDot, 0.3, "F");
+  pdf.circle(centroDireita + 1, yDot, 0.3, "F");
+
+}
 
 }
 
