@@ -343,43 +343,78 @@ if (!isNaN(topoPrefiltro)) {
 
   /* AREIA ACIMA DO PRÉ FILTRO */
 
-  pdf.setFillColor(245,222,179);
+pdf.setFillColor(245,222,179);
 
-  pdf.rect(
-    esquerdaPrefiltro,
-    topo,
-    larguraPrefiltro,
-    yInicioPrefiltro - topo,
-    "F"
-  );
+pdf.rect(
+  esquerdaPrefiltro,
+  topo,
+  larguraPrefiltro,
+  yInicioPrefiltro - topo,
+  "F"
+);
 
-  pdf.rect(
-    direitaPrefiltro,
-    topo,
-    larguraPrefiltro,
-    yInicioPrefiltro - topo,
-    "F"
-  );
+pdf.rect(
+  direitaPrefiltro,
+  topo,
+  larguraPrefiltro,
+  yInicioPrefiltro - topo,
+  "F"
+);
 
-  /* PRÉ FILTRO */
+/* BORDA BLOCO SUPERIOR */
 
-  pdf.setFillColor(210,180,140);
+pdf.setDrawColor(0);
+pdf.setLineWidth(0.2);
 
-  pdf.rect(
-    esquerdaPrefiltro,
-    yInicioPrefiltro,
-    larguraPrefiltro,
-    alturaPrefiltro,
-    "F"
-  );
+pdf.rect(
+  esquerdaPrefiltro,
+  topo,
+  larguraPrefiltro,
+  yInicioPrefiltro - topo
+);
 
-  pdf.rect(
-    direitaPrefiltro,
-    yInicioPrefiltro,
-    larguraPrefiltro,
-    alturaPrefiltro,
-    "F"
-  );
+pdf.rect(
+  direitaPrefiltro,
+  topo,
+  larguraPrefiltro,
+  yInicioPrefiltro - topo
+);
+
+/* PRÉ FILTRO */
+
+pdf.setFillColor(210,180,140);
+
+pdf.rect(
+  esquerdaPrefiltro,
+  yInicioPrefiltro,
+  larguraPrefiltro,
+  alturaPrefiltro,
+  "F"
+);
+
+pdf.rect(
+  direitaPrefiltro,
+  yInicioPrefiltro,
+  larguraPrefiltro,
+  alturaPrefiltro,
+  "F"
+);
+
+/* BORDA PRÉ FILTRO */
+
+pdf.rect(
+  esquerdaPrefiltro,
+  yInicioPrefiltro,
+  larguraPrefiltro,
+  alturaPrefiltro
+);
+
+pdf.rect(
+  direitaPrefiltro,
+  yInicioPrefiltro,
+  larguraPrefiltro,
+  alturaPrefiltro
+);
 
   /* TEXTURA DO PRÉ FILTRO */
 
