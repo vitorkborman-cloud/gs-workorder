@@ -656,6 +656,65 @@ pdf.triangle(
       }
     }
 
+    /* ================= COTAS DE DIÂMETRO ================= */
+
+const yCota1 = topo + alturaMax + 10; // primeira linha de cota
+const yCota2 = topo + alturaMax + 20; // segunda linha de cota
+
+pdf.setDrawColor(0);
+pdf.setLineWidth(0.3);
+
+/* ===== DIÂMETRO DO POÇO ===== */
+
+const diametroPoco = data.diametro_poco ?? "-";
+
+const esquerdaCotaPoco = esquerdaTubo;
+const direitaCotaPoco = esquerdaTubo + larguraTubo;
+
+/* linhas verticais */
+
+pdf.line(esquerdaCotaPoco, topo + alturaMax, esquerdaCotaPoco, yCota1);
+pdf.line(direitaCotaPoco, topo + alturaMax, direitaCotaPoco, yCota1);
+
+/* linha horizontal */
+
+pdf.line(esquerdaCotaPoco, yCota1, direitaCotaPoco, yCota1);
+
+/* texto */
+
+pdf.setFontSize(9);
+pdf.text(
+  `Ø ${diametroPoco} in`,
+  (esquerdaCotaPoco + direitaCotaPoco) / 2,
+  yCota1 + 4,
+  { align: "center" }
+);
+
+/* ===== DIÂMETRO DA SONDAGEM ===== */
+
+const diametroSondagem = data.diametro_sondagem ?? "-";
+
+const esquerdaCotaSondagem = esquerdaPerfil;
+const direitaCotaSondagem = direitaPerfil;
+
+/* linhas verticais */
+
+pdf.line(esquerdaCotaSondagem, topo + alturaMax, esquerdaCotaSondagem, yCota2);
+pdf.line(direitaCotaSondagem, topo + alturaMax, direitaCotaSondagem, yCota2);
+
+/* linha horizontal */
+
+pdf.line(esquerdaCotaSondagem, yCota2, direitaCotaSondagem, yCota2);
+
+/* texto */
+
+pdf.text(
+  `Ø ${diametroSondagem} in`,
+  (esquerdaCotaSondagem + direitaCotaSondagem) / 2,
+  yCota2 + 4,
+  { align: "center" }
+);
+
     pdf.save(`perfil_${data.nome_sondagem}.pdf`);
   }
 
