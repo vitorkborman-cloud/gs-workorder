@@ -219,7 +219,7 @@ function gerarCor(nome: string): [number, number, number] {
     const alturaMax = 170;
     const larguraPerfil = 40;
 
-    const centro = pageWidth / 2 - 20;
+    const centro = pageWidth / 2 - 35;
 
     const esquerdaPerfil = centro - larguraPerfil / 2;
     const direitaPerfil = centro + larguraPerfil / 2;
@@ -501,30 +501,53 @@ pdf.rect(
 
 pdf.setFillColor(0,0,0);
 
-const margem = 0.8;       // distância da borda
-const espacamento = 1.2;  // densidade
-const raio = 0.18;        // tamanho das bolinhas
+const espacamento = 2.4;
+const raioBase = 0.25;
 
 for (
-  let yDot = yInicioPrefiltro + margem;
+  let yDot = yInicioPrefiltro + 1;
   yDot < yInicioPrefiltro + alturaPrefiltro;
   yDot += espacamento
 ) {
 
   for (
-    let xDot = esquerdaPrefiltro + margem;
-    xDot < esquerdaPrefiltro + larguraPrefiltro - margem;
+    let xDot = esquerdaPrefiltro + 0.8;
+    xDot < esquerdaPrefiltro + larguraPrefiltro - 0.8;
     xDot += espacamento
   ) {
-    pdf.circle(xDot, yDot, raio, "F");
+
+    const jitterX = (Math.random() - 0.5) * 0.6;
+    const jitterY = (Math.random() - 0.5) * 0.6;
+
+    const raio = raioBase + (Math.random() - 0.5) * 0.1;
+
+    pdf.circle(
+      xDot + jitterX,
+      yDot + jitterY,
+      raio,
+      "F"
+    );
+
   }
 
   for (
-    let xDot = direitaPrefiltro + margem;
-    xDot < direitaPrefiltro + larguraPrefiltro - margem;
+    let xDot = direitaPrefiltro + 0.8;
+    xDot < direitaPrefiltro + larguraPrefiltro - 0.8;
     xDot += espacamento
   ) {
-    pdf.circle(xDot, yDot, raio, "F");
+
+    const jitterX = (Math.random() - 0.5) * 0.6;
+    const jitterY = (Math.random() - 0.5) * 0.6;
+
+    const raio = raioBase + (Math.random() - 0.5) * 0.1;
+
+    pdf.circle(
+      xDot + jitterX,
+      yDot + jitterY,
+      raio,
+      "F"
+    );
+
   }
 
 }
