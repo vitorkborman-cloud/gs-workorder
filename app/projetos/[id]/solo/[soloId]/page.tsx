@@ -205,6 +205,133 @@ export default function SoloDetailPage() {
       return mapaCores[nome];
     }
 
+    /* ================= CORES GEOLOGICAS ================= */
+
+function getCorSolo(nome: string): [number, number, number] {
+
+  const n = nome.toLowerCase()
+
+  if (n.startsWith("argila org")) return [103,105,100]   // #676964
+  if (n.startsWith("argila")) return [189,60,13]         // #bd3c0d
+  if (n.startsWith("silte")) return [61,29,1]            // #3d1d01
+  if (n.startsWith("areia")) return [219,198,129]        // #dbc681
+  if (n.startsWith("brita")) return [89,88,87]
+  if (n.startsWith("rach")) return [89,88,87]
+
+  return gerarCor(nome)
+}
+
+
+/* ================= TEXTURAS ================= */
+
+function desenharTexturaSolo(
+  pdf:any,
+  nome:string,
+  x:number,
+  y:number,
+  w:number,
+  h:number
+){
+
+  const n = nome.toLowerCase()
+
+  /* AREIA FINA */
+
+  if(n.startsWith("areia fina")){
+
+    for(let yy=y;yy<y+h;yy+=2){
+      for(let xx=x;xx<x+w;xx+=2){
+        pdf.circle(xx,yy,0.25,"F")
+      }
+    }
+
+  }
+
+  /* AREIA FINA E MÉDIA */
+
+  else if(n.startsWith("areia fina e média")){
+
+    for(let yy=y;yy<y+h;yy+=3){
+      for(let xx=x;xx<x+w;xx+=3){
+        pdf.circle(xx,yy,0.35,"F")
+      }
+    }
+
+  }
+
+  /* AREIA GROSSA */
+
+  else if(n.startsWith("areia grossa")){
+
+    for(let yy=y;yy<y+h;yy+=4){
+      for(let xx=x;xx<x+w;xx+=4){
+        pdf.circle(xx,yy,0.5,"F")
+      }
+    }
+
+  }
+
+  /* AREIA GRANULAÇÃO VARIADA */
+
+  else if(n.includes("granulação")){
+
+    for(let yy=y;yy<y+h;yy+=3){
+      for(let xx=x;xx<x+w;xx+=3){
+
+        const r = Math.random()*0.5+0.2
+        pdf.circle(xx,yy,r,"F")
+
+      }
+    }
+
+  }
+
+  /* ARGILAS */
+
+  else if(n.startsWith("argila")){
+
+    for(let i=0;i<w+h;i+=4){
+      pdf.line(x+i,y,x+i-h,y+h)
+    }
+
+  }
+
+  /* SILTES */
+
+  else if(n.startsWith("silte")){
+
+    for(let yy=y;yy<y+h;yy+=6){
+      pdf.line(x,yy,x+w,yy)
+    }
+
+  }
+
+  /* BRITA */
+
+  else if(n.startsWith("brita")){
+
+    for(let yy=y;yy<y+h;yy+=4){
+      for(let xx=x;xx<x+w;xx+=4){
+        pdf.circle(xx,yy,1,"S")
+      }
+    }
+
+  }
+
+  /* RACHÃO */
+
+  else if(n.startsWith("rach")){
+
+    for(let yy=y;yy<y+h;yy+=6){
+      for(let xx=x;xx<x+w;xx+=6){
+        pdf.circle(xx,yy,1.6,"S")
+      }
+    }
+
+  }
+
+}
+
     let profAnt = 0;
 
     layers.forEach((l) => {
@@ -214,9 +341,28 @@ export default function SoloDetailPage() {
       const altura = (profAtual - profAnt) * escala;
       const yCamada = topo + profAnt * escala;
 
-      const [r, g, b] = gerarCor(nome);
-      pdf.setFillColor(r, g, b);
-      pdf.rect(esquerdaPerfil, yCamada, larguraPerfil, altura, "F");
+const [r,g,b] = getCorSolo(nome)
+
+pdf.setFillColor(r,g,b)
+
+pdf.rect(
+  esquerdaPerfil,
+  yCamada,
+  larguraPerfil,
+  altura,
+  "F"
+)
+
+pdf.setDrawColor(0)
+
+desenharTexturaSolo(
+  pdf,
+  nome,
+  esquerdaPerfil,
+  yCamada,
+  larguraPerfil,
+  altura
+)
 
       profAnt = profAtual;
     });
