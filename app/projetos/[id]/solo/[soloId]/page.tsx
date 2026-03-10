@@ -364,7 +364,86 @@ if (
       const [r, g, b] = gerarCor(l.tipo);
 
       pdf.setFillColor(r, g, b);
-      pdf.rect(direitaPerfil + 20, yLegenda, 8, 8, "F");
+      const xLegenda = direitaPerfil + 20;
+const tamanhoLegenda = 8;
+
+pdf.setFillColor(r, g, b);
+pdf.rect(xLegenda, yLegenda, tamanhoLegenda, tamanhoLegenda, "F");
+
+const tipo = l.tipo.toLowerCase();
+
+if (tipo.includes("brita")) {
+
+  const espacamento = 3;
+  const raio = 0.6;
+
+  for (let yDot = yLegenda + 2; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
+
+    for (let xDot = xLegenda + 2; xDot < xLegenda + tamanhoLegenda; xDot += espacamento) {
+
+      pdf.circle(xDot, yDot, raio);
+
+    }
+
+  }
+
+}
+
+if (tipo.includes("rachão") || tipo.includes("rachao")) {
+
+  const espacamento = 4;
+  const raio = 1;
+
+  for (let yDot = yLegenda + 2; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
+
+    for (let xDot = xLegenda + 2; xDot < xLegenda + tamanhoLegenda; xDot += espacamento) {
+
+      pdf.circle(xDot, yDot, raio);
+
+    }
+
+  }
+
+}
+
+if (tipo.includes("siltosa")) {
+
+  const espacamento = 2;
+  const tamanhoX = 0.33;
+
+  for (let yDot = yLegenda + 1; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
+
+    for (let xDot = xLegenda + 1; xDot < xLegenda + tamanhoLegenda; xDot += espacamento) {
+
+      pdf.line(xDot - tamanhoX, yDot - tamanhoX, xDot + tamanhoX, yDot + tamanhoX);
+      pdf.line(xDot - tamanhoX, yDot + tamanhoX, xDot + tamanhoX, yDot - tamanhoX);
+
+    }
+
+  }
+
+}
+
+if (
+  tipo.includes("areia") ||
+  tipo.includes("arenoso") ||
+  tipo.includes("arenosa")
+) {
+
+  const espacamento = 2;
+  const raio = 0.2;
+
+  for (let yDot = yLegenda + 1; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
+
+    for (let xDot = xLegenda + 1; xDot < xLegenda + tamanhoLegenda; xDot += espacamento) {
+
+      pdf.circle(xDot, yDot, raio, "F");
+
+    }
+
+  }
+
+}
 
       pdf.text(
         `${profLegenda} – ${profAtual} m : ${l.tipo}`,
