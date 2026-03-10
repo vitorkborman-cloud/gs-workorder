@@ -232,7 +232,13 @@ export default function SoloDetailPage() {
       pdf.setFillColor(r, g, b);
       pdf.rect(esquerdaPerfil, yCamada, larguraPerfil, altura, "F");
 
-     if (l.tipo.toLowerCase().includes("areia")) {
+     const tipo = l.tipo.toLowerCase();
+
+if (
+  tipo.includes("areia") ||
+  tipo.includes("arenoso") ||
+  tipo.includes("arenosa")
+) {
 
   let espacamento = 1.5;
   let raio = 0.15;
