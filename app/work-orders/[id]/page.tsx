@@ -64,21 +64,17 @@ export default function WorkOrderPage() {
 
   async function updateStatus(id: string, status: string) {
     if (finalized) return;
-
     setActivities(prev =>
       prev.map(a => (a.id === id ? { ...a, status } : a))
     );
-
     await supabase.from("activities").update({ status }).eq("id", id);
   }
 
   async function updateNote(id: string, note: string) {
     if (finalized) return;
-
     setActivities(prev =>
       prev.map(a => (a.id === id ? { ...a, note } : a))
     );
-
     await supabase.from("activities").update({ note }).eq("id", id);
   }
 
@@ -86,7 +82,6 @@ export default function WorkOrderPage() {
     if (finalized) return;
 
     const incomplete = activities.some(a => !a.status);
-
     if (incomplete) {
       alert("Todas as atividades precisam ser respondidas.");
       return;
@@ -104,85 +99,269 @@ export default function WorkOrderPage() {
   }
 
   async function gerarPDF() {
-    /* TODO: mantém seu código existente sem alteração */
+    if (!workOrder) return;
+
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 20;
+
+    async function urlToBase64(url: string) {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    function addHeaderBase() {
+      pdf.setFillColor(57, 30, 42);
+      pdf.rect(0, 0, pageWidth, 25, "F");
+
+      pdf.setFillColor(128, 176, 45);
+      pdf.rect(0, 25, pageWidth, 3, "F");
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("RELATÓRIO WORK ORDER", pageWidth / 2, 15, { align: "center" });
+
+      pdf.setTextColor(0, 0, 0);
+    }
+
+    function addFooter(pageNumber: number, total: number) {
+      pdf.setFillColor(57, 30, 42);
+      pdf.rect(0, pageHeight - 15, pageWidth, 15, "F");
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(9);
+      pdf.text(`Página ${pageNumber} de ${total}`, pageWidth - margin, pageHeight - 6, {
+        align: "right",
+      });
+    }
+
+    /* ================= CAPA ================= */
+
+    addHeaderBase();
+
+    pdf.setFontSize(18);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Greensoil do Brasil LTDA", pageWidth / 2, 60, { align: "center" });
+
+    pdf.setFontSize(12);
+    pdf.text("CNPJ: 29.088.151/0001-25", pageWidth / 2, 75, { align: "center" });
+
+    pdf.text(
+      "Avenida Brigadeiro Faria Lima, 1572, Conjunto 1601 - Jardim Paulistano, São Paulo/SP - 014151-001",
+      pageWidth / 2,
+      85,
+      { align: "center", maxWidth: 140 }
+    );
+
+    pdf.line(margin, 105, pageWidth - margin, 105);
+
+    pdf.setFontSize(14);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(`Projeto: ${workOrder.projects?.name ?? "-"}`, pageWidth / 2, 125, { align: "center" });
+
+    pdf.text(`Work Order: ${workOrder.title}`, pageWidth / 2, 140, { align: "center" });
+
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Data de emissão: ${new Date().toLocaleDateString()}`, pageWidth / 2, 155, {
+      align: "center",
+    });
+
+    /* ================= ATIVIDADES (1 POR PÁGINA) ================= */
+
+    for (const act of activities) {
+      pdf.addPage();
+      addHeaderBase();
+
+      let currentY = 40;
+
+      const statusTexto =
+        act.status === "concluído" ? "Concluída" : "Não Concluída";
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(13);
+      pdf.text("Atividade", margin, currentY);
+      currentY += 10;
+
+      pdf.setFontSize(12);
+      pdf.text(act.description, margin, currentY);
+      currentY += 10;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Status: ${statusTexto}`, margin, currentY);
+      currentY += 8;
+
+      pdf.text(
+        `Observações: ${act.note?.trim() ? act.note : "Sem observações"}`,
+        margin,
+        currentY,
+        { maxWidth: pageWidth - margin * 2 }
+      );
+
+      currentY += 15;
+
+      if (act.images?.length) {
+        const imgBase64 = await urlToBase64(act.images[0]);
+
+        const img = new Image();
+        img.src = imgBase64;
+        await new Promise(resolve => (img.onload = resolve));
+
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - currentY - 30;
+
+        let width = img.width;
+        let height = img.height;
+        const ratio = width / height;
+
+        if (width > maxWidth) {
+          width = maxWidth;
+          height = width / ratio;
+        }
+
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * ratio;
+        }
+
+        const x = (pageWidth - width) / 2;
+        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
+      }
+    }
+
+    /* ================= INFORMAÇÕES ADICIONAIS ================= */
+
+    if (workOrder.additional_info || (workOrder.additional_images?.length ?? 0) > 0) {
+      pdf.addPage();
+      addHeaderBase();
+
+      let currentY = 40;
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(13);
+      pdf.text("Informações adicionais", margin, currentY);
+      currentY += 10;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.text(
+        workOrder.additional_info?.trim() || "Sem observações adicionais.",
+        margin,
+        currentY,
+        { maxWidth: pageWidth - margin * 2 }
+      );
+
+      currentY += 15;
+
+      if (workOrder.additional_images?.length) {
+        const imgBase64 = await urlToBase64(workOrder.additional_images[0]);
+
+        const img = new Image();
+        img.src = imgBase64;
+        await new Promise(resolve => (img.onload = resolve));
+
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - currentY - 30;
+
+        let width = img.width;
+        let height = img.height;
+        const ratio = width / height;
+
+        if (width > maxWidth) {
+          width = maxWidth;
+          height = width / ratio;
+        }
+
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * ratio;
+        }
+
+        if (currentY + height > pageHeight - 30) {
+          pdf.addPage();
+          addHeaderBase();
+          currentY = 40;
+        }
+
+        const x = (pageWidth - width) / 2;
+        pdf.addImage(imgBase64, "JPEG", x, currentY, width, height);
+      }
+    }
+
+    /* ================= ASSINATURA ================= */
+
+    if (workOrder.signature_url) {
+      pdf.addPage();
+      addHeaderBase();
+
+      let signY = 80;
+
+      pdf.setFontSize(12);
+      pdf.text("Assinatura do Responsável", pageWidth / 2, signY - 10, {
+        align: "center",
+      });
+
+      const signBase64 = await urlToBase64(workOrder.signature_url);
+      const img = new Image();
+      img.src = signBase64;
+      await new Promise(resolve => (img.onload = resolve));
+
+      const ratio = img.width / img.height;
+      const width = 80;
+      const height = width / ratio;
+
+      pdf.addImage(signBase64, "PNG", pageWidth / 2 - width / 2, signY, width, height);
+
+      const hoje = new Date();
+      const meses = [
+        "janeiro","fevereiro","março","abril","maio","junho",
+        "julho","agosto","setembro","outubro","novembro","dezembro"
+      ];
+
+      const dataExtenso = `São Paulo, ${hoje.getDate()} de ${
+        meses[hoje.getMonth()]
+      } de ${hoje.getFullYear()}.`;
+
+      pdf.text(dataExtenso, pageWidth / 2, signY + height + 20, { align: "center" });
+    }
+
+    const totalPages = pdf.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      addFooter(i, totalPages);
+    }
+
+    pdf.save(`workorder_${workOrder.title}.pdf`);
   }
 
   return (
     <AdminShell>
-
-      <div className="space-y-8">
-
-        {/* HEADER */}
+      <div className="space-y-6">
         <div className="flex justify-between items-center">
-
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              Atividades
-            </h1>
-
-            <p className="text-sm text-gray-500">
-              Checklist da visita técnica
-            </p>
-          </div>
+          <h1 className="text-2xl font-bold">Atividades</h1>
 
           {!mobile && !finalized && (
-            <Button
-              className="bg-gradient-to-r from-[#391e2a] to-[#80b02d] text-white shadow-lg"
-              onClick={createActivity}
-            >
+            <Button className="bg-primary text-white" onClick={createActivity}>
               + Adicionar atividade
             </Button>
           )}
-
         </div>
 
-
-        {/* LISTA DE ATIVIDADES */}
-        <div className="bg-secondary rounded-3xl p-8 shadow-inner space-y-5">
-
-          {activities.length === 0 && (
-            <p className="text-white/70">
-              Nenhuma atividade cadastrada.
-            </p>
-          )}
-
+        <div className="bg-secondary rounded-2xl p-6 shadow-inner space-y-4">
           {activities.map(act => (
+            <Card key={act.id} className="border-0 shadow bg-card">
+              <CardContent className="p-5 space-y-4">
+                <p className="font-semibold">{act.description}</p>
 
-            <Card
-              key={act.id}
-              className="border-0 shadow-lg bg-card rounded-2xl"
-            >
-
-              <CardContent className="p-6 space-y-5">
-
-                {/* DESCRIÇÃO */}
-                <div className="flex justify-between items-center">
-
-                  <p className="font-semibold text-lg">
-                    {act.description}
-                  </p>
-
-                  {act.status && (
-                    <span
-                      className={`text-xs px-3 py-1 rounded-full ${
-                        act.status === "concluído"
-                          ? "bg-green-600 text-white"
-                          : "bg-red-600 text-white"
-                      }`}
-                    >
-                      {act.status === "concluído"
-                        ? "Concluído"
-                        : "Não concluído"}
-                    </span>
-                  )}
-
-                </div>
-
-
-                {/* BOTÕES DE STATUS */}
                 {!finalized && (
                   <div className="flex gap-3">
-
                     <Button
                       className="bg-green-600 text-white"
                       onClick={() => updateStatus(act.id, "concluído")}
@@ -192,74 +371,37 @@ export default function WorkOrderPage() {
 
                     <Button
                       className="bg-red-600 text-white"
-                      onClick={() =>
-                        updateStatus(act.id, "não concluído")
-                      }
+                      onClick={() => updateStatus(act.id, "não concluído")}
                     >
                       Não concluído
                     </Button>
-
                   </div>
                 )}
 
-
-                {/* OBSERVAÇÃO */}
                 <textarea
                   placeholder="Observações..."
                   value={act.note ?? ""}
                   disabled={finalized}
-                  onChange={(e) =>
-                    updateNote(act.id, e.target.value)
-                  }
-                  className="
-                  w-full
-                  border
-                  border-gray-300
-                  rounded-xl
-                  p-3
-                  text-sm
-                  resize-none
-                  focus:ring-2
-                  focus:ring-[var(--green)]
-                  outline-none
-                  "
-                  rows={3}
+                  onChange={(e) => updateNote(act.id, e.target.value)}
+                  className="w-full border rounded-lg p-3 text-sm"
                 />
-
               </CardContent>
-
             </Card>
-
           ))}
-
         </div>
 
+        {finalized && (
+          <Button className="bg-primary text-white" onClick={gerarPDF}>
+            Gerar Relatório PDF
+          </Button>
+        )}
 
-        {/* BOTÕES FINAIS */}
-        <div className="flex gap-4">
-
-          {finalized && (
-            <Button
-              className="bg-gradient-to-r from-[#391e2a] to-[#80b02d] text-white shadow-lg"
-              onClick={gerarPDF}
-            >
-              Gerar Relatório PDF
-            </Button>
-          )}
-
-          {!finalized && (
-            <Button
-              className="bg-gradient-to-r from-[#391e2a] to-[#80b02d] text-white shadow-lg"
-              onClick={finalizeWorkOrder}
-            >
-              Finalizar Work Order
-            </Button>
-          )}
-
-        </div>
-
+        {!finalized && (
+          <Button className="bg-primary text-white" onClick={finalizeWorkOrder}>
+            Finalizar Work Order
+          </Button>
+        )}
       </div>
-
     </AdminShell>
   );
 }
