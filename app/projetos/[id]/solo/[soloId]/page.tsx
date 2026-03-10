@@ -430,7 +430,7 @@ if (
   tipo.includes("arenosa")
 ) {
 
-  const raio = 0.35;
+  const raio = 2.0;
 
 const centro = tamanhoLegenda / 2;
 
