@@ -33,8 +33,14 @@ export default function DashboardPage() {
 
   async function load() {
     const { data: p } = await supabase.from("projects").select("*");
-    setProjects(p || []);
-    setTotalProjects(p?.length || 0);
+
+const sortedProjects =
+  p?.sort((a, b) =>
+    a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
+  ) || [];
+
+setProjects(sortedProjects);
+setTotalProjects(sortedProjects.length);
 
     const { data: a } = await supabase.from("activities").select("status");
     if (a) {
