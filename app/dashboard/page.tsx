@@ -171,7 +171,7 @@ const curveData = [
         <div className="bg-white rounded-2xl shadow-lg p-6">
 
   <h2 className="text-lg font-semibold mb-4">
-    Curva S do Projeto
+    Curva S - EM CONSTRUÇÃO
   </h2>
 
   <div style={{ width: "100%", height: 300 }}>
