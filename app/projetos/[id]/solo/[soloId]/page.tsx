@@ -430,16 +430,15 @@ if (
   tipo.includes("arenosa")
 ) {
 
-  const raio = 2.0;
+const raio = 0.35;
 
-const centro = tamanhoLegenda / 2;
+pdf.setFillColor(0,0,0);
 
-pdf.circle(xLegenda + centro - 2, yLegenda + centro - 2, raio, "F");
-pdf.circle(xLegenda + centro + 2, yLegenda + centro - 2, raio, "F");
+pdf.circle(xLegenda + 2, yLegenda + 2, raio, "F");
+pdf.circle(xLegenda + 6, yLegenda + 2, raio, "F");
 
-pdf.circle(xLegenda + centro - 2, yLegenda + centro + 2, raio, "F");
-pdf.circle(xLegenda + centro + 2, yLegenda + centro + 2, raio, "F");
-
+pdf.circle(xLegenda + 2, yLegenda + 6, raio, "F");
+pdf.circle(xLegenda + 6, yLegenda + 6, raio, "F");
 }
 
       pdf.text(
