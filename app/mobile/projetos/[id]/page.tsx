@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { supabase } from "../../../../lib/supabase";
 import MobileShell from "../../../../components/layout/MobileShell";
 
 export default function MobileProjetoPage() {
@@ -8,9 +10,27 @@ export default function MobileProjetoPage() {
   const params = useParams();
   const projectId = params.id as string;
 
+  const [projectName, setProjectName] = useState("Projeto");
+
+  useEffect(() => {
+    loadProject();
+  }, []);
+
+  async function loadProject() {
+    const { data } = await supabase
+      .from("projects")
+      .select("name")
+      .eq("id", projectId)
+      .single();
+
+    if (data) {
+      setProjectName(data.name);
+    }
+  }
+
   return (
     <MobileShell
-      title="Módulos do Projeto"
+      title={projectName}
       subtitle="Escolha o que deseja preencher em campo"
       backHref="/mobile"
     >
@@ -90,7 +110,7 @@ export default function MobileProjetoPage() {
           </div>
         </button>
 
-        {/* MONITORAMENTO FÍSICO-QUÍMICO */}
+        {/* FÍSICO-QUÍMICOS */}
         <button
           onClick={() =>
             router.push(`/mobile/projetos/${projectId}/fisico-quimicos`)
@@ -116,7 +136,7 @@ export default function MobileProjetoPage() {
               </div>
 
               <div className="text-sm opacity-90 mt-1">
-                Registrar parâmetros de água
+                EM CONSTRUÇÃO
               </div>
             </div>
 
