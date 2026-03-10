@@ -55,16 +55,28 @@ export default function MobileHome() {
     );
   }
 
-  function getProjectStats(projectId: string) {
-    const acts = activities.filter((a) => a.project_id === projectId);
+function getProjectStats(projectId: string) {
 
-    const total = acts.length;
-    const done = acts.filter((a) => a.status === "concluído").length;
+  const acts = activities.filter(
+    (a: any) =>
+      a.project_id === projectId ||
+      a.project === projectId ||
+      a.projectId === projectId
+  );
 
-    const progress = total === 0 ? 0 : Math.round((done / total) * 100);
+  const total = acts.length;
 
-    return { total, done, progress };
-  }
+  const done = acts.filter(
+    (a: any) =>
+      a.status === "concluído" ||
+      a.status === "concluido" ||
+      a.status === "done"
+  ).length;
+
+  const progress = total === 0 ? 0 : Math.round((done / total) * 100);
+
+  return { total, done, progress };
+}
 
   const filteredProjects = projects
     .filter((p) =>
