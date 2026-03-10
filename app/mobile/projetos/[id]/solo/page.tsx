@@ -44,6 +44,9 @@ const tiposSolo = [
 "Silte muito arenoso",
 
 "Areia",
+"Areia fina",
+"Areia média",
+"Areia grossa",
 "Areia fina argilosa",
 "Areia fina pouco argilosa",
 "Areia fina muito argilosa",

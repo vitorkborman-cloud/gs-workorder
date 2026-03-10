@@ -234,6 +234,28 @@ export default function SoloDetailPage() {
 
      const tipo = l.tipo.toLowerCase();
 
+     /* TEXTURA SILTOSA (X) */
+
+if (tipo.includes("siltosa")) {
+
+  const espacamento = 2;
+  const tamanhoX = 0.5;
+
+  pdf.setDrawColor(0);
+
+  for (let yDot = yCamada + 1; yDot < yCamada + altura; yDot += espacamento) {
+
+    for (let xDot = esquerdaPerfil + 1; xDot < esquerdaPerfil + larguraPerfil; xDot += espacamento) {
+
+      pdf.line(xDot - tamanhoX, yDot - tamanhoX, xDot + tamanhoX, yDot + tamanhoX);
+      pdf.line(xDot - tamanhoX, yDot + tamanhoX, xDot + tamanhoX, yDot - tamanhoX);
+
+    }
+
+  }
+
+}
+
 if (
   tipo.includes("areia") ||
   tipo.includes("arenoso") ||
