@@ -54,17 +54,17 @@ function gerarCor(nome: string): [number, number, number] {
   /* ARGILAS */
 
   if (n.includes("argila")) {
-    if (n.includes("silt")) return [185, 120, 95];
-    if (n.includes("aren")) return [200, 140, 90];
-    return [170, 95, 70];
+    if (n.includes("silt")) return [220, 120, 120];
+    if (n.includes("aren")) return [200, 70, 70];
+    return [150, 40, 40];
   }
 
   /* SILTES */
 
   if (n.includes("silte")) {
-    if (n.includes("aren")) return [175, 175, 175];
-    if (n.includes("argil")) return [155, 155, 155];
-    return [165, 165, 165];
+    if (n.includes("silt")) return [185, 120, 95];
+    if (n.includes("aren")) return [200, 140, 90];
+    return [170, 95, 70];
   }
 
   /* AREIAS */
@@ -637,7 +637,7 @@ for (
       if (!isNaN(nivel)) {
         const yNivel = topo + nivel * escala;
 
-        pdf.setDrawColor(0, 0, 255);
+        pdf.setDrawColor(135, 206, 235);
         pdf.setLineWidth(0.7);
         pdf.line(esquerdaPerfil - 10, yNivel, direitaPerfil + 10, yNivel);
         const xTri = esquerdaPerfil - 12;

@@ -29,6 +29,7 @@ type FormData = {
 
 const tiposSolo = [
 
+"Argila",
 "Argila orgânica",
 "Argila plástica",
 "Argila siltosa",
