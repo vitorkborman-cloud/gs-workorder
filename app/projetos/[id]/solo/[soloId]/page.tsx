@@ -369,23 +369,23 @@ if (!isNaN(topoPrefiltro)) {
   for (
     let yDot = yInicioPrefiltro + 1;
     yDot < yInicioPrefiltro + alturaPrefiltro;
-    yDot += 3
+    yDot += 1.5
   ) {
 
     for (
       let xDot = esquerdaPrefiltro + 1;
       xDot < esquerdaPrefiltro + larguraPrefiltro;
-      xDot += 3
+      xDot += 1.5
     ) {
-      pdf.circle(xDot, yDot, 0.3, "F");
+      pdf.circle(xDot, yDot, 0.2, "F");
     }
 
     for (
       let xDot = direitaPrefiltro + 1;
       xDot < direitaPrefiltro + larguraPrefiltro;
-      xDot += 3
+      xDot += 1.5
     ) {
-      pdf.circle(xDot, yDot, 0.3, "F");
+      pdf.circle(xDot, yDot, 0.2, "F");
     }
 
   }
