@@ -1,5 +1,15 @@
 "use client";
 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid
+} from "recharts";
+
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
@@ -78,6 +88,15 @@ export default function DashboardPage() {
     load();
   }
 
+  const progress = totalActivities === 0
+  ? 0
+  : Math.round((doneActivities / totalActivities) * 100);
+
+const curveData = [
+  { name: "Início", planejado: 0, executado: 0 },
+  { name: "Planejado", planejado: 100, executado: progress }
+];
+
   return (
     <AdminShell>
       <div className="space-y-8">
@@ -148,6 +167,49 @@ export default function DashboardPage() {
           </Card>
 
         </div>
+
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+
+  <h2 className="text-lg font-semibold mb-4">
+    Curva S do Projeto
+  </h2>
+
+  <div style={{ width: "100%", height: 300 }}>
+
+    <ResponsiveContainer>
+
+      <LineChart data={curveData}>
+
+        <CartesianGrid strokeDasharray="3 3" />
+
+        <XAxis dataKey="name" />
+
+        <YAxis />
+
+        <Tooltip />
+
+        <Line
+          type="monotone"
+          dataKey="planejado"
+          stroke="#80b02d"
+          strokeWidth={3}
+          dot={false}
+        />
+
+        <Line
+          type="monotone"
+          dataKey="executado"
+          stroke="#391e2a"
+          strokeWidth={3}
+        />
+
+      </LineChart>
+
+    </ResponsiveContainer>
+
+  </div>
+
+</div>
 
         {/* ÁREA PROJETOS */}
         <div className="bg-gradient-to-br from-[#391e2a] to-[#2a1420] rounded-3xl p-8 shadow-inner space-y-6">
