@@ -219,7 +219,7 @@ function gerarCor(nome: string): [number, number, number] {
     const alturaMax = 170;
     const larguraPerfil = 40;
 
-    const centro = pageWidth / 2;
+    const centro = pageWidth / 2 - 20;
 
     const esquerdaPerfil = centro - larguraPerfil / 2;
     const direitaPerfil = centro + larguraPerfil / 2;
