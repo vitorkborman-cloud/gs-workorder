@@ -45,6 +45,8 @@ function gerarCor(nome: string): [number, number, number] {
 
   const n = nome.toLowerCase();
 
+  if (n.includes("concreto")) return [200, 200, 200]; // cinza claro
+
   /* MATERIAIS GROSSEIROS */
 
   if (n.includes("rachão") || n.includes("rachao")) return [100, 100, 100]; // cinza escuro
