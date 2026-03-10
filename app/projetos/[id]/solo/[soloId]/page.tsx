@@ -540,8 +540,16 @@ for (
         const yNivel = topo + nivel * escala;
 
         pdf.setDrawColor(0, 0, 255);
-        pdf.setLineWidth(1.2);
+        pdf.setLineWidth(0.7);
         pdf.line(esquerdaPerfil - 10, yNivel, direitaPerfil + 10, yNivel);
+        const xTri = esquerdaPerfil - 12;
+
+pdf.triangle(
+  xTri, yNivel,        // ponta do triângulo
+  xTri - 3, yNivel - 2,
+  xTri - 3, yNivel + 2,
+  "F"
+);
       }
     }
 
