@@ -259,11 +259,12 @@ async function uploadPhoto(file: File) {
     .from("soil-photos")
     .upload(filePath, file);
 
-  if (error) {
-    alert("Erro ao enviar foto.");
-    setUploading(false);
-    return;
-  }
+if (error) {
+  console.error(error);
+  alert(error.message);
+  setUploading(false);
+  return;
+}
 
   const { data } = supabase.storage
     .from("soil-photos")
