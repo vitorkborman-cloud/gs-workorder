@@ -86,29 +86,42 @@ export default function ProjetoPage() {
 
   return (
     <AdminShell>
-      <div className="space-y-8">
+      <div className="space-y-10">
 
         {/* WORK ORDERS */}
-        <div className="space-y-4">
+        <div className="space-y-5">
+
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Work Orders</h1>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                Work Orders
+              </h1>
+              <p className="text-sm text-gray-500">
+                Registros de visitas e atividades de campo
+              </p>
+            </div>
 
             {!mobile && (
-              <Button onClick={createWorkOrder} className="bg-primary text-white">
+              <Button
+                onClick={createWorkOrder}
+                className="bg-gradient-to-r from-[#391e2a] to-[#80b02d] text-white shadow-lg"
+              >
                 Nova Work Order
               </Button>
             )}
           </div>
 
-          <div className="bg-secondary rounded-2xl p-6 shadow-inner">
+          <div className="bg-secondary rounded-3xl p-8 shadow-inner">
+
             {loading ? (
               <p className="text-white/80">Carregando...</p>
             ) : workOrders.length === 0 ? (
               <p className="text-white/70">Nenhuma Work Order criada.</p>
             ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
                 {workOrders.map((wo) => (
-                  <div key={wo.id} className="relative">
+                  <div key={wo.id} className="relative group">
 
                     {!mobile && (
                       <button
@@ -116,7 +129,7 @@ export default function ProjetoPage() {
                           e.stopPropagation();
                           deleteWorkOrder(wo.id, wo.title);
                         }}
-                        className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 z-10"
+                        className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 opacity-0 group-hover:opacity-100 transition z-10"
                       >
                         ✕
                       </button>
@@ -124,62 +137,111 @@ export default function ProjetoPage() {
 
                     <Card
                       onClick={() => router.push(`/work-orders/${wo.id}`)}
-                      className="cursor-pointer bg-primary text-white border-0 hover:scale-[1.02] transition shadow"
+                      className="
+                      cursor-pointer
+                      border-0
+                      bg-gradient-to-br
+                      from-[#80b02d]
+                      to-[#5e8420]
+                      text-white
+                      shadow-xl
+                      hover:shadow-2xl
+                      hover:-translate-y-1
+                      transition
+                      rounded-2xl
+                      "
                     >
-                      <CardContent className="p-6">
-                        <p className="font-semibold">{wo.title}</p>
-                        <p className="text-sm opacity-80">
+                      <CardContent className="p-6 space-y-2">
+
+                        <p className="font-semibold text-lg">
+                          {wo.title}
+                        </p>
+
+                        <p className="text-sm opacity-90">
                           {wo.finalized ? "Finalizada" : "Em andamento"}
                         </p>
+
                       </CardContent>
                     </Card>
 
                   </div>
                 ))}
+
               </div>
             )}
+
           </div>
         </div>
 
         {/* PERFIS DESCRITIVOS */}
-        <div className="space-y-4">
+        <div className="space-y-5">
 
-          <h2 className="text-2xl font-bold">Perfis descritivos</h2>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">
+              Perfis descritivos
+            </h2>
+            <p className="text-sm text-gray-500">
+              Perfis estratigráficos gerados pelo aplicativo
+            </p>
+          </div>
 
-          <div className="bg-secondary rounded-2xl p-6 shadow-inner">
+          <div className="bg-secondary rounded-3xl p-8 shadow-inner">
 
             {perfis.length === 0 ? (
-              <p className="text-white/70">Nenhum perfil gerado pelo aplicativo.</p>
+              <p className="text-white/70">
+                Nenhum perfil gerado pelo aplicativo.
+              </p>
             ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
                 {perfis.map((p) => (
-                  <div key={p.id} className="relative">
+                  <div key={p.id} className="relative group">
 
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         deletePerfil(p.id, p.nome_sondagem);
                       }}
-                      className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 z-10"
+                      className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 opacity-0 group-hover:opacity-100 transition z-10"
                     >
                       ✕
                     </button>
 
-                    {/* ROTA CORRIGIDA */}
                     <Card
-                      onClick={() => router.push(`/projetos/${projectId}/solo/${p.id}`)}
-                      className="cursor-pointer bg-primary text-white border-0 hover:scale-[1.02] transition shadow"
+                      onClick={() =>
+                        router.push(`/projetos/${projectId}/solo/${p.id}`)
+                      }
+                      className="
+                      cursor-pointer
+                      border-0
+                      bg-gradient-to-br
+                      from-[#391e2a]
+                      to-[#2a1420]
+                      text-white
+                      shadow-xl
+                      hover:shadow-2xl
+                      hover:-translate-y-1
+                      transition
+                      rounded-2xl
+                      "
                     >
-                      <CardContent className="p-6 space-y-1">
-                        <p className="font-semibold">{p.nome_sondagem}</p>
+                      <CardContent className="p-6 space-y-2">
+
+                        <p className="font-semibold text-lg">
+                          {p.nome_sondagem}
+                        </p>
+
                         <p className="text-sm opacity-80">
                           {new Date(p.created_at).toLocaleDateString()}
                         </p>
+
                       </CardContent>
                     </Card>
 
                   </div>
                 ))}
+
               </div>
             )}
 
