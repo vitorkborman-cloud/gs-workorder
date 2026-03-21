@@ -57,6 +57,13 @@ const [draftId, setDraftId] = useState<string | null>(null);
 
   const [assinaturaAberta, setAssinaturaAberta] = useState<number | null>(null);
 
+  const [sheq, setSheq] = useState({
+  incidente: "",
+  incidenteObs: "",
+  vazamento: "",
+  vazamentoObs: "",
+});
+
   const pdfRef = useRef<HTMLDivElement>(null);
 
   const [projectName, setProjectName] = useState("");
@@ -81,6 +88,71 @@ const [draftId, setDraftId] = useState<string | null>(null);
   const [atividades, setAtividades] = useState<Atividade[]>([
     { atividade: "", empresa: "", status: "", obs: "" },
   ]);
+
+  {/* ================= SHEQ ================= */}
+<Section title="SHEQ">
+
+  {/* INCIDENTE */}
+  <div className="space-y-2">
+    <div className="text-sm font-semibold">Incidente/Acidente?</div>
+
+    <div className="flex gap-4 text-sm">
+      {["Sim", "Não", "N/A"].map((op) => (
+        <label key={op} className="flex items-center gap-1">
+          <input
+            type="radio"
+            name="incidente"
+            value={op}
+            checked={sheq.incidente === op}
+            onChange={(e) =>
+              setSheq({ ...sheq, incidente: e.target.value })
+            }
+          />
+          {op}
+        </label>
+      ))}
+    </div>
+
+    <Input
+      label="Observações"
+      value={sheq.incidenteObs}
+      onChange={(v: string) =>
+        setSheq({ ...sheq, incidenteObs: v })
+      }
+    />
+  </div>
+
+  {/* VAZAMENTO */}
+  <div className="space-y-2 mt-4">
+    <div className="text-sm font-semibold">Vazamento?</div>
+
+    <div className="flex gap-4 text-sm">
+      {["Sim", "Não", "N/A"].map((op) => (
+        <label key={op} className="flex items-center gap-1">
+          <input
+            type="radio"
+            name="vazamento"
+            value={op}
+            checked={sheq.vazamento === op}
+            onChange={(e) =>
+              setSheq({ ...sheq, vazamento: e.target.value })
+            }
+          />
+          {op}
+        </label>
+      ))}
+    </div>
+
+    <Input
+      label="Observações"
+      value={sheq.vazamentoObs}
+      onChange={(v: string) =>
+        setSheq({ ...sheq, vazamentoObs: v })
+      }
+    />
+  </div>
+
+</Section>
 
   /* ===== COMENTÁRIOS ===== */
   const [comentarios, setComentarios] = useState("");
@@ -127,6 +199,7 @@ async function salvarRascunho() {
         clima,
         envolvidos,
         atividades,
+        sheq,
         comentarios,
         fotos: fotos.map(f => ({
   preview: f.preview,
@@ -200,6 +273,12 @@ async function loadDraft() {
   setClima(data.clima || clima);
   setEnvolvidos(data.envolvidos || envolvidos);
   setAtividades(data.atividades || atividades);
+  setSheq(data.sheq || {
+  incidente: "",
+  incidenteObs: "",
+  vazamento: "",
+  vazamentoObs: "",
+});
   setComentarios(data.comentarios || "");
   setFotos(data.fotos || fotos);
   setAssinaturas(data.assinaturas || assinaturas);
