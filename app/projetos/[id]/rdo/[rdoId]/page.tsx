@@ -117,6 +117,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
       <div className="space-y-6">
 
         {/* HEADER */}
+        <div style={{ height: "4px", backgroundColor: "#80b02d", marginTop: "10px" }} />
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold">RDO</h1>
@@ -138,17 +139,27 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
 >
 
           {/* CABEÇALHO */}
-          <div className="flex justify-between border-b pb-4">
-            <div>
-              <h2 className="text-lg font-bold">GREENSOIL</h2>
-              <p>Relatório Diário de Obra</p>
-            </div>
+          <div className="border-b pb-4">
+  <table className="w-full">
+    <tbody>
+      <tr>
+        <td style={{ verticalAlign: "top" }}>
+          <img src="/logo.png" style={{ height: "50px", marginBottom: "5px" }} />
+          <p style={{ margin: 0 }}>Relatório Diário de Obra</p>
+        </td>
 
-            <div className="text-right">
-              <p><b>Projeto:</b> {projectName}</p>
-              <p><b>Data:</b> {rdo.data}</p>
-            </div>
-          </div>
+        <td style={{ textAlign: "right", verticalAlign: "top" }}>
+          <p style={{ margin: 0 }}>
+            <b>Projeto:</b> {projectName}
+          </p>
+          <p style={{ margin: 0 }}>
+            <b>Data:</b> {rdo.data}
+          </p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
           {/* HORÁRIOS */}
           <div className="grid grid-cols-2 border p-3">
@@ -158,11 +169,11 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
 
           {/* CLIMA */}
           <div>
-            <h3 className="font-semibold mb-2">Condições Climáticas</h3>
+            <h3 style={{ color: "#391e2a", fontWeight: 600, marginBottom: "8px" }}>Condições Climáticas</h3>
 
             <table className="w-full border">
               <thead>
-                <tr style={{ backgroundColor: "#e5e5e5" }}>
+                <tr style={{ backgroundColor: "#391e2a", color: "#ffffff" }}>
                   <th className="border p-1">Período</th>
                   <th className="border p-1">Tempo</th>
                   <th className="border p-1">Condição</th>
@@ -186,7 +197,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
           {/* ENVOLVIDOS */}
 <table className="w-full border">
   <thead>
-    <tr style={{ backgroundColor: "#e5e5e5" }}>
+    <tr style={{ backgroundColor: "#391e2a", color: "#ffffff" }}>
       <th className="border p-1">Empresa</th>
       <th className="border p-1">N° colaboradores</th>
       <th className="border p-1">Função</th>
@@ -207,7 +218,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
           {/* ATIVIDADES */}
 <table className="w-full border">
   <thead>
-    <tr style={{ backgroundColor: "#e5e5e5" }}>
+    <tr style={{ backgroundColor: "#391e2a", color: "#ffffff" }}>
       <th className="border p-1">Atividade</th>
       <th className="border p-1">Empresa responsável</th>
       <th className="border p-1">Status</th>
@@ -230,7 +241,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
           {/* SHEQ */}
 <table className="w-full border">
   <thead>
-    <tr style={{ backgroundColor: "#e5e5e5" }}>
+    <tr style={{ backgroundColor: "#391e2a", color: "#ffffff" }}>
       <th className="border p-1">Ocorrências</th>
       <th className="border p-1">Registro</th>
       <th className="border p-1">Observações</th>
@@ -254,7 +265,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
 
           {/* COMENTÁRIOS */}
           <div>
-            <h3 className="font-semibold mb-2">Comentários</h3>
+            <h3 style={{ color: "#391e2a", fontWeight: 600, marginBottom: "8px" }}>Comentários</h3>
             <div className="border p-3 min-h-[80px]">
               {rdo.comentarios}
             </div>
@@ -262,7 +273,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
 
           {/* FOTOS */}
           <div>
-            <h3 className="font-semibold mb-2">Registro Fotográfico</h3>
+            <h3 style={{ color: "#391e2a", fontWeight: 600, marginBottom: "8px" }}>Registro Fotográfico</h3>
 
             <div className="grid grid-cols-2 gap-4">
               {rdo.fotos?.map((f: any, i: number) => (
@@ -278,7 +289,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
 
           {/* ASSINATURAS */}
           <div>
-            <h3 className="font-semibold mb-2">Assinaturas</h3>
+            <h3 style={{ color: "#391e2a", fontWeight: 600, marginBottom: "8px" }}>Assinaturas</h3>
 
             <div className="grid grid-cols-2 gap-6">
               {rdo.assinaturas?.map((a: any, i: number) => (
