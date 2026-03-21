@@ -296,8 +296,8 @@ if (rdoData) setRdos(rdoData);
             cursor-pointer
             border-0
             bg-gradient-to-br
-            from-[#1e3a5f]
-            to-[#2c5282]
+            from-[#80b02d]
+            to-[#5e8420]
             text-white
             shadow-xl
             hover:shadow-2xl
