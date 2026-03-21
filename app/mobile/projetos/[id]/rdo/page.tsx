@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import MobileShell from "@/components/layout/MobileShell";
 import SignaturePad from "@/components/SignaturePad";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import { useRef } from "react";
 
 /* ================= TYPES ================= */
 
@@ -53,6 +56,8 @@ const [draftId, setDraftId] = useState<string | null>(null);
   const projectId = params?.id as string;
 
   const [assinaturaAberta, setAssinaturaAberta] = useState<number | null>(null);
+
+  const pdfRef = useRef<HTMLDivElement>(null);
 
   const [projectName, setProjectName] = useState("");
 
@@ -198,6 +203,25 @@ async function loadDraft() {
   setComentarios(data.comentarios || "");
   setFotos(data.fotos || fotos);
   setAssinaturas(data.assinaturas || assinaturas);
+}
+
+async function gerarPDF() {
+  if (!pdfRef.current) return;
+
+  const canvas = await html2canvas(pdfRef.current, {
+    scale: 2,
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  const width = 210;
+  const height = (canvas.height * width) / canvas.width;
+
+  pdf.addImage(imgData, "PNG", 0, 0, width, height);
+
+  pdf.save(`RDO_${projectName}.pdf`);
 }
 
   /* ================= FUNÇÕES ================= */
@@ -517,6 +541,28 @@ async function loadDraft() {
           </button>
 
         </div>
+
+        <div className="hidden">
+  <div ref={pdfRef} className="p-6 bg-white text-black">
+
+    <h1 className="text-xl font-bold mb-2">Greensoil</h1>
+    <h2 className="text-md mb-4">Relatório Diário de Obra</h2>
+
+    <p><b>Projeto:</b> {projectName}</p>
+    <p><b>Data:</b> {dataRelatorio}</p>
+    <p><b>Início:</b> {inicio}</p>
+    <p><b>Fim:</b> {fim}</p>
+
+    <h3 className="mt-4 font-semibold">Atividades</h3>
+    {atividades.map((a, i) => (
+      <p key={i}>- {a.atividade} ({a.status})</p>
+    ))}
+
+    <h3 className="mt-4 font-semibold">Comentários</h3>
+    <p>{comentarios}</p>
+
+  </div>
+</div>
 
       </div>
     </MobileShell>
