@@ -220,9 +220,12 @@ async function loadDraft() {
 }
 
 async function gerarPDF() {
-  if (!pdfRef.current) return;
+  if (!pdfRef.current) {
+  alert("PDF REF está NULL");
+  return;
+}
 
-console.log("PDF REF:", pdfRef.current);
+alert("PDF REF OK");
 
   await new Promise(r => setTimeout(r, 300));
 
