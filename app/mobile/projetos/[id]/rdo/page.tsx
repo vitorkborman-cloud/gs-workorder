@@ -223,17 +223,32 @@ async function gerarPDF() {
   if (!pdfRef.current) return;
 
   const canvas = await html2canvas(pdfRef.current, {
-    scale: 2,
+    scale: 1,
+    useCORS: true,
   });
 
-  const imgData = canvas.toDataURL("image/png");
+  const imgData = canvas.toDataURL("image/jpeg", 0.8);
 
   const pdf = new jsPDF("p", "mm", "a4");
 
-  const width = 210;
-  const height = (canvas.height * width) / canvas.width;
+  const pageWidth = 210;
+  const pageHeight = 297;
 
-  pdf.addImage(imgData, "PNG", 0, 0, width, height);
+  const imgWidth = pageWidth;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
 
   pdf.save(`RDO_${projectName}.pdf`);
 }
@@ -658,8 +673,6 @@ async function gerarPDF() {
 </div>
 
         <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-  <div ref={pdfRef} className="p-6 bg-white text-black">
-
 <div ref={pdfRef} className="p-6 bg-white text-black text-xs">
 
   <div className="flex justify-between items-center border-b pb-2 mb-4">
@@ -765,10 +778,44 @@ async function gerarPDF() {
     </div>
   </div>
 
+  <div className="mb-4">
+  <h3 className="font-semibold mb-1">Registro Fotográfico</h3>
+
+  <div className="grid grid-cols-2 gap-2">
+    {fotos.map((f, i) => (
+      <div key={i}>
+        {f.preview && (
+          <img src={f.preview} className="w-full border" />
+        )}
+        <p className="text-[10px]">{f.legenda}</p>
+      </div>
+    ))}
+  </div>
+</div>
+
+<div className="mt-6 border-t pt-4">
+  <h3 className="font-semibold mb-2">Assinaturas</h3>
+
+  <div className="grid grid-cols-2 gap-4">
+    {assinaturas.map((a, i) => (
+      <div key={i} className="text-center">
+        <p>{a.empresa}</p>
+
+        {a.assinatura && (
+          <img src={a.assinatura} className="h-16 mx-auto border" />
+        )}
+
+        <div className="border-t mt-2 pt-1 text-[10px]">
+          Assinatura
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
 </div>
 
   </div>
-</div>
 
       </div>
     </MobileShell>
