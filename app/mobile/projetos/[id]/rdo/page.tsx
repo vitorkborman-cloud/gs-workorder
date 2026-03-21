@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import MobileShell from "@/components/layout/MobileShell";
+import SignaturePad from "@/components/SignaturePad";
 
 /* ================= TYPES ================= */
 
@@ -86,8 +87,12 @@ export default function RdoPage() {
   ]);
 
   useEffect(() => {
-    loadProject();
-  }, []);
+  if (!projectId) return;
+
+  loadProject();
+  loadDraft();
+
+}, [projectId]);
 
   async function loadProject() {
     const { data } = await supabase
@@ -98,6 +103,55 @@ export default function RdoPage() {
 
     if (data) setProjectName(data.name);
   }
+
+  <button
+  onClick={salvarRascunho}
+  className="w-full bg-white border-2 border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl"
+>
+  Salvar rascunho
+</button>
+
+  async function salvarRascunho() {
+
+  await supabase
+    .from("rdo_reports")
+    .upsert({
+      project_id: projectId,
+      data,
+      inicio,
+      fim,
+      clima,
+      envolvidos,
+      atividades,
+      comentarios,
+      fotos,
+      assinaturas,
+      draft: true,
+    });
+
+  alert("Rascunho salvo!");
+}
+
+async function loadDraft() {
+  const { data } = await supabase
+    .from("rdo_reports")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("draft", true)
+    .maybeSingle();
+
+  if (!data) return;
+
+  setData(data.data || "");
+  setInicio(data.inicio || "");
+  setFim(data.fim || "");
+  setClima(data.clima || clima);
+  setEnvolvidos(data.envolvidos || envolvidos);
+  setAtividades(data.atividades || atividades);
+  setComentarios(data.comentarios || "");
+  setFotos(data.fotos || fotos);
+  setAssinaturas(data.assinaturas || assinaturas);
+}
 
   /* ================= FUNÇÕES ================= */
 
@@ -341,9 +395,13 @@ export default function RdoPage() {
                 }}
               />
 
-              <div className="h-20 border rounded-xl flex items-center justify-center text-gray-400">
-                Área de assinatura (próximo passo)
-              </div>
+              <SignaturePad
+  onSave={(dataUrl) => {
+    const copy = [...assinaturas];
+    (copy[i] as any).assinatura = dataUrl;
+    setAssinaturas(copy);
+  }}
+/>
 
             </div>
           ))}
