@@ -533,14 +533,21 @@ async function gerarPDF() {
         {/* BOTÕES FINAIS */}
         <div className="space-y-4 pt-4">
 
-          <button
-            onClick={salvarRascunho}
-            className="w-full bg-white border-2 border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl shadow-sm"
-          >
-            Salvar rascunho
-          </button>
+  <button
+    onClick={salvarRascunho}
+    className="w-full bg-white border-2 border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl shadow-sm"
+  >
+    Salvar rascunho
+  </button>
 
-        </div>
+  <button
+    onClick={gerarPDF}
+    className="w-full bg-[#80b02d] text-white font-semibold py-3 rounded-xl"
+  >
+    Finalizar e Gerar PDF
+  </button>
+
+</div>
 
         <div className="hidden">
   <div ref={pdfRef} className="p-6 bg-white text-black">
