@@ -1,0 +1,227 @@
+"use client";
+
+import { useEffect, useState, useRef } from "react";
+import { useParams } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import AdminShell from "@/components/layout/AdminShell";
+import { Button } from "@/components/ui/button";
+
+type RDO = any;
+
+export default function RdoViewPage() {
+  const params = useParams();
+  const projectId = params.id as string;
+  const rdoId = params.rdoId as string;
+
+  const [rdo, setRdo] = useState<RDO | null>(null);
+  const [projectName, setProjectName] = useState("");
+
+  const pdfRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function load() {
+    const { data } = await supabase
+      .from("rdo_reports")
+      .select("*")
+      .eq("id", rdoId)
+      .single();
+
+    if (data) setRdo(data);
+
+    const { data: proj } = await supabase
+      .from("projects")
+      .select("name")
+      .eq("id", projectId)
+      .single();
+
+    if (proj) setProjectName(proj.name);
+  }
+
+  if (!rdo) {
+    return (
+      <AdminShell>
+        <p className="p-10">Carregando...</p>
+      </AdminShell>
+    );
+  }
+
+  return (
+    <AdminShell>
+      <div className="space-y-6">
+
+        {/* HEADER */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold">RDO</h1>
+            <p className="text-sm text-gray-500">
+              {projectName}
+            </p>
+          </div>
+
+          <Button onClick={() => window.print()}>
+            Gerar PDF
+          </Button>
+        </div>
+
+        {/* CONTEÚDO */}
+        <div
+          ref={pdfRef}
+          className="bg-white text-black p-10 rounded-xl shadow space-y-6"
+        >
+
+          {/* CABEÇALHO */}
+          <div className="flex justify-between border-b pb-4">
+            <div>
+              <h2 className="text-lg font-bold">GREENSOIL</h2>
+              <p>Relatório Diário de Obra</p>
+            </div>
+
+            <div className="text-right">
+              <p><b>Projeto:</b> {projectName}</p>
+              <p><b>Data:</b> {rdo.data}</p>
+            </div>
+          </div>
+
+          {/* HORÁRIOS */}
+          <div className="grid grid-cols-2 border p-3">
+            <p><b>Hora início:</b> {rdo.inicio}</p>
+            <p><b>Hora fim:</b> {rdo.fim}</p>
+          </div>
+
+          {/* CLIMA */}
+          <div>
+            <h3 className="font-semibold mb-2">Condições Climáticas</h3>
+
+            <table className="w-full border">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border p-1">Período</th>
+                  <th className="border p-1">Tempo</th>
+                  <th className="border p-1">Condição</th>
+                  <th className="border p-1">Razão</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {rdo.clima?.map((c: any, i: number) => (
+                  <tr key={i}>
+                    <td className="border p-1">{c.periodo}</td>
+                    <td className="border p-1">{c.tempo}</td>
+                    <td className="border p-1">{c.condicao}</td>
+                    <td className="border p-1">{c.razao}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ENVOLVIDOS */}
+          <div>
+            <h3 className="font-semibold mb-2">Envolvidos</h3>
+
+            <table className="w-full border">
+              <tbody>
+                {rdo.envolvidos?.map((e: any, i: number) => (
+                  <tr key={i}>
+                    <td className="border p-1">{e.empresa}</td>
+                    <td className="border p-1">{e.colaboradores}</td>
+                    <td className="border p-1">{e.funcao}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ATIVIDADES */}
+          <div>
+            <h3 className="font-semibold mb-2">Atividades</h3>
+
+            <table className="w-full border">
+              <tbody>
+                {rdo.atividades?.map((a: any, i: number) => (
+                  <tr key={i}>
+                    <td className="border p-1">{a.atividade}</td>
+                    <td className="border p-1">{a.empresa}</td>
+                    <td className="border p-1">{a.status}</td>
+                    <td className="border p-1">{a.obs}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* SHEQ */}
+          <div>
+            <h3 className="font-semibold mb-2">SHEQ</h3>
+
+            <table className="w-full border">
+              <tbody>
+                <tr>
+                  <td className="border p-1"><b>Incidente</b></td>
+                  <td className="border p-1">{rdo.sheq?.incidente}</td>
+                  <td className="border p-1">{rdo.sheq?.incidenteObs}</td>
+                </tr>
+
+                <tr>
+                  <td className="border p-1"><b>Vazamento</b></td>
+                  <td className="border p-1">{rdo.sheq?.vazamento}</td>
+                  <td className="border p-1">{rdo.sheq?.vazamentoObs}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* COMENTÁRIOS */}
+          <div>
+            <h3 className="font-semibold mb-2">Comentários</h3>
+            <div className="border p-3 min-h-[80px]">
+              {rdo.comentarios}
+            </div>
+          </div>
+
+          {/* FOTOS */}
+          <div>
+            <h3 className="font-semibold mb-2">Registro Fotográfico</h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              {rdo.fotos?.map((f: any, i: number) => (
+                <div key={i}>
+                  {f.preview && (
+                    <img src={f.preview} className="w-full border" />
+                  )}
+                  <p className="text-xs">{f.legenda}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ASSINATURAS */}
+          <div>
+            <h3 className="font-semibold mb-2">Assinaturas</h3>
+
+            <div className="grid grid-cols-2 gap-6">
+              {rdo.assinaturas?.map((a: any, i: number) => (
+                <div key={i} className="text-center">
+                  <p>{a.empresa}</p>
+
+                  {a.assinatura && (
+                    <img src={a.assinatura} className="h-16 mx-auto border" />
+                  )}
+
+                  <div className="border-t mt-2 pt-1 text-xs">
+                    Assinatura
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </AdminShell>
+  );
+}
