@@ -7,6 +7,13 @@ import MobileShell from "@/components/layout/MobileShell";
 
 /* ================= TYPES ================= */
 
+type Clima = {
+  periodo: string;
+  tempo: string;
+  condicao: string;
+  razao: string;
+};
+
 type Envolvido = {
   empresa: string;
   colaboradores: string;
@@ -32,6 +39,8 @@ type Assinatura = {
 
 /* ================= CONSTANTES ================= */
 
+const tempos = ["Claro", "Chuva", "Tempestade"];
+const condicoes = ["Praticável", "Não praticável"];
 const statusList = ["Concluído", "Não concluído"];
 
 /* ================= PAGE ================= */
@@ -42,18 +51,36 @@ export default function RdoPage() {
 
   const [projectName, setProjectName] = useState("");
 
+  /* ===== GERAL ===== */
+  const [data, setData] = useState("");
+  const [inicio, setInicio] = useState("");
+  const [fim, setFim] = useState("");
+
+  const [clima, setClima] = useState<Clima[]>([
+    { periodo: "Manhã", tempo: "", condicao: "", razao: "" },
+    { periodo: "Tarde", tempo: "", condicao: "", razao: "" },
+    { periodo: "Noite", tempo: "", condicao: "", razao: "" },
+  ]);
+
+  /* ===== ENVOLVIDOS ===== */
   const [envolvidos, setEnvolvidos] = useState<Envolvido[]>([
     { empresa: "Greensoil", colaboradores: "", funcao: "" },
   ]);
 
+  /* ===== ATIVIDADES ===== */
   const [atividades, setAtividades] = useState<Atividade[]>([
     { atividade: "", empresa: "", status: "", obs: "" },
   ]);
 
+  /* ===== COMENTÁRIOS ===== */
+  const [comentarios, setComentarios] = useState("");
+
+  /* ===== FOTOS ===== */
   const [fotos, setFotos] = useState<Foto[]>([
     { file: null, preview: "", legenda: "" },
   ]);
 
+  /* ===== ASSINATURAS ===== */
   const [assinaturas, setAssinaturas] = useState<Assinatura[]>([
     { empresa: "Greensoil" },
   ]);
@@ -72,24 +99,22 @@ export default function RdoPage() {
     if (data) setProjectName(data.name);
   }
 
-  /* ================= REMOVER ================= */
-
-  const removeItem = (setter: any, index: number, list: any[]) => {
-    const copy = [...list];
-    copy.splice(index, 1);
-    setter(copy);
-  };
-
   /* ================= FUNÇÕES ================= */
 
   const empresas = envolvidos.map(e => e.empresa).filter(Boolean);
 
-  function handleFoto(index: number, file: File) {
-  const copy = [...fotos];
-  copy[index].file = file;
-  copy[index].preview = URL.createObjectURL(file);
-  setFotos(copy);
-}
+  function removeItem(setter: any, index: number, list: any[]) {
+    const copy = [...list];
+    copy.splice(index, 1);
+    setter(copy);
+  }
+
+  function handleFoto(i: number, file: File) {
+    const copy = [...fotos];
+    copy[i].file = file;
+    copy[i].preview = URL.createObjectURL(file);
+    setFotos(copy);
+  }
 
   /* ================= UI ================= */
 
@@ -101,6 +126,45 @@ export default function RdoPage() {
     >
       <div className="space-y-6">
 
+        {/* ================= INFORMAÇÕES ================= */}
+        <Section title="Informações Gerais">
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Data *" value={data} onChange={(v: string) => setData(v)} />
+            <Input label="Hora início *" value={inicio} onChange={(v: string) => setInicio(v)} />
+          </div>
+
+          <Input label="Hora término *" value={fim} onChange={(v: string) => setFim(v)} />
+
+          {clima.map((c, i) => (
+            <div key={i} className="bg-gray-50 p-3 rounded-xl space-y-2">
+              <div className="text-xs font-semibold">{c.periodo}</div>
+
+              <Select label="Tempo" value={c.tempo} options={tempos}
+                onChange={(v: string) => {
+                  const copy = [...clima];
+                  copy[i].tempo = v;
+                  setClima(copy);
+                }} />
+
+              <Select label="Condição" value={c.condicao} options={condicoes}
+                onChange={(v: string) => {
+                  const copy = [...clima];
+                  copy[i].condicao = v;
+                  setClima(copy);
+                }} />
+
+              <Input label="Razão" value={c.razao}
+                onChange={(v: string) => {
+                  const copy = [...clima];
+                  copy[i].razao = v;
+                  setClima(copy);
+                }} />
+            </div>
+          ))}
+
+        </Section>
+
         {/* ================= ENVOLVIDOS ================= */}
         <Section title="Envolvidos">
 
@@ -108,50 +172,36 @@ export default function RdoPage() {
             <div key={i} className="relative grid grid-cols-3 gap-2">
 
               {i !== 0 && (
-                <RemoveButton onClick={() =>
-                  removeItem(setEnvolvidos, i, envolvidos)
-                } />
+                <RemoveButton onClick={() => removeItem(setEnvolvidos, i, envolvidos)} />
               )}
 
-              <Input
-                label="Empresa"
-                value={e.empresa}
+              <Input label="Empresa" value={e.empresa}
                 onChange={(v: string) => {
                   const copy = [...envolvidos];
                   copy[i].empresa = v;
                   setEnvolvidos(copy);
-                }}
-              />
+                }} />
 
-              <Input
-                label="N°"
-                value={e.colaboradores}
+              <Input label="N°" value={e.colaboradores}
                 onChange={(v: string) => {
                   const copy = [...envolvidos];
                   copy[i].colaboradores = v;
                   setEnvolvidos(copy);
-                }}
-              />
+                }} />
 
-              <Input
-                label="Função"
-                value={e.funcao}
+              <Input label="Função" value={e.funcao}
                 onChange={(v: string) => {
                   const copy = [...envolvidos];
                   copy[i].funcao = v;
                   setEnvolvidos(copy);
-                }}
-              />
+                }} />
 
             </div>
           ))}
 
           <button
             onClick={() =>
-              setEnvolvidos([
-                ...envolvidos,
-                { empresa: "", colaboradores: "", funcao: "" },
-              ])
+              setEnvolvidos([...envolvidos, { empresa: "", colaboradores: "", funcao: "" }])
             }
             className="w-full bg-[#391e2a] text-white py-2 rounded-lg"
           >
@@ -166,61 +216,46 @@ export default function RdoPage() {
           {atividades.map((a, i) => (
             <div key={i} className="relative bg-gray-50 p-3 rounded-xl space-y-2">
 
-              <RemoveButton onClick={() =>
-                removeItem(setAtividades, i, atividades)
-              } />
+              <RemoveButton onClick={() => removeItem(setAtividades, i, atividades)} />
 
-              <Input
-                label="Atividade"
-                value={a.atividade}
+              <Input label="Atividade" value={a.atividade}
                 onChange={(v: string) => {
                   const copy = [...atividades];
                   copy[i].atividade = v;
                   setAtividades(copy);
-                }}
-              />
+                }} />
 
-              <Select
-                label="Empresa"
+              <Select label="Empresa"
                 value={a.empresa}
                 options={empresas}
                 onChange={(v: string) => {
                   const copy = [...atividades];
                   copy[i].empresa = v;
                   setAtividades(copy);
-                }}
-              />
+                }} />
 
-              <Select
-                label="Status"
+              <Select label="Status"
                 value={a.status}
                 options={statusList}
                 onChange={(v: string) => {
                   const copy = [...atividades];
                   copy[i].status = v;
                   setAtividades(copy);
-                }}
-              />
+                }} />
 
-              <Input
-                label="Observações"
-                value={a.obs}
+              <Input label="Observações" value={a.obs}
                 onChange={(v: string) => {
                   const copy = [...atividades];
                   copy[i].obs = v;
                   setAtividades(copy);
-                }}
-              />
+                }} />
 
             </div>
           ))}
 
           <button
             onClick={() =>
-              setAtividades([
-                ...atividades,
-                { atividade: "", empresa: "", status: "", obs: "" },
-              ])
+              setAtividades([...atividades, { atividade: "", empresa: "", status: "", obs: "" }])
             }
             className="w-full bg-[#391e2a] text-white py-2 rounded-lg"
           >
@@ -229,15 +264,22 @@ export default function RdoPage() {
 
         </Section>
 
+        {/* ================= COMENTÁRIOS ================= */}
+        <Section title="Comentários adicionais">
+          <textarea
+            value={comentarios}
+            onChange={(e) => setComentarios(e.target.value)}
+            className="w-full h-32 border rounded-xl p-3 text-sm"
+          />
+        </Section>
+
         {/* ================= FOTOS ================= */}
         <Section title="Fotos">
 
           {fotos.map((f, i) => (
             <div key={i} className="relative space-y-2">
 
-              <RemoveButton onClick={() =>
-                removeItem(setFotos, i, fotos)
-              } />
+              <RemoveButton onClick={() => removeItem(setFotos, i, fotos)} />
 
               <label className="block">
                 <div className="bg-[#80b02d] text-white text-center py-2 rounded-xl cursor-pointer">
@@ -248,35 +290,26 @@ export default function RdoPage() {
                   type="file"
                   className="hidden"
                   onChange={(e) =>
-                    e.target.files &&
-                    handleFoto(i, e.target.files[0])
+                    e.target.files && handleFoto(i, e.target.files[0])
                   }
                 />
               </label>
 
-              {f.preview && (
-                <img src={f.preview} className="rounded-xl" />
-              )}
+              {f.preview && <img src={f.preview} className="rounded-xl" />}
 
-              <Input
-                label="Legenda"
-                value={f.legenda}
+              <Input label="Legenda" value={f.legenda}
                 onChange={(v: string) => {
                   const copy = [...fotos];
                   copy[i].legenda = v;
                   setFotos(copy);
-                }}
-              />
+                }} />
 
             </div>
           ))}
 
           <button
             onClick={() =>
-              setFotos([
-                ...fotos,
-                { file: null, preview: "", legenda: "" },
-              ])
+              setFotos([...fotos, { file: null, preview: "", legenda: "" }])
             }
             className="w-full bg-[#391e2a] text-white py-2 rounded-lg"
           >
@@ -317,10 +350,7 @@ export default function RdoPage() {
 
           <button
             onClick={() =>
-              setAssinaturas([
-                ...assinaturas,
-                { empresa: "" },
-              ])
+              setAssinaturas([...assinaturas, { empresa: "" }])
             }
             className="w-full bg-[#391e2a] text-white py-2 rounded-lg"
           >
