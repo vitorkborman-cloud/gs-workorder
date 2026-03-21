@@ -5,9 +5,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import MobileShell from "@/components/layout/MobileShell";
 import SignaturePad from "@/components/SignaturePad";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import { useRef } from "react";
 
 /* ================= TYPES ================= */
 
@@ -63,8 +60,6 @@ const [draftId, setDraftId] = useState<string | null>(null);
   vazamento: "",
   vazamentoObs: "",
 });
-
-  const pdfRef = useRef<HTMLDivElement>(null);
 
   const [projectName, setProjectName] = useState("");
 
@@ -219,48 +214,38 @@ async function loadDraft() {
   setAssinaturas(data.assinaturas || assinaturas);
 }
 
-async function gerarPDF() {
-  if (!pdfRef.current) {
-  alert("PDF REF está NULL");
-  return;
-}
-
-alert("PDF REF OK");
-
-await new Promise(resolve => setTimeout(resolve, 300));
-
-  pdfRef.current.style.height = "auto";
-pdfRef.current.style.maxHeight = "none";
-pdfRef.current.getBoundingClientRect();
-
-const canvas = await html2canvas(pdfRef.current, {
-  scale: 1,
-});
-
-  const imgData = canvas.toDataURL("image/jpeg", 0.8);
-
-  const pdf = new jsPDF("p", "mm", "a4");
-
-  const pageWidth = 210;
-  const pageHeight = 297;
-
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+async function finalizarRDO() {
+  if (!draftId) {
+    alert("Salve o rascunho antes de finalizar");
+    return;
   }
 
-  pdf.save(`RDO_${projectName}.pdf`);
+  const { error } = await supabase
+    .from("rdo_reports")
+    .update({
+      data: dataRelatorio,
+      inicio,
+      fim,
+      clima,
+      envolvidos,
+      atividades,
+      sheq,
+      comentarios,
+      fotos: fotos.map(f => ({
+        preview: f.preview,
+        legenda: f.legenda,
+      })),
+      assinaturas,
+      draft: false,
+    })
+    .eq("id", draftId);
+
+  if (error) {
+    alert("Erro ao finalizar: " + error.message);
+    return;
+  }
+
+  alert("RDO finalizado com sucesso!");
 }
 
   /* ================= FUNÇÕES ================= */
@@ -674,162 +659,11 @@ const canvas = await html2canvas(pdfRef.current, {
   </button>
 
   <button
-    onClick={gerarPDF}
-    className="w-full bg-[#80b02d] text-white font-semibold py-3 rounded-xl"
-  >
-    Finalizar e Gerar PDF
-  </button>
-
-</div>
-
-<div style={{ 
-  position: "absolute",
-  top: "-9999px",
-  left: 0,
-  width: "210mm",
-  background: "white"
-}}>
-<div ref={pdfRef} className="p-6 bg-white text-black text-xs">
-
-  <div className="flex justify-between items-center border-b pb-2 mb-4">
-    <div>
-      <h1 className="text-lg font-bold">GREENSOIL</h1>
-      <p>Relatório Diário de Obra</p>
-    </div>
-
-    <div className="text-right">
-      <p><b>Projeto:</b> {projectName}</p>
-      <p><b>Data:</b> {dataRelatorio}</p>
-    </div>
-  </div>
-
-  <div className="border p-2 mb-4 grid grid-cols-2 gap-2">
-    <p><b>Hora início:</b> {inicio}</p>
-    <p><b>Hora fim:</b> {fim}</p>
-  </div>
-
-  <div className="mb-4">
-    <h3 className="font-semibold mb-1">Condições Climáticas</h3>
-
-    <table className="w-full border">
-      <thead>
-        <tr className="bg-gray-100">
-          <th className="border p-1">Período</th>
-          <th className="border p-1">Tempo</th>
-          <th className="border p-1">Condição</th>
-          <th className="border p-1">Razão</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        {clima.map((c, i) => (
-          <tr key={i}>
-            <td className="border p-1">{c.periodo}</td>
-            <td className="border p-1">{c.tempo}</td>
-            <td className="border p-1">{c.condicao}</td>
-            <td className="border p-1">{c.razao}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-
-  <div className="mb-4">
-    <h3 className="font-semibold mb-1">Envolvidos</h3>
-
-    <table className="w-full border">
-      <tbody>
-        {envolvidos.map((e, i) => (
-          <tr key={i}>
-            <td className="border p-1">{e.empresa}</td>
-            <td className="border p-1">{e.colaboradores}</td>
-            <td className="border p-1">{e.funcao}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-
-  <div className="mb-4">
-    <h3 className="font-semibold mb-1">Atividades</h3>
-
-    <table className="w-full border">
-      <tbody>
-        {atividades.map((a, i) => (
-          <tr key={i}>
-            <td className="border p-1">{a.atividade}</td>
-            <td className="border p-1">{a.empresa}</td>
-            <td className="border p-1">{a.status}</td>
-            <td className="border p-1">{a.obs}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-
-  <div className="mb-4">
-    <h3 className="font-semibold mb-1">SHEQ</h3>
-
-    <table className="w-full border">
-      <tbody>
-        <tr>
-          <td className="border p-1"><b>Incidente</b></td>
-          <td className="border p-1">{sheq.incidente || "-"}</td>
-          <td className="border p-1">{sheq.incidenteObs || "-"}</td>
-        </tr>
-
-        <tr>
-          <td className="border p-1"><b>Vazamento</b></td>
-          <td className="border p-1">{sheq.vazamento || "-"}</td>
-          <td className="border p-1">{sheq.vazamentoObs || "-"}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div className="mb-4">
-    <h3 className="font-semibold mb-1">Comentários</h3>
-    <div className="border p-2 min-h-[60px]">
-      {comentarios}
-    </div>
-  </div>
-
-  <div className="mb-4">
-  <h3 className="font-semibold mb-1">Registro Fotográfico</h3>
-
-  <div className="grid grid-cols-2 gap-2">
-    {fotos.map((f, i) => (
-      <div key={i}>
-        {f.preview && (
-  <img src={f.preview} className="w-full border" />
-)}
-        <p className="text-[10px]">{f.legenda}</p>
-      </div>
-    ))}
-  </div>
-</div>
-
-<div className="mt-6 border-t pt-4">
-  <h3 className="font-semibold mb-2">Assinaturas</h3>
-
-  <div className="grid grid-cols-2 gap-4">
-    {assinaturas.map((a, i) => (
-      <div key={i} className="text-center">
-        <p>{a.empresa}</p>
-
-        {a.assinatura && (
-          <img src={a.assinatura} className="h-16 mx-auto border" />
-        )}
-
-        <div className="border-t mt-2 pt-1 text-[10px]">
-          Assinatura
-        </div>
-      </div>
-    ))}
-  </div>
-</div>
-
-</div>
+  onClick={finalizarRDO}
+  className="w-full bg-[#80b02d] text-white font-semibold py-3 rounded-xl"
+>
+  Finalizar
+</button>
 
   </div>
 
