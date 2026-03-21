@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import MobileShell from "@/components/layout/MobileShell";
 import SignaturePad from "@/components/SignaturePad";
+const [draftId, setDraftId] = useState<string | null>(null);
 
 /* ================= TYPES ================= */
 
@@ -104,30 +105,64 @@ export default function RdoPage() {
     if (data) setProjectName(data.name);
   }
 
-  <button
-  onClick={salvarRascunho}
-  className="w-full bg-white border-2 border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl"
->
-  Salvar rascunho
-</button>
+async function salvarRascunho() {
 
-  async function salvarRascunho() {
+  // 🔁 SE JÁ EXISTE RASCUNHO → ATUALIZA
+  if (draftId) {
 
-  await supabase
-    .from("rdo_reports")
-    .upsert({
-      project_id: projectId,
-      data,
-      inicio,
-      fim,
-      clima,
-      envolvidos,
-      atividades,
-      comentarios,
-      fotos,
-      assinaturas,
-      draft: true,
-    });
+    const { error } = await supabase
+      .from("rdo_reports")
+      .update({
+        data,
+        inicio,
+        fim,
+        clima,
+        envolvidos,
+        atividades,
+        comentarios,
+        fotos,
+        assinaturas,
+        draft: true,
+      })
+      .eq("id", draftId);
+
+    if (error) {
+      console.error(error);
+      alert("Erro ao atualizar rascunho");
+      return;
+    }
+
+  } else {
+
+    // 🆕 SE NÃO EXISTE → CRIA NOVO
+    const { data: newDraft, error } = await supabase
+      .from("rdo_reports")
+      .insert({
+        project_id: projectId,
+        data,
+        inicio,
+        fim,
+        clima,
+        envolvidos,
+        atividades,
+        comentarios,
+        fotos,
+        assinaturas,
+        draft: true,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error(error);
+      alert("Erro ao salvar rascunho");
+      return;
+    }
+
+    if (newDraft) {
+      setDraftId(newDraft.id);
+    }
+  }
 
   alert("Rascunho salvo!");
 }
@@ -141,6 +176,7 @@ async function loadDraft() {
     .maybeSingle();
 
   if (!data) return;
+  setDraftId(data.id);
 
   setData(data.data || "");
   setInicio(data.inicio || "");
@@ -415,7 +451,19 @@ async function loadDraft() {
             + Adicionar responsável
           </button>
 
-        </Section>
+                </Section>
+
+        {/* BOTÕES FINAIS */}
+        <div className="space-y-4 pt-4">
+
+          <button
+            onClick={salvarRascunho}
+            className="w-full bg-white border-2 border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl shadow-sm"
+          >
+            Salvar rascunho
+          </button>
+
+        </div>
 
       </div>
     </MobileShell>
