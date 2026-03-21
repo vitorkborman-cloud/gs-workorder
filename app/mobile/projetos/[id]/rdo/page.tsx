@@ -660,47 +660,112 @@ async function gerarPDF() {
         <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
   <div ref={pdfRef} className="p-6 bg-white text-black">
 
-<div className="flex justify-between items-center border-b pb-2 mb-4">
-  <div>
-    <h1 className="text-lg font-bold">GREENSOIL</h1>
-    <p className="text-xs">Relatório Diário de Obra</p>
+<div ref={pdfRef} className="p-6 bg-white text-black text-xs">
+
+  <div className="flex justify-between items-center border-b pb-2 mb-4">
+    <div>
+      <h1 className="text-lg font-bold">GREENSOIL</h1>
+      <p>Relatório Diário de Obra</p>
+    </div>
+
+    <div className="text-right">
+      <p><b>Projeto:</b> {projectName}</p>
+      <p><b>Data:</b> {dataRelatorio}</p>
+    </div>
   </div>
 
-  <div className="text-xs text-right">
-    <p><b>Projeto:</b> {projectName}</p>
-    <p><b>Data:</b> {dataRelatorio}</p>
+  <div className="border p-2 mb-4 grid grid-cols-2 gap-2">
+    <p><b>Hora início:</b> {inicio}</p>
+    <p><b>Hora fim:</b> {fim}</p>
   </div>
+
+  <div className="mb-4">
+    <h3 className="font-semibold mb-1">Condições Climáticas</h3>
+
+    <table className="w-full border">
+      <thead>
+        <tr className="bg-gray-100">
+          <th className="border p-1">Período</th>
+          <th className="border p-1">Tempo</th>
+          <th className="border p-1">Condição</th>
+          <th className="border p-1">Razão</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {clima.map((c, i) => (
+          <tr key={i}>
+            <td className="border p-1">{c.periodo}</td>
+            <td className="border p-1">{c.tempo}</td>
+            <td className="border p-1">{c.condicao}</td>
+            <td className="border p-1">{c.razao}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <div className="mb-4">
+    <h3 className="font-semibold mb-1">Envolvidos</h3>
+
+    <table className="w-full border">
+      <tbody>
+        {envolvidos.map((e, i) => (
+          <tr key={i}>
+            <td className="border p-1">{e.empresa}</td>
+            <td className="border p-1">{e.colaboradores}</td>
+            <td className="border p-1">{e.funcao}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <div className="mb-4">
+    <h3 className="font-semibold mb-1">Atividades</h3>
+
+    <table className="w-full border">
+      <tbody>
+        {atividades.map((a, i) => (
+          <tr key={i}>
+            <td className="border p-1">{a.atividade}</td>
+            <td className="border p-1">{a.empresa}</td>
+            <td className="border p-1">{a.status}</td>
+            <td className="border p-1">{a.obs}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <div className="mb-4">
+    <h3 className="font-semibold mb-1">SHEQ</h3>
+
+    <table className="w-full border">
+      <tbody>
+        <tr>
+          <td className="border p-1"><b>Incidente</b></td>
+          <td className="border p-1">{sheq.incidente || "-"}</td>
+          <td className="border p-1">{sheq.incidenteObs || "-"}</td>
+        </tr>
+
+        <tr>
+          <td className="border p-1"><b>Vazamento</b></td>
+          <td className="border p-1">{sheq.vazamento || "-"}</td>
+          <td className="border p-1">{sheq.vazamentoObs || "-"}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div className="mb-4">
+    <h3 className="font-semibold mb-1">Comentários</h3>
+    <div className="border p-2 min-h-[60px]">
+      {comentarios}
+    </div>
+  </div>
+
 </div>
-
-    <p><b>Projeto:</b> {projectName}</p>
-    <p><b>Data:</b> {dataRelatorio}</p>
-    <p><b>Início:</b> {inicio}</p>
-    <p><b>Fim:</b> {fim}</p>
-
-    <h3 className="mt-4 font-semibold">Atividades</h3>
-    {atividades.map((a, i) => (
-      <p key={i}>- {a.atividade} ({a.status})</p>
-    ))}
-
-    {/* SHEQ */}
-<div className="mb-4">
-  <h3 className="font-semibold mb-1">SHEQ</h3>
-
-  <div className="border p-2 mb-2">
-    <b>Incidente/Acidente:</b> {sheq.incidente || "-"}
-    <br />
-    <b>Observações:</b> {sheq.incidenteObs || "-"}
-  </div>
-
-  <div className="border p-2">
-    <b>Vazamento:</b> {sheq.vazamento || "-"}
-    <br />
-    <b>Observações:</b> {sheq.vazamentoObs || "-"}
-  </div>
-</div>
-
-    <h3 className="mt-4 font-semibold">Comentários</h3>
-    <p>{comentarios}</p>
 
   </div>
 </div>
