@@ -114,14 +114,17 @@ async function salvarRascunho() {
     const { error } = await supabase
       .from("rdo_reports")
       .update({
-        dataRelatorio,
+        data: dataRelatorio,
         inicio,
         fim,
         clima,
         envolvidos,
         atividades,
         comentarios,
-        fotos,
+        fotos: fotos.map(f => ({
+  preview: f.preview,
+  legenda: f.legenda,
+})),
         assinaturas,
         draft: true,
       })
@@ -160,7 +163,8 @@ alert("Erro ao salvar rascunho: " + error?.message);
 
     if (error) {
       console.error(error);
-      alert("Erro ao salvar rascunho");
+      console.error(error);
+alert("Erro ao salvar rascunho: " + error?.message);
       return;
     }
 
