@@ -7,6 +7,7 @@ import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 type RDO = any;
 
@@ -30,8 +31,7 @@ async function gerarPDF() {
   let y = 10;
 
   // 🔹 LOGO
-  const logo = "/logo.png";
-  pdf.addImage(logo, "PNG", 10, y, 30, 15);
+  pdf.addImage("/logo.png", "PNG", 10, y, 30, 15);
 
   // 🔹 TÍTULO
   pdf.setFontSize(14);
@@ -39,63 +39,73 @@ async function gerarPDF() {
 
   // 🔹 PROJETO / DATA
   pdf.setFontSize(10);
-  pdf.text(`Projeto: ${projectName}`, 150, y + 10, { align: "right" });
-  pdf.text(`Data: ${rdo.data}`, 150, y + 15, { align: "right" });
+  pdf.text(`Projeto: ${projectName}`, 200, y + 10, { align: "right" });
+  pdf.text(`Data: ${rdo.data}`, 200, y + 15, { align: "right" });
 
   y += 30;
 
-  // 🔹 HORÁRIOS
-  pdf.setFontSize(10);
-  pdf.text(`Hora início: ${rdo.inicio}`, 10, y);
-  pdf.text(`Hora fim: ${rdo.fim}`, 100, y);
-
-  y += 10;
-
   // 🔹 LINHA VERDE
-  pdf.setDrawColor(128, 176, 45); // #80b02d
+  pdf.setDrawColor(128, 176, 45);
   pdf.setLineWidth(1);
   pdf.line(10, y, 200, y);
 
   y += 10;
 
   // 🔹 CLIMA
-  pdf.setFontSize(12);
-  pdf.text("Condições Climáticas", 10, y);
-  y += 6;
-
-  rdo.clima?.forEach((c: any) => {
-    pdf.setFontSize(10);
-    pdf.text(`${c.periodo} - ${c.tempo} - ${c.condicao} - ${c.razao}`, 10, y);
-    y += 5;
+  autoTable(pdf, {
+    startY: y,
+    head: [["Período", "Tempo", "Condição", "Razão"]],
+    body: rdo.clima?.map((c: any) => [
+      c.periodo,
+      c.tempo,
+      c.condicao,
+      c.razao || "-"
+    ]) || [],
+    styles: { fontSize: 9 },
+    headStyles: {
+      fillColor: [57, 30, 42], // roxo
+      textColor: 255
+    }
   });
 
-  y += 5;
+  y = (pdf as any).lastAutoTable.finalY + 5;
 
   // 🔹 ENVOLVIDOS
-  pdf.setFontSize(12);
-  pdf.text("Envolvidos", 10, y);
-  y += 6;
-
-  rdo.envolvidos?.forEach((e: any) => {
-    pdf.setFontSize(10);
-    pdf.text(`${e.empresa} | ${e.colaboradores} | ${e.funcao}`, 10, y);
-    y += 5;
+  autoTable(pdf, {
+    startY: y,
+    head: [["Empresa", "N° colaboradores", "Função"]],
+    body: rdo.envolvidos?.map((e: any) => [
+      e.empresa,
+      e.colaboradores,
+      e.funcao
+    ]) || [],
+    styles: { fontSize: 9 },
+    headStyles: {
+      fillColor: [57, 30, 42],
+      textColor: 255
+    }
   });
 
-  y += 5;
+  y = (pdf as any).lastAutoTable.finalY + 5;
 
   // 🔹 ATIVIDADES
-  pdf.setFontSize(12);
-  pdf.text("Atividades", 10, y);
-  y += 6;
-
-  rdo.atividades?.forEach((a: any) => {
-    pdf.setFontSize(10);
-    pdf.text(`${a.atividade} | ${a.empresa} | ${a.status}`, 10, y);
-    y += 5;
+  autoTable(pdf, {
+    startY: y,
+    head: [["Atividade", "Empresa", "Status", "Obs"]],
+    body: rdo.atividades?.map((a: any) => [
+      a.atividade,
+      a.empresa,
+      a.status,
+      a.obs || "-"
+    ]) || [],
+    styles: { fontSize: 9 },
+    headStyles: {
+      fillColor: [57, 30, 42],
+      textColor: 255
+    }
   });
 
-  y += 5;
+  y = (pdf as any).lastAutoTable.finalY + 5;
 
   // 🔹 COMENTÁRIOS
   pdf.setFontSize(12);
@@ -103,17 +113,9 @@ async function gerarPDF() {
   y += 6;
 
   pdf.setFontSize(10);
-  pdf.text(rdo.comentarios || "-", 10, y);
-
-  y += 10;
-
-  // 🔹 FOTOS (simples)
-  for (const f of rdo.fotos || []) {
-    if (f.preview) {
-      pdf.addImage(f.preview, "JPEG", 10, y, 60, 40);
-      y += 45;
-    }
-  }
+  pdf.text(rdo.comentarios || "-", 10, y, {
+    maxWidth: 180
+  });
 
   pdf.save(`RDO_${projectName}.pdf`);
 }
