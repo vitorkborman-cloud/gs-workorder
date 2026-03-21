@@ -52,6 +52,8 @@ const [draftId, setDraftId] = useState<string | null>(null);
   const params = useParams();
   const projectId = params?.id as string;
 
+  const [assinaturaAberta, setAssinaturaAberta] = useState<number | null>(null);
+
   const [projectName, setProjectName] = useState("");
 
   /* ===== GERAL ===== */
@@ -440,13 +442,55 @@ async function loadDraft() {
                 }}
               />
 
-              <SignaturePad
-  onSave={(dataUrl) => {
-    const copy = [...assinaturas];
-    (copy[i] as any).assinatura = dataUrl;
-    setAssinaturas(copy);
-  }}
-/>
+              {a.assinatura ? (
+
+  <div className="space-y-2">
+    <img src={a.assinatura} className="rounded-xl border" />
+
+    <div className="text-xs text-green-600 font-semibold">
+      Assinado ✔
+    </div>
+
+    <button
+      onClick={() => setAssinaturaAberta(i)}
+      className="text-xs text-blue-600 underline"
+    >
+      Refazer assinatura
+    </button>
+  </div>
+
+) : assinaturaAberta === i ? (
+
+  <div className="space-y-2">
+
+    <SignaturePad
+      onSave={(dataUrl) => {
+        const copy = [...assinaturas];
+        copy[i].assinatura = dataUrl;
+        setAssinaturas(copy);
+        setAssinaturaAberta(null);
+      }}
+    />
+
+    <button
+      onClick={() => setAssinaturaAberta(null)}
+      className="w-full bg-gray-200 py-2 rounded-lg text-sm"
+    >
+      Cancelar
+    </button>
+
+  </div>
+
+) : (
+
+  <button
+    onClick={() => setAssinaturaAberta(i)}
+    className="w-full bg-[#80b02d] text-white py-2 rounded-lg text-sm"
+  >
+    Assinar
+  </button>
+
+)}
 
             </div>
           ))}
