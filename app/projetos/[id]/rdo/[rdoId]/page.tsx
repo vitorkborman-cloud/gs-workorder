@@ -24,39 +24,49 @@ export default function RdoViewPage() {
     load();
   }, []);
 
-  async function gerarPDF() {
-  if (!pdfRef.current) return;
+async function gerarPDF() {
+  try {
+    if (!pdfRef.current) {
+      alert("REF NULL");
+      return;
+    }
 
-  const element = pdfRef.current;
+    const canvas = await html2canvas(pdfRef.current, {
+      scale: 1,
+      useCORS: true,
+    });
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-  });
+    // 🔥 CONVERTE PARA BLOB (SOLUÇÃO REAL)
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.8)
+    );
 
-  const imgData = canvas.toDataURL("image/png");
+    if (!blob) {
+      alert("Erro ao gerar imagem");
+      return;
+    }
 
-  const pdf = new jsPDF("p", "mm", "a4");
+    const reader = new FileReader();
 
-  const pageWidth = 210;
-  const pageHeight = 297;
+    reader.onloadend = () => {
+      const base64data = reader.result as string;
 
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pdf = new jsPDF("p", "mm", "a4");
 
-  let heightLeft = imgHeight;
-  let position = 0;
+      const imgWidth = 210;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
+      pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
 
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+      pdf.save(`RDO_${projectName}.pdf`);
+    };
+
+    reader.readAsDataURL(blob);
+
+  } catch (err: any) {
+    console.error(err);
+    alert("ERRO: " + err.message);
   }
-
-  pdf.save(`RDO_${projectName}.pdf`);
 }
 
   async function load() {
