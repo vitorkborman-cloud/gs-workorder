@@ -21,20 +21,10 @@ export default function RdoViewPage() {
   }, []);
 
   async function load() {
-    const { data } = await supabase
-      .from("rdo_reports")
-      .select("*")
-      .eq("id", rdoId)
-      .single();
-
+    const { data } = await supabase.from("rdo_reports").select("*").eq("id", rdoId).single();
     if (data) setRdo(data);
 
-    const { data: proj } = await supabase
-      .from("projects")
-      .select("name")
-      .eq("id", projectId)
-      .single();
-
+    const { data: proj } = await supabase.from("projects").select("name").eq("id", projectId).single();
     if (proj) setProjectName(proj.name);
   }
 
@@ -42,21 +32,65 @@ export default function RdoViewPage() {
     if (!rdo) return;
 
     const doc = new jsPDF("p", "mm", "a4");
-    
-    // Configurações de Layout
     const marginX = 15;
     const pageWidth = doc.internal.pageSize.getWidth();
     const contentWidth = pageWidth - marginX * 2;
-    let currentY = 20;
+    let currentY = 0;
 
-    // Identidade Visual
+    // --- CORES DE ELITE ---
     const brandPurple: [number, number, number] = [57, 30, 42];
     const brandGreen: [number, number, number] = [128, 176, 45];
-    const textColor: [number, number, number] = [60, 60, 60];
+    const lightGray: [number, number, number] = [245, 245, 247];
+    const textMain: [number, number, number] = [40, 40, 40];
 
-    // Funções Auxiliares internas para evitar erros de escopo
-    const checkPageBreak = (neededSpace: number) => {
-      if (currentY + neededSpace > 275) {
+    // --- 1. CABEÇALHO MODERNO (DARK MODE STYLE) ---
+    doc.setFillColor(...brandPurple);
+    doc.rect(0, 0, pageWidth, 40, "F"); // Faixa superior
+    
+    try {
+      doc.addImage("/logo.png", "PNG", marginX, 10, 35, 10);
+    } catch (e) {}
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("DIÁRIO DE OBRA", pageWidth - marginX, 18, { align: "right" });
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${projectName} | ${rdo.data}`, pageWidth - marginX, 25, { align: "right" });
+    
+    currentY = 50;
+
+    // --- 2. DASHBOARD DE RESUMO (KPIs) ---
+    const cardW = contentWidth / 3 - 5;
+    const drawCard = (x: number, title: string, value: string, color: [number, number, number]) => {
+      doc.setFillColor(...lightGray);
+      doc.roundedRect(x, currentY, cardW, 20, 2, 2, "F");
+      doc.setDrawColor(...color);
+      doc.setLineWidth(1);
+      doc.line(x, currentY + 18, x + cardW, currentY + 18);
+      
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.setFont("helvetica", "bold");
+      doc.text(title.toUpperCase(), x + 5, currentY + 7);
+      
+      doc.setFontSize(11);
+      doc.setTextColor(...brandPurple);
+      doc.text(value, x + 5, currentY + 14);
+    };
+
+    const totalColab = rdo.envolvidos?.reduce((acc: number, cur: any) => acc + (Number(cur.colaboradores) || 0), 0) || 0;
+    drawCard(marginX, "Efetivo Total", `${totalColab} Colaboradores`, brandGreen);
+    drawCard(marginX + cardW + 7.5, "Clima Predominante", rdo.clima?.[0]?.condicao || "N/A", brandGreen);
+    drawCard(marginX + (cardW + 7.5) * 2, "Segurança (SHEQ)", rdo.sheq?.incidente === "Não" ? "Operação Segura" : "Alerta de Incidente", [200, 0, 0]);
+
+    currentY += 35;
+
+    // --- FUNÇÕES AUXILIARES ---
+    const checkPageBreak = (needed: number) => {
+      if (currentY + needed > 275) {
         doc.addPage();
         currentY = 20;
         return true;
@@ -64,188 +98,152 @@ export default function RdoViewPage() {
       return false;
     };
 
-    const addSectionTitle = (title: string) => {
+    const sectionHeader = (title: string) => {
       checkPageBreak(15);
-      doc.setFillColor(...brandGreen);
-      doc.rect(marginX, currentY, 3, 6, "F");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
+      doc.setFontSize(11);
       doc.setTextColor(...brandPurple);
-      doc.text(title, marginX + 5, currentY + 5);
-      currentY += 12;
+      doc.text(title, marginX, currentY);
+      doc.setDrawColor(...brandGreen);
+      doc.setLineWidth(0.5);
+      doc.line(marginX, currentY + 2, marginX + 20, currentY + 2);
+      currentY += 10;
     };
 
-    // --- CABEÇALHO ---
-    try {
-      doc.addImage("/logo.png", "PNG", marginX, currentY, 40, 12);
-    } catch (e) {
-      console.warn("Logo não carregado");
-    }
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(...brandPurple);
-    doc.text("RELATÓRIO DIÁRIO DE OBRA", marginX + 45, currentY + 7);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Data: ${rdo.data || "-"}`, pageWidth - marginX, currentY + 2, { align: "right" });
-    doc.text(`Projeto: ${projectName}`, pageWidth - marginX, currentY + 8, { align: "right" });
-
-    currentY += 20;
-    doc.setDrawColor(...brandGreen);
-    doc.setLineWidth(0.5);
-    doc.line(marginX, currentY, pageWidth - marginX, currentY);
-    currentY += 10;
-
-    // --- TABELAS ---
-    const tableStyles: any = {
-      theme: "grid",
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: brandPurple, textColor: 255 },
+    // --- 3. TABELAS ESTILIZADAS ---
+    const tableBaseConfig: any = {
+      startY: currentY,
       margin: { left: marginX, right: marginX },
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: brandPurple, textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [250, 250, 250] }
     };
 
-    // 1. Clima
-    if (rdo.clima?.length > 0) {
-      addSectionTitle("Condições Climáticas");
-      autoTable(doc, {
-        ...tableStyles,
-        startY: currentY,
-        head: [["Período", "Tempo", "Condição", "Razão"]],
-        body: rdo.clima.map((c: any) => [c.periodo, c.tempo, c.condicao, c.razao || "-"]),
-      });
-      currentY = (doc as any).lastAutoTable.finalY + 10;
-    }
-
-    // 2. Envolvidos
-    if (rdo.envolvidos?.length > 0) {
-      addSectionTitle("Efetivo no Local");
-      autoTable(doc, {
-        ...tableStyles,
-        startY: currentY,
-        head: [["Empresa", "N° Colab.", "Função"]],
-        body: rdo.envolvidos.map((e: any) => [e.empresa, e.colaboradores, e.funcao]),
-      });
-      currentY = (doc as any).lastAutoTable.finalY + 10;
-    }
-
-    // 3. Atividades
+    // Tabela de Atividades com Lógica de Cores no Status
     if (rdo.atividades?.length > 0) {
-      addSectionTitle("Atividades Realizadas");
+      sectionHeader("CRONOGRAMA E ATIVIDADES");
       autoTable(doc, {
-        ...tableStyles,
+        ...tableBaseConfig,
         startY: currentY,
-        head: [["Atividade", "Empresa", "Status", "Obs"]],
+        head: [["Atividade", "Responsável", "Status", "Observações"]],
         body: rdo.atividades.map((a: any) => [a.atividade, a.empresa, a.status, a.obs || "-"]),
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 2) {
+            const val = String(data.cell.raw).toLowerCase();
+            if (val.includes("conclu") || val.includes("final")) data.cell.styles.textColor = [0, 128, 0];
+            if (val.includes("andamento")) data.cell.styles.textColor = [210, 105, 30];
+          }
+        }
       });
-      currentY = (doc as any).lastAutoTable.finalY + 10;
+      currentY = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    // 4. Comentários
+    // --- 4. COMENTÁRIOS COM DESIGN DE CITAÇÃO ---
     if (rdo.comentarios) {
-      addSectionTitle("Comentários Gerais");
-      const lines = doc.splitTextToSize(rdo.comentarios, contentWidth - 6);
-      const h = (lines.length * 5) + 8;
+      sectionHeader("NOTAS DE CAMPO");
+      const lines = doc.splitTextToSize(rdo.comentarios, contentWidth - 10);
+      const h = (lines.length * 5) + 10;
       checkPageBreak(h);
-      doc.setFillColor(248, 248, 248);
+      
+      doc.setFillColor(...lightGray);
       doc.rect(marginX, currentY, contentWidth, h, "F");
-      doc.setFontSize(10);
-      doc.setTextColor(...textColor);
-      doc.text(lines, marginX + 3, currentY + 6);
-      currentY += h + 10;
+      doc.setDrawColor(...brandGreen);
+      doc.setLineWidth(1);
+      doc.line(marginX, currentY, marginX, currentY + h); // Barra lateral esquerda
+      
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(...textMain);
+      doc.text(lines, marginX + 5, currentY + 7);
+      currentY += h + 15;
     }
 
-    // --- FOTOS ---
+    // --- 5. GALERIA FOTOGRÁFICA (POLAROID STYLE) ---
     if (rdo.fotos?.length > 0) {
-      addSectionTitle("Registro Fotográfico");
-      const imgW = (contentWidth / 2) - 4;
-      const imgH = 50;
-      
+      sectionHeader("EVIDÊNCIAS FOTOGRÁFICAS");
+      const imgW = (contentWidth / 2) - 5;
+      const imgH = 45;
+
       rdo.fotos.forEach((foto: any, i: number) => {
-        const isEven = i % 2 === 0;
-        const xPos = isEven ? marginX : marginX + imgW + 8;
-        
-        checkPageBreak(imgH + 15);
+        const x = i % 2 === 0 ? marginX : marginX + imgW + 10;
+        checkPageBreak(imgH + 20);
         
         if (foto.preview) {
           try {
-            doc.addImage(foto.preview, "JPEG", xPos, currentY, imgW, imgH);
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(220, 220, 220);
+            doc.rect(x, currentY, imgW, imgH + 10, "FD"); // Moldura
+            doc.addImage(foto.preview, "JPEG", x + 2, currentY + 2, imgW - 4, imgH - 4);
+            
+            doc.setFontSize(7);
+            doc.setTextColor(100);
+            doc.text(foto.legenda || "Sem legenda", x + 2, currentY + imgH + 5);
           } catch (e) {}
         }
-        doc.setFontSize(8);
-        doc.text(foto.legenda || "", xPos, currentY + imgH + 4);
-        
-        if (!isEven || i === rdo.fotos.length - 1) {
-          currentY += imgH + 15;
-        }
+        if (i % 2 !== 0 || i === rdo.fotos.length - 1) currentY += imgH + 20;
       });
     }
 
-    // --- ASSINATURAS ---
+    // --- 6. ASSINATURAS E RODAPÉ ---
     if (rdo.assinaturas?.length > 0) {
-      addSectionTitle("Assinaturas");
+      sectionHeader("VALIDAÇÃO");
       currentY += 5;
       rdo.assinaturas.forEach((a: any, i: number) => {
-        checkPageBreak(30);
-        const xPos = i % 2 === 0 ? marginX : pageWidth / 2 + 5;
-        
+        checkPageBreak(35);
+        const x = i % 2 === 0 ? marginX : pageWidth / 2 + 5;
         if (a.assinatura) {
-          try { doc.addImage(a.assinatura, "PNG", xPos + 10, currentY, 35, 12); } catch(e) {}
+          try { doc.addImage(a.assinatura, "PNG", x + 10, currentY, 40, 15); } catch(e) {}
         }
-        doc.setDrawColor(150);
-        doc.line(xPos, currentY + 13, xPos + 60, currentY + 13);
-        doc.setFontSize(9);
-        doc.text(a.empresa || "", xPos, currentY + 18);
-        
-        if (i % 2 !== 0 || i === rdo.assinaturas.length - 1) currentY += 25;
+        doc.setDrawColor(200);
+        doc.line(x, currentY + 16, x + 60, currentY + 16);
+        doc.setFontSize(8);
+        doc.setTextColor(...brandPurple);
+        doc.text(a.empresa || "Empresa", x, currentY + 21);
+        if (i % 2 !== 0 || i === rdo.assinaturas.length - 1) currentY += 30;
       });
     }
 
-    // Rodapé com paginação
+    // Numeração de páginas final
     const totalPages = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, 290, { align: "center" });
+      doc.text(`Relatório Gerado via Sistema RDO - Página ${i} de ${totalPages}`, pageWidth / 2, 290, { align: "center" });
     }
 
-    doc.save(`RDO_${projectName}_${rdo.data}.pdf`);
+    doc.save(`RDO_PREMIUM_${projectName}_${rdo.data}.pdf`);
   }
 
-  if (!rdo) {
-    return (
-      <AdminShell>
-        <p className="p-10">Carregando...</p>
-      </AdminShell>
-    );
-  }
+  if (!rdo) return <AdminShell><p className="p-10">Carregando...</p></AdminShell>;
 
   return (
     <AdminShell>
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
-        <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border-l-4 border-[#80b02d]">
-          <div>
-            <h1 className="text-2xl font-bold text-[#391e2a]">Relatório Diário de Obra</h1>
-            <p className="text-gray-500">{projectName} | {rdo.data}</p>
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="bg-[#391e2a] p-8 text-white flex justify-between items-center">
+            <div>
+              <p className="text-sm opacity-70 uppercase tracking-widest">Visualização do Relatório</p>
+              <h1 className="text-3xl font-bold">{projectName}</h1>
+              <p className="mt-1 text-[#80b02d] font-medium">{rdo.data}</p>
+            </div>
+            <Button 
+              onClick={gerarPDF} 
+              className="bg-[#80b02d] hover:bg-[#6a9425] text-white px-8 py-6 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg"
+            >
+              BAIXAR RELATÓRIO EXECUTIVO (PDF)
+            </Button>
           </div>
-          <Button onClick={gerarPDF} className="bg-[#391e2a] hover:bg-[#4d2a39]">
-            Exportar PDF Premium
-          </Button>
-        </div>
-
-        <div className="bg-white p-8 rounded-lg shadow-md border border-gray-100">
-          {/* O conteúdo visual da tela permanece aqui se você quiser visualizar antes de baixar */}
-          <p className="text-sm text-gray-400 mb-4">Pré-visualização do Relatório</p>
-          <div className="space-y-4">
-             <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                <p><b>Início:</b> {rdo.inicio}</p>
-                <p><b>Fim:</b> {rdo.fim}</p>
-             </div>
-             {/* ... você pode adicionar outros campos aqui se quiser ver na tela também ... */}
-             <p className="italic text-gray-600">O PDF exportado conterá todos os detalhes, fotos e assinaturas formatados.</p>
+          
+          <div className="p-10 text-center">
+            <div className="inline-block p-4 rounded-full bg-green-50 mb-4">
+              <svg className="w-12 h-12 text-[#80b02d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800">Relatório Pronto para Exportação</h2>
+            <p className="text-gray-500 mt-2 max-w-sm mx-auto">
+              O layout executivo inclui dashboard de indicadores, análise de clima, status colorido de atividades e galeria de fotos otimizada.
+            </p>
           </div>
         </div>
       </div>
