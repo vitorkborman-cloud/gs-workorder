@@ -37,12 +37,13 @@ pdfRef.current.querySelectorAll("*").forEach((el) => {
 
   element.style.background = "#ffffff";
   element.style.backgroundColor = "#ffffff";
+  element.style.backgroundImage = "none";
   element.style.color = "#000000";
   element.style.boxShadow = "none";
 });
 
     const canvas = await html2canvas(pdfRef.current, {
-  scale: 1,
+  scale: 2,
   useCORS: true,
   backgroundColor: "#ffffff", // 🔥 ESSENCIAL
 });
@@ -161,7 +162,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
 
             <table className="w-full border">
               <thead>
-                <tr className="bg-gray-100">
+                <tr style={{ backgroundColor: "#e5e5e5" }}>
                   <th className="border p-1">Período</th>
                   <th className="border p-1">Tempo</th>
                   <th className="border p-1">Condição</th>
@@ -185,7 +186,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
           {/* ENVOLVIDOS */}
 <table className="w-full border">
   <thead>
-    <tr className="bg-gray-100">
+    <tr style={{ backgroundColor: "#e5e5e5" }}>
       <th className="border p-1">Empresa</th>
       <th className="border p-1">N° colaboradores</th>
       <th className="border p-1">Função</th>
@@ -206,7 +207,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
           {/* ATIVIDADES */}
 <table className="w-full border">
   <thead>
-    <tr className="bg-gray-100">
+    <tr style={{ backgroundColor: "#e5e5e5" }}>
       <th className="border p-1">Atividade</th>
       <th className="border p-1">Empresa responsável</th>
       <th className="border p-1">Status</th>
@@ -229,7 +230,7 @@ pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
           {/* SHEQ */}
 <table className="w-full border">
   <thead>
-    <tr className="bg-gray-100">
+    <tr style={{ backgroundColor: "#e5e5e5" }}>
       <th className="border p-1">Ocorrências</th>
       <th className="border p-1">Registro</th>
       <th className="border p-1">Observações</th>
