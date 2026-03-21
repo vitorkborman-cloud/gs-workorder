@@ -35,8 +35,10 @@ async function gerarPDF() {
 pdfRef.current.querySelectorAll("*").forEach((el) => {
   const element = el as HTMLElement;
 
-  element.style.color = "#000000";
+  element.style.background = "#ffffff";
   element.style.backgroundColor = "#ffffff";
+  element.style.color = "#000000";
+  element.style.boxShadow = "none";
 });
 
     const canvas = await html2canvas(pdfRef.current, {
