@@ -229,10 +229,15 @@ alert("PDF REF OK");
 
   await new Promise(r => setTimeout(r, 300));
 
+  pdfRef.current.style.height = "auto";
+pdfRef.current.style.maxHeight = "none";
+
 const canvas = await html2canvas(pdfRef.current, {
-    scale: 1,
-    useCORS: true,
-  });
+  scale: 0.8,
+  useCORS: true,
+  logging: false,
+  allowTaint: true,
+});
 
   const imgData = canvas.toDataURL("image/jpeg", 0.8);
 
@@ -791,9 +796,7 @@ const canvas = await html2canvas(pdfRef.current, {
   <div className="grid grid-cols-2 gap-2">
     {fotos.map((f, i) => (
       <div key={i}>
-        {f.preview && (
-          <img src={f.preview} className="w-full border" />
-        )}
+        {/* imagem removida para teste */}
         <p className="text-[10px]">{f.legenda}</p>
       </div>
     ))}
