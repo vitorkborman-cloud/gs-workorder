@@ -227,18 +227,14 @@ async function gerarPDF() {
 
 alert("PDF REF OK");
 
-  await new Promise(requestAnimationFrame);
-await new Promise(requestAnimationFrame);
+await new Promise(resolve => setTimeout(resolve, 300));
 
   pdfRef.current.style.height = "auto";
 pdfRef.current.style.maxHeight = "none";
 pdfRef.current.getBoundingClientRect();
 
 const canvas = await html2canvas(pdfRef.current, {
-  scale: 0.8,
-  useCORS: true,
-  logging: false,
-  allowTaint: true,
+  scale: 1,
 });
 
   const imgData = canvas.toDataURL("image/jpeg", 0.8);
@@ -686,13 +682,12 @@ const canvas = await html2canvas(pdfRef.current, {
 
 </div>
 
-        <div style={{ position: "fixed", 
-        top: 0, 
-        left: 0, 
-        opacity: 1,
-zIndex: -1, 
-pointerEvents: "none", 
-width: "210mm" 
+<div style={{ 
+  position: "absolute",
+  top: "-9999px",
+  left: 0,
+  width: "210mm",
+  background: "white"
 }}>
 <div ref={pdfRef} className="p-6 bg-white text-black text-xs">
 
