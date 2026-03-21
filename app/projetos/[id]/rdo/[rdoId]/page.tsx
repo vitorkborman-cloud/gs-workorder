@@ -119,60 +119,73 @@ export default function RdoViewPage() {
           </div>
 
           {/* ENVOLVIDOS */}
-          <div>
-            <h3 className="font-semibold mb-2">Envolvidos</h3>
+<table className="w-full border">
+  <thead>
+    <tr className="bg-gray-100">
+      <th className="border p-1">Empresa</th>
+      <th className="border p-1">N° colaboradores</th>
+      <th className="border p-1">Função</th>
+    </tr>
+  </thead>
 
-            <table className="w-full border">
-              <tbody>
-                {rdo.envolvidos?.map((e: any, i: number) => (
-                  <tr key={i}>
-                    <td className="border p-1">{e.empresa}</td>
-                    <td className="border p-1">{e.colaboradores}</td>
-                    <td className="border p-1">{e.funcao}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+  <tbody>
+    {rdo.envolvidos?.map((e: any, i: number) => (
+      <tr key={i}>
+        <td className="border p-1">{e.empresa}</td>
+        <td className="border p-1">{e.colaboradores}</td>
+        <td className="border p-1">{e.funcao}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
 
           {/* ATIVIDADES */}
-          <div>
-            <h3 className="font-semibold mb-2">Atividades</h3>
+<table className="w-full border">
+  <thead>
+    <tr className="bg-gray-100">
+      <th className="border p-1">Atividade</th>
+      <th className="border p-1">Empresa responsável</th>
+      <th className="border p-1">Status</th>
+      <th className="border p-1">Observação</th>
+    </tr>
+  </thead>
 
-            <table className="w-full border">
-              <tbody>
-                {rdo.atividades?.map((a: any, i: number) => (
-                  <tr key={i}>
-                    <td className="border p-1">{a.atividade}</td>
-                    <td className="border p-1">{a.empresa}</td>
-                    <td className="border p-1">{a.status}</td>
-                    <td className="border p-1">{a.obs}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+  <tbody>
+    {rdo.atividades?.map((a: any, i: number) => (
+      <tr key={i}>
+        <td className="border p-1">{a.atividade}</td>
+        <td className="border p-1">{a.empresa}</td>
+        <td className="border p-1">{a.status}</td>
+        <td className="border p-1">{a.obs}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
 
           {/* SHEQ */}
-          <div>
-            <h3 className="font-semibold mb-2">SHEQ</h3>
+<table className="w-full border">
+  <thead>
+    <tr className="bg-gray-100">
+      <th className="border p-1">Ocorrências</th>
+      <th className="border p-1">-</th>
+      <th className="border p-1">Observações</th>
+    </tr>
+  </thead>
 
-            <table className="w-full border">
-              <tbody>
-                <tr>
-                  <td className="border p-1"><b>Incidente</b></td>
-                  <td className="border p-1">{rdo.sheq?.incidente}</td>
-                  <td className="border p-1">{rdo.sheq?.incidenteObs}</td>
-                </tr>
+  <tbody>
+    <tr>
+      <td className="border p-1"><b>Incidente</b></td>
+      <td className="border p-1">{rdo.sheq?.incidente || "-"}</td>
+      <td className="border p-1">{rdo.sheq?.incidenteObs || "-"}</td>
+    </tr>
 
-                <tr>
-                  <td className="border p-1"><b>Vazamento</b></td>
-                  <td className="border p-1">{rdo.sheq?.vazamento}</td>
-                  <td className="border p-1">{rdo.sheq?.vazamentoObs}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+    <tr>
+      <td className="border p-1"><b>Vazamento</b></td>
+      <td className="border p-1">{rdo.sheq?.vazamento || "-"}</td>
+      <td className="border p-1">{rdo.sheq?.vazamentoObs || "-"}</td>
+    </tr>
+  </tbody>
+</table>
 
           {/* COMENTÁRIOS */}
           <div>
