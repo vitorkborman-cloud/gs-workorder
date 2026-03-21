@@ -36,6 +36,7 @@ type Foto = {
 
 type Assinatura = {
   empresa: string;
+  assinatura?: string;
 };
 
 /* ================= CONSTANTES ================= */
@@ -54,7 +55,7 @@ const [draftId, setDraftId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
 
   /* ===== GERAL ===== */
-  const [data, setData] = useState("");
+  const [dataRelatorio, setDataRelatorio] = useState("");
   const [inicio, setInicio] = useState("");
   const [fim, setFim] = useState("");
 
@@ -113,7 +114,7 @@ async function salvarRascunho() {
     const { error } = await supabase
       .from("rdo_reports")
       .update({
-        data,
+        dataRelatorio,
         inicio,
         fim,
         clima,
@@ -140,14 +141,17 @@ alert("Erro ao salvar rascunho: " + error?.message);
       .from("rdo_reports")
       .insert({
         project_id: projectId,
-        data,
+        data: dataRelatorio,
         inicio,
         fim,
         clima,
         envolvidos,
         atividades,
         comentarios,
-        fotos,
+        fotos: fotos.map(f => ({
+  preview: f.preview,
+  legenda: f.legenda,
+})),
         assinaturas,
         draft: true,
       })
@@ -179,7 +183,7 @@ async function loadDraft() {
   if (!data) return;
   setDraftId(data.id);
 
-  setData(data.data || "");
+  setDataRelatorio(data.data || "");
   setInicio(data.inicio || "");
   setFim(data.fim || "");
   setClima(data.clima || clima);
@@ -221,7 +225,7 @@ async function loadDraft() {
         <Section title="Informações Gerais">
 
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Data *" value={data} onChange={(v: string) => setData(v)} />
+            <Input label="Data *" value={dataRelatorio} onChange={(v: string) => setDataRelatorio(v)} />
             <Input label="Hora início *" value={inicio} onChange={(v: string) => setInicio(v)} />
           </div>
 
