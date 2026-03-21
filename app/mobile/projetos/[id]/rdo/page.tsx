@@ -660,8 +660,17 @@ async function gerarPDF() {
         <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
   <div ref={pdfRef} className="p-6 bg-white text-black">
 
-    <h1 className="text-xl font-bold mb-2">Greensoil</h1>
-    <h2 className="text-md mb-4">Relatório Diário de Obra</h2>
+<div className="flex justify-between items-center border-b pb-2 mb-4">
+  <div>
+    <h1 className="text-lg font-bold">GREENSOIL</h1>
+    <p className="text-xs">Relatório Diário de Obra</p>
+  </div>
+
+  <div className="text-xs text-right">
+    <p><b>Projeto:</b> {projectName}</p>
+    <p><b>Data:</b> {dataRelatorio}</p>
+  </div>
+</div>
 
     <p><b>Projeto:</b> {projectName}</p>
     <p><b>Data:</b> {dataRelatorio}</p>
@@ -672,6 +681,23 @@ async function gerarPDF() {
     {atividades.map((a, i) => (
       <p key={i}>- {a.atividade} ({a.status})</p>
     ))}
+
+    {/* SHEQ */}
+<div className="mb-4">
+  <h3 className="font-semibold mb-1">SHEQ</h3>
+
+  <div className="border p-2 mb-2">
+    <b>Incidente/Acidente:</b> {sheq.incidente || "-"}
+    <br />
+    <b>Observações:</b> {sheq.incidenteObs || "-"}
+  </div>
+
+  <div className="border p-2">
+    <b>Vazamento:</b> {sheq.vazamento || "-"}
+    <br />
+    <b>Observações:</b> {sheq.vazamentoObs || "-"}
+  </div>
+</div>
 
     <h3 className="mt-4 font-semibold">Comentários</h3>
     <p>{comentarios}</p>
