@@ -34,7 +34,7 @@ async function gerarPDF() {
   const logo = "/logo.png";
 
 // mantém proporção (ajuste manual baseado no seu logo)
-pdf.addImage(logo, "PNG", 10, y, 40, 20);
+pdf.addImage(logo, "PNG", 10, y, 50, 0);
 
   // 🔹 TÍTULO
   pdf.setFontSize(14);
@@ -108,30 +108,6 @@ pdf.addImage(logo, "PNG", 10, y, 40, 20);
     }
   });
 
-  pdf.setFontSize(12);
-pdf.text("Assinaturas", 10, y);
-
-y += 10;
-
-const colWidth = 90;
-
-rdo.assinaturas?.forEach((a: any, i: number) => {
-  const x = 10 + (i % 2) * colWidth;
-  const row = Math.floor(i / 2);
-
-  const yPos = y + row * 40;
-
-  pdf.text(a.empresa || "-", x, yPos);
-
-  if (a.assinatura) {
-    pdf.addImage(a.assinatura, "PNG", x, yPos + 2, 40, 15);
-  }
-
-  pdf.line(x, yPos + 20, x + 60, yPos + 20);
-  pdf.setFontSize(8);
-  pdf.text("Assinatura", x, yPos + 24);
-});
-
 y = (pdf as any).lastAutoTable.finalY + 10;
 
 // 🔹 COMENTÁRIOS
@@ -140,15 +116,17 @@ pdf.text("Comentários", 10, y);
 
 y += 8;
 
+const comentario = rdo.comentarios || "-";
+
+const textLines = pdf.splitTextToSize(comentario, 180);
+
 pdf.setDrawColor(200);
-pdf.rect(10, y, 190, 20);
+pdf.rect(10, y, 190, textLines.length * 5 + 4);
 
 pdf.setFontSize(10);
-pdf.text(rdo.comentarios || "-", 12, y + 5, {
-  maxWidth: 180
-});
+pdf.text(textLines, 12, y + 5);
 
-y += 25;
+y += textLines.length * 5 + 10;
 
 // 🔹 ASSINATURAS (ÚNICA)
 pdf.setFontSize(12);
@@ -160,7 +138,14 @@ y += 10;
   const x = 10 + (i % 2) * 90;
   const row = Math.floor(i / 2);
 
-  const yPos = y + row * 40;
+  let yPos = y + row * 40;
+
+  // 🔥 quebra de página correta
+  if (yPos > 270) {
+    pdf.addPage();
+    y = 20;
+    yPos = y; // recalcula posição
+  }
 
   pdf.setFontSize(10);
   pdf.text(a.empresa || "-", x, yPos);
