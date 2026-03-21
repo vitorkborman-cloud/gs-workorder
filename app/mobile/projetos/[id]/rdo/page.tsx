@@ -686,7 +686,14 @@ const canvas = await html2canvas(pdfRef.current, {
 
 </div>
 
-        <div style={{ position: "fixed", top: 0, left: 0, opacity: 0, pointerEvents: "none", width: "210mm" }}>
+        <div style={{ position: "fixed", 
+        top: 0, 
+        left: 0, 
+        opacity: 1,
+zIndex: -1, 
+pointerEvents: "none", 
+width: "210mm" 
+}}>
 <div ref={pdfRef} className="p-6 bg-white text-black text-xs">
 
   <div className="flex justify-between items-center border-b pb-2 mb-4">
