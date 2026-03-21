@@ -205,7 +205,7 @@ export default function RdoViewPage() {
   <thead>
     <tr className="bg-gray-100">
       <th className="border p-1">Ocorrências</th>
-      <th className="border p-1">-</th>
+      <th className="border p-1">Registro</th>
       <th className="border p-1">Observações</th>
     </tr>
   </thead>
