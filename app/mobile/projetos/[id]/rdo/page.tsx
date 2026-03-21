@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import MobileShell from "@/components/layout/MobileShell";
 import SignaturePad from "@/components/SignaturePad";
-const [draftId, setDraftId] = useState<string | null>(null);
 
 /* ================= TYPES ================= */
 
@@ -48,6 +47,7 @@ const statusList = ["Concluído", "Não concluído"];
 /* ================= PAGE ================= */
 
 export default function RdoPage() {
+const [draftId, setDraftId] = useState<string | null>(null);
   const params = useParams();
   const projectId = params?.id as string;
 
