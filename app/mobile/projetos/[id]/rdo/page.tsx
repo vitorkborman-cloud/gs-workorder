@@ -222,7 +222,11 @@ async function loadDraft() {
 async function gerarPDF() {
   if (!pdfRef.current) return;
 
-  const canvas = await html2canvas(pdfRef.current, {
+console.log("PDF REF:", pdfRef.current);
+
+  await new Promise(r => setTimeout(r, 300));
+
+const canvas = await html2canvas(pdfRef.current, {
     scale: 1,
     useCORS: true,
   });
