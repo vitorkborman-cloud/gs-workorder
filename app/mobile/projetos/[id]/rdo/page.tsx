@@ -549,7 +549,7 @@ async function gerarPDF() {
 
 </div>
 
-        <div className="hidden">
+        <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
   <div ref={pdfRef} className="p-6 bg-white text-black">
 
     <h1 className="text-xl font-bold mb-2">Greensoil</h1>
