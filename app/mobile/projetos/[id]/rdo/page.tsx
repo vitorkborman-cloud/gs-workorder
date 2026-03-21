@@ -5,14 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import MobileShell from "@/components/layout/MobileShell";
 
-/* ========================= TYPES ========================= */
-
-type Clima = {
-  periodo: string;
-  tempo: string;
-  condicao: string;
-  razao: string;
-};
+/* ================= TYPES ================= */
 
 type Envolvido = {
   empresa: string;
@@ -35,16 +28,13 @@ type Foto = {
 
 type Assinatura = {
   empresa: string;
-  assinatura: string | null;
 };
 
-/* ========================= CONSTANTES ========================= */
+/* ================= CONSTANTES ================= */
 
-const tempos = ["Claro", "Chuva", "Tempestade"];
-const condicoes = ["Praticável", "Não praticável"];
 const statusList = ["Concluído", "Não concluído"];
 
-/* ========================= PAGE ========================= */
+/* ================= PAGE ================= */
 
 export default function RdoPage() {
   const params = useParams();
@@ -52,38 +42,20 @@ export default function RdoPage() {
 
   const [projectName, setProjectName] = useState("");
 
-  /* ====== GERAL ====== */
-  const [data, setData] = useState("");
-  const [inicio, setInicio] = useState("");
-  const [fim, setFim] = useState("");
-
-  const [clima, setClima] = useState<Clima[]>([
-    { periodo: "Manhã", tempo: "", condicao: "", razao: "" },
-    { periodo: "Tarde", tempo: "", condicao: "", razao: "" },
-    { periodo: "Noite", tempo: "", condicao: "", razao: "" },
-  ]);
-
-  /* ====== ENVOLVIDOS ====== */
   const [envolvidos, setEnvolvidos] = useState<Envolvido[]>([
     { empresa: "Greensoil", colaboradores: "", funcao: "" },
   ]);
 
-  /* ====== ATIVIDADES ====== */
   const [atividades, setAtividades] = useState<Atividade[]>([
     { atividade: "", empresa: "", status: "", obs: "" },
   ]);
 
-  /* ====== COMENTÁRIOS ====== */
-  const [comentarios, setComentarios] = useState("");
-
-  /* ====== FOTOS ====== */
   const [fotos, setFotos] = useState<Foto[]>([
     { file: null, preview: "", legenda: "" },
   ]);
 
-  /* ====== ASSINATURAS ====== */
   const [assinaturas, setAssinaturas] = useState<Assinatura[]>([
-    { empresa: "Greensoil", assinatura: null },
+    { empresa: "Greensoil" },
   ]);
 
   useEffect(() => {
@@ -100,62 +72,26 @@ export default function RdoPage() {
     if (data) setProjectName(data.name);
   }
 
-  /* ========================= FUNÇÕES ========================= */
+  /* ================= REMOVER ================= */
 
-  function updateClima(i: number, field: keyof Clima, value: string) {
-    const copy = [...clima];
-    (copy[i] as any)[field] = value;
-    setClima(copy);
-  }
+  const removeItem = (setter: any, index: number, list: any[]) => {
+    const copy = [...list];
+    copy.splice(index, 1);
+    setter(copy);
+  };
 
-  function addEnvolvido() {
-    setEnvolvidos([
-      ...envolvidos,
-      { empresa: "", colaboradores: "", funcao: "" },
-    ]);
-  }
+  /* ================= FUNÇÕES ================= */
 
-  function updateEnvolvido(i: number, field: keyof Envolvido, value: string) {
-    const copy = [...envolvidos];
-    (copy[i] as any)[field] = value;
-    setEnvolvidos(copy);
-  }
+  const empresas = envolvidos.map(e => e.empresa).filter(Boolean);
 
-  function addAtividade() {
-    setAtividades([
-      ...atividades,
-      { atividade: "", empresa: "", status: "", obs: "" },
-    ]);
-  }
+  function handleFoto(index: number, file: File) {
+  const copy = [...fotos];
+  copy[index].file = file;
+  copy[index].preview = URL.createObjectURL(file);
+  setFotos(copy);
+}
 
-  function updateAtividade(i: number, field: keyof Atividade, value: string) {
-    const copy = [...atividades];
-    (copy[i] as any)[field] = value;
-    setAtividades(copy);
-  }
-
-  function addFoto() {
-    setFotos([...fotos, { file: null, preview: "", legenda: "" }]);
-  }
-
-  function handleFoto(i: number, file: File) {
-    const copy = [...fotos];
-    copy[i].file = file;
-    copy[i].preview = URL.createObjectURL(file);
-    setFotos(copy);
-  }
-
-  function addAssinatura() {
-    setAssinaturas([...assinaturas, { empresa: "", assinatura: null }]);
-  }
-
-  function updateAssinatura(i: number, empresa: string) {
-    const copy = [...assinaturas];
-    copy[i].empresa = empresa;
-    setAssinaturas(copy);
-  }
-
-  /* ========================= UI ========================= */
+  /* ================= UI ================= */
 
   return (
     <MobileShell
@@ -165,52 +101,60 @@ export default function RdoPage() {
     >
       <div className="space-y-6">
 
-        {/* ================= INFORMAÇÕES ================= */}
-        <Section title="Informações Gerais">
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Data *" value={data} onChange={setData} />
-            <Input label="Hora início *" value={inicio} onChange={setInicio} />
-          </div>
-
-          <Input label="Hora término *" value={fim} onChange={setFim} />
-
-          {/* TABELA CLIMA */}
-          {clima.map((c, i) => (
-            <div key={i} className="bg-gray-50 p-3 rounded-xl space-y-2">
-              <div className="text-xs font-semibold">{c.periodo}</div>
-
-              <Select label="Tempo" value={c.tempo} options={tempos}
-                onChange={(v: string) => updateClima(i, "tempo", v)} />
-
-              <Select label="Condição" value={c.condicao} options={condicoes}
-                onChange={(v: string) => updateClima(i, "condicao", v)} />
-
-              <Input label="Razão" value={c.razao}
-                onChange={(v: string) => updateClima(i, "razao", v)} />
-            </div>
-          ))}
-
-        </Section>
-
         {/* ================= ENVOLVIDOS ================= */}
         <Section title="Envolvidos">
 
           {envolvidos.map((e, i) => (
-            <div key={i} className="grid grid-cols-3 gap-2">
-              <Input label="Empresa" value={e.empresa}
-                onChange={(v: string) => updateEnvolvido(i, "empresa", v)} />
+            <div key={i} className="relative grid grid-cols-3 gap-2">
 
-              <Input label="N°" value={e.colaboradores}
-                onChange={(v: string) => updateEnvolvido(i, "colaboradores", v)} />
+              {i !== 0 && (
+                <RemoveButton onClick={() =>
+                  removeItem(setEnvolvidos, i, envolvidos)
+                } />
+              )}
 
-              <Input label="Função" value={e.funcao}
-                onChange={(v: string) => updateEnvolvido(i, "funcao", v)} />
+              <Input
+                label="Empresa"
+                value={e.empresa}
+                onChange={(v: string) => {
+                  const copy = [...envolvidos];
+                  copy[i].empresa = v;
+                  setEnvolvidos(copy);
+                }}
+              />
+
+              <Input
+                label="N°"
+                value={e.colaboradores}
+                onChange={(v: string) => {
+                  const copy = [...envolvidos];
+                  copy[i].colaboradores = v;
+                  setEnvolvidos(copy);
+                }}
+              />
+
+              <Input
+                label="Função"
+                value={e.funcao}
+                onChange={(v: string) => {
+                  const copy = [...envolvidos];
+                  copy[i].funcao = v;
+                  setEnvolvidos(copy);
+                }}
+              />
+
             </div>
           ))}
 
-          <button onClick={addEnvolvido}
-            className="w-full bg-[#391e2a] text-white py-2 rounded-lg">
+          <button
+            onClick={() =>
+              setEnvolvidos([
+                ...envolvidos,
+                { empresa: "", colaboradores: "", funcao: "" },
+              ])
+            }
+            className="w-full bg-[#391e2a] text-white py-2 rounded-lg"
+          >
             + Adicionar envolvidos
           </button>
 
@@ -220,42 +164,68 @@ export default function RdoPage() {
         <Section title="Atividades">
 
           {atividades.map((a, i) => (
-            <div key={i} className="space-y-2 bg-gray-50 p-3 rounded-xl">
+            <div key={i} className="relative bg-gray-50 p-3 rounded-xl space-y-2">
 
-              <Input label="Atividade" value={a.atividade}
-                onChange={(v: string) => updateAtividade(i, "atividade", v)} />
+              <RemoveButton onClick={() =>
+                removeItem(setAtividades, i, atividades)
+              } />
 
-              <Select label="Empresa"
+              <Input
+                label="Atividade"
+                value={a.atividade}
+                onChange={(v: string) => {
+                  const copy = [...atividades];
+                  copy[i].atividade = v;
+                  setAtividades(copy);
+                }}
+              />
+
+              <Select
+                label="Empresa"
                 value={a.empresa}
-                options={envolvidos.map(e => e.empresa).filter(Boolean)}
-                onChange={(v: string) => updateAtividade(i, "empresa", v)} />
+                options={empresas}
+                onChange={(v: string) => {
+                  const copy = [...atividades];
+                  copy[i].empresa = v;
+                  setAtividades(copy);
+                }}
+              />
 
-              <Select label="Status"
+              <Select
+                label="Status"
                 value={a.status}
                 options={statusList}
-                onChange={(v: string) => updateAtividade(i, "status", v)} />
+                onChange={(v: string) => {
+                  const copy = [...atividades];
+                  copy[i].status = v;
+                  setAtividades(copy);
+                }}
+              />
 
-              <Input label="Observações" value={a.obs}
-                onChange={(v: string) => updateAtividade(i, "obs", v)} />
+              <Input
+                label="Observações"
+                value={a.obs}
+                onChange={(v: string) => {
+                  const copy = [...atividades];
+                  copy[i].obs = v;
+                  setAtividades(copy);
+                }}
+              />
 
             </div>
           ))}
 
-          <button onClick={addAtividade}
-            className="w-full bg-[#391e2a] text-white py-2 rounded-lg">
+          <button
+            onClick={() =>
+              setAtividades([
+                ...atividades,
+                { atividade: "", empresa: "", status: "", obs: "" },
+              ])
+            }
+            className="w-full bg-[#391e2a] text-white py-2 rounded-lg"
+          >
             + Adicionar atividade
           </button>
-
-        </Section>
-
-        {/* ================= COMENTÁRIOS ================= */}
-        <Section title="Comentários adicionais">
-
-          <textarea
-            value={comentarios}
-            onChange={(e) => setComentarios(e.target.value)}
-            className="w-full h-32 border rounded-xl p-3 text-sm"
-          />
 
         </Section>
 
@@ -263,31 +233,53 @@ export default function RdoPage() {
         <Section title="Fotos">
 
           {fotos.map((f, i) => (
-            <div key={i} className="space-y-2">
+            <div key={i} className="relative space-y-2">
 
-              <input
-                type="file"
-                onChange={(e) =>
-                  e.target.files && handleFoto(i, e.target.files[0])
-                }
-              />
+              <RemoveButton onClick={() =>
+                removeItem(setFotos, i, fotos)
+              } />
+
+              <label className="block">
+                <div className="bg-[#80b02d] text-white text-center py-2 rounded-xl cursor-pointer">
+                  Selecionar imagem
+                </div>
+
+                <input
+                  type="file"
+                  className="hidden"
+                  onChange={(e) =>
+                    e.target.files &&
+                    handleFoto(i, e.target.files[0])
+                  }
+                />
+              </label>
 
               {f.preview && (
                 <img src={f.preview} className="rounded-xl" />
               )}
 
-              <Input label="Legenda" value={f.legenda}
+              <Input
+                label="Legenda"
+                value={f.legenda}
                 onChange={(v: string) => {
                   const copy = [...fotos];
                   copy[i].legenda = v;
                   setFotos(copy);
-                }} />
+                }}
+              />
 
             </div>
           ))}
 
-          <button onClick={addFoto}
-            className="w-full bg-[#391e2a] text-white py-2 rounded-lg">
+          <button
+            onClick={() =>
+              setFotos([
+                ...fotos,
+                { file: null, preview: "", legenda: "" },
+              ])
+            }
+            className="w-full bg-[#391e2a] text-white py-2 rounded-lg"
+          >
             + Adicionar mais fotos
           </button>
 
@@ -297,21 +289,41 @@ export default function RdoPage() {
         <Section title="Assinaturas">
 
           {assinaturas.map((a, i) => (
-            <div key={i} className="space-y-2">
+            <div key={i} className="relative space-y-2">
 
-              <Input label="Empresa"
+              {i !== 0 && (
+                <RemoveButton onClick={() =>
+                  removeItem(setAssinaturas, i, assinaturas)
+                } />
+              )}
+
+              <Select
+                label="Empresa"
                 value={a.empresa}
-                onChange={(v: string) => updateAssinatura(i, v)} />
+                options={empresas}
+                onChange={(v: string) => {
+                  const copy = [...assinaturas];
+                  copy[i].empresa = v;
+                  setAssinaturas(copy);
+                }}
+              />
 
-              <div className="h-20 border rounded-xl flex items-center justify-center text-gray-400 text-sm">
+              <div className="h-20 border rounded-xl flex items-center justify-center text-gray-400">
                 Área de assinatura (próximo passo)
               </div>
 
             </div>
           ))}
 
-          <button onClick={addAssinatura}
-            className="w-full bg-[#391e2a] text-white py-2 rounded-lg">
+          <button
+            onClick={() =>
+              setAssinaturas([
+                ...assinaturas,
+                { empresa: "" },
+              ])
+            }
+            className="w-full bg-[#391e2a] text-white py-2 rounded-lg"
+          >
             + Adicionar responsável
           </button>
 
@@ -322,7 +334,18 @@ export default function RdoPage() {
   );
 }
 
-/* ================= COMPONENTES BASE ================= */
+/* ================= COMPONENTES ================= */
+
+function RemoveButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="absolute top-0 right-0 bg-red-500 text-white w-6 h-6 rounded-full text-xs flex items-center justify-center"
+    >
+      ✕
+    </button>
+  );
+}
 
 function Section({ title, children }: any) {
   return (
