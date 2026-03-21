@@ -25,76 +25,97 @@ export default function RdoViewPage() {
   }, []);
 
 async function gerarPDF() {
-  try {
-    if (!pdfRef.current) {
-      alert("REF NULL");
-      return;
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  let y = 10;
+
+  // 🔹 LOGO
+  const logo = "/logo.png";
+  pdf.addImage(logo, "PNG", 10, y, 30, 15);
+
+  // 🔹 TÍTULO
+  pdf.setFontSize(14);
+  pdf.text("Relatório Diário de Obra", 10, y + 20);
+
+  // 🔹 PROJETO / DATA
+  pdf.setFontSize(10);
+  pdf.text(`Projeto: ${projectName}`, 150, y + 10, { align: "right" });
+  pdf.text(`Data: ${rdo.data}`, 150, y + 15, { align: "right" });
+
+  y += 30;
+
+  // 🔹 HORÁRIOS
+  pdf.setFontSize(10);
+  pdf.text(`Hora início: ${rdo.inicio}`, 10, y);
+  pdf.text(`Hora fim: ${rdo.fim}`, 100, y);
+
+  y += 10;
+
+  // 🔹 LINHA VERDE
+  pdf.setDrawColor(128, 176, 45); // #80b02d
+  pdf.setLineWidth(1);
+  pdf.line(10, y, 200, y);
+
+  y += 10;
+
+  // 🔹 CLIMA
+  pdf.setFontSize(12);
+  pdf.text("Condições Climáticas", 10, y);
+  y += 6;
+
+  rdo.clima?.forEach((c: any) => {
+    pdf.setFontSize(10);
+    pdf.text(`${c.periodo} - ${c.tempo} - ${c.condicao} - ${c.razao}`, 10, y);
+    y += 5;
+  });
+
+  y += 5;
+
+  // 🔹 ENVOLVIDOS
+  pdf.setFontSize(12);
+  pdf.text("Envolvidos", 10, y);
+  y += 6;
+
+  rdo.envolvidos?.forEach((e: any) => {
+    pdf.setFontSize(10);
+    pdf.text(`${e.empresa} | ${e.colaboradores} | ${e.funcao}`, 10, y);
+    y += 5;
+  });
+
+  y += 5;
+
+  // 🔹 ATIVIDADES
+  pdf.setFontSize(12);
+  pdf.text("Atividades", 10, y);
+  y += 6;
+
+  rdo.atividades?.forEach((a: any) => {
+    pdf.setFontSize(10);
+    pdf.text(`${a.atividade} | ${a.empresa} | ${a.status}`, 10, y);
+    y += 5;
+  });
+
+  y += 5;
+
+  // 🔹 COMENTÁRIOS
+  pdf.setFontSize(12);
+  pdf.text("Comentários", 10, y);
+  y += 6;
+
+  pdf.setFontSize(10);
+  pdf.text(rdo.comentarios || "-", 10, y);
+
+  y += 10;
+
+  // 🔹 FOTOS (simples)
+  for (const f of rdo.fotos || []) {
+    if (f.preview) {
+      pdf.addImage(f.preview, "JPEG", 10, y, 60, 40);
+      y += 45;
     }
-
-    // 🔥 CORREÇÃO DO ERRO "lab" (Tailwind moderno)
-pdfRef.current.querySelectorAll("*").forEach((el) => {
-  const element = el as HTMLElement;
-
-  element.style.background = "#ffffff";
-  element.style.backgroundColor = "#ffffff";
-  element.style.backgroundImage = "none";
-  element.style.color = "#000000";
-  element.style.boxShadow = "none";
-});
-
-    const canvas = await html2canvas(pdfRef.current, {
-  scale: 2,
-  useCORS: true,
-  backgroundColor: "#ffffff", // 🔥 ESSENCIAL
-});
-
-    // 🔥 CONVERTE PARA BLOB (SOLUÇÃO REAL)
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.8)
-    );
-
-    if (!blob) {
-      alert("Erro ao gerar imagem");
-      return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onloadend = () => {
-      const base64data = reader.result as string;
-
-const pdf = new jsPDF("p", "mm", "a4");
-
-if (!canvas.width || !canvas.height) {
-  alert("Canvas inválido");
-  return;
-}
-
-const imgWidth = 210;
-const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-let heightLeft = imgHeight;
-let position = 0;
-
-pdf.addImage(base64data, "JPEG", 0, position, imgWidth, imgHeight);
-heightLeft -= 297;
-
-while (heightLeft > 0) {
-  position = heightLeft - imgHeight;
-  pdf.addPage();
-  pdf.addImage(base64data, "JPEG", 0, position, imgWidth, imgHeight);
-  heightLeft -= 297;
-}
-
-pdf.save(`RDO_${projectName}.pdf`);
-    };
-
-    reader.readAsDataURL(blob);
-
-  } catch (err: any) {
-    console.error(err);
-    alert("ERRO: " + err.message);
   }
+
+  pdf.save(`RDO_${projectName}.pdf`);
 }
 
   async function load() {
