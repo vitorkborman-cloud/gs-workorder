@@ -128,7 +128,8 @@ async function salvarRascunho() {
 
     if (error) {
       console.error(error);
-      alert("Erro ao atualizar rascunho");
+      console.error(error);
+alert("Erro ao salvar rascunho: " + error?.message);
       return;
     }
 
