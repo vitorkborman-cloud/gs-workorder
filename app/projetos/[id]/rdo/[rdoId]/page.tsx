@@ -73,9 +73,20 @@ if (!canvas.width || !canvas.height) {
 const imgWidth = 210;
 const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
+let heightLeft = imgHeight;
+let position = 0;
 
-      pdf.save(`RDO_${projectName}.pdf`);
+pdf.addImage(base64data, "JPEG", 0, position, imgWidth, imgHeight);
+heightLeft -= 297;
+
+while (heightLeft > 0) {
+  position = heightLeft - imgHeight;
+  pdf.addPage();
+  pdf.addImage(base64data, "JPEG", 0, position, imgWidth, imgHeight);
+  heightLeft -= 297;
+}
+
+pdf.save(`RDO_${projectName}.pdf`);
     };
 
     reader.readAsDataURL(blob);
