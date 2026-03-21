@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 type RDO = any;
 
@@ -21,6 +23,41 @@ export default function RdoViewPage() {
   useEffect(() => {
     load();
   }, []);
+
+  async function gerarPDF() {
+  if (!pdfRef.current) return;
+
+  const element = pdfRef.current;
+
+  const canvas = await html2canvas(element, {
+    scale: 2,
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+
+  const imgWidth = pageWidth;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+
+  pdf.save(`RDO_${projectName}.pdf`);
+}
 
   async function load() {
     const { data } = await supabase
@@ -61,16 +98,17 @@ export default function RdoViewPage() {
             </p>
           </div>
 
-          <Button onClick={() => window.print()}>
-            Gerar PDF
-          </Button>
+          <Button onClick={gerarPDF}>
+  Baixar PDF
+</Button>
         </div>
 
         {/* CONTEÚDO */}
-        <div
-          ref={pdfRef}
-          className="bg-white text-black p-10 rounded-xl shadow space-y-6"
-        >
+<div
+  ref={pdfRef}
+  className="bg-white text-black p-10 rounded-xl shadow space-y-6"
+  style={{ width: "794px" }} // 🔥 ESSENCIAL
+>
 
           {/* CABEÇALHO */}
           <div className="flex justify-between border-b pb-4">
