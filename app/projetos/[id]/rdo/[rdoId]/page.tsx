@@ -31,7 +31,10 @@ async function gerarPDF() {
   let y = 10;
 
   // 🔹 LOGO
-  pdf.addImage("/logo.png", "PNG", 10, y, 30, 15);
+  const logo = "/logo.png";
+
+// mantém proporção (ajuste manual baseado no seu logo)
+pdf.addImage(logo, "PNG", 10, y, 40, 20);
 
   // 🔹 TÍTULO
   pdf.setFontSize(14);
@@ -68,7 +71,7 @@ async function gerarPDF() {
     }
   });
 
-  y = (pdf as any).lastAutoTable.finalY + 5;
+  y = (pdf as any).lastAutoTable.finalY + 10;
 
   // 🔹 ENVOLVIDOS
   autoTable(pdf, {
@@ -86,7 +89,7 @@ async function gerarPDF() {
     }
   });
 
-  y = (pdf as any).lastAutoTable.finalY + 5;
+  y = (pdf as any).lastAutoTable.finalY + 10;
 
   // 🔹 ATIVIDADES
   autoTable(pdf, {
@@ -105,17 +108,70 @@ async function gerarPDF() {
     }
   });
 
-  y = (pdf as any).lastAutoTable.finalY + 5;
+  pdf.setFontSize(12);
+pdf.text("Assinaturas", 10, y);
+
+y += 10;
+
+const colWidth = 90;
+
+rdo.assinaturas?.forEach((a: any, i: number) => {
+  const x = 10 + (i % 2) * colWidth;
+  const row = Math.floor(i / 2);
+
+  const yPos = y + row * 40;
+
+  pdf.text(a.empresa || "-", x, yPos);
+
+  if (a.assinatura) {
+    pdf.addImage(a.assinatura, "PNG", x, yPos + 2, 40, 15);
+  }
+
+  pdf.line(x, yPos + 20, x + 60, yPos + 20);
+  pdf.setFontSize(8);
+  pdf.text("Assinatura", x, yPos + 24);
+});
+
+  y = (pdf as any).lastAutoTable.finalY + 10;
 
   // 🔹 COMENTÁRIOS
   pdf.setFontSize(12);
-  pdf.text("Comentários", 10, y);
-  y += 6;
+pdf.text("Comentários", 10, y);
+
+y += 8;
+
+pdf.setDrawColor(200);
+pdf.rect(10, y, 190, 20); // caixa
+
+pdf.setFontSize(10);
+pdf.text(rdo.comentarios || "-", 12, y + 5, {
+  maxWidth: 180
+});
+
+y += 25;
+
+pdf.setFontSize(12);
+pdf.text("Assinaturas", 10, y);
+
+y += 10;
+
+(rdo.assinaturas || []).forEach((a: any, i: number) => {
+  const x = 10 + (i % 2) * 90; // 👈 SEM colWidth
+  const row = Math.floor(i / 2);
+
+  const yPos = y + row * 40;
 
   pdf.setFontSize(10);
-  pdf.text(rdo.comentarios || "-", 10, y, {
-    maxWidth: 180
-  });
+  pdf.text(a.empresa || "-", x, yPos);
+
+  if (a.assinatura) {
+    pdf.addImage(a.assinatura, "PNG", x, yPos + 2, 40, 15);
+  }
+
+  pdf.line(x, yPos + 20, x + 60, yPos + 20);
+  pdf.setFontSize(8);
+  pdf.text("Assinatura", x, yPos + 24);
+});
 
   pdf.save(`RDO_${projectName}.pdf`);
 }
