@@ -132,16 +132,16 @@ rdo.assinaturas?.forEach((a: any, i: number) => {
   pdf.text("Assinatura", x, yPos + 24);
 });
 
-  y = (pdf as any).lastAutoTable.finalY + 10;
+y = (pdf as any).lastAutoTable.finalY + 10;
 
-  // 🔹 COMENTÁRIOS
-  pdf.setFontSize(12);
+// 🔹 COMENTÁRIOS
+pdf.setFontSize(12);
 pdf.text("Comentários", 10, y);
 
 y += 8;
 
 pdf.setDrawColor(200);
-pdf.rect(10, y, 190, 20); // caixa
+pdf.rect(10, y, 190, 20);
 
 pdf.setFontSize(10);
 pdf.text(rdo.comentarios || "-", 12, y + 5, {
@@ -150,13 +150,14 @@ pdf.text(rdo.comentarios || "-", 12, y + 5, {
 
 y += 25;
 
+// 🔹 ASSINATURAS (ÚNICA)
 pdf.setFontSize(12);
 pdf.text("Assinaturas", 10, y);
 
 y += 10;
 
 (rdo.assinaturas || []).forEach((a: any, i: number) => {
-  const x = 10 + (i % 2) * 90; // 👈 SEM colWidth
+  const x = 10 + (i % 2) * 90;
   const row = Math.floor(i / 2);
 
   const yPos = y + row * 40;
@@ -173,7 +174,7 @@ y += 10;
   pdf.text("Assinatura", x, yPos + 24);
 });
 
-  pdf.save(`RDO_${projectName}.pdf`);
+pdf.save(`RDO_${projectName}.pdf`);
 }
 
   async function load() {
