@@ -234,12 +234,43 @@ async function gerarPDF() {
     setter(copy);
   }
 
-  function handleFoto(i: number, file: File) {
-    const copy = [...fotos];
-    copy[i].file = file;
-    copy[i].preview = URL.createObjectURL(file);
-    setFotos(copy);
-  }
+ function handleFoto(i: number, file: File) {
+  const reader = new FileReader();
+
+  reader.onload = (event) => {
+    const img = new Image();
+    img.src = event.target?.result as string;
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // 🔥 REDUZ TAMANHO
+      const MAX_WIDTH = 800;
+
+      const scale = Math.min(1, MAX_WIDTH / img.width);
+
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+
+      ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // 🔥 COMPRESSÃO FORTE
+      const compressed = canvas.toDataURL("image/jpeg", 0.6);
+
+      const copy = [...fotos];
+      copy[i] = {
+        file: null, // 🔥 REMOVE arquivo pesado
+        preview: compressed,
+        legenda: copy[i]?.legenda || "",
+      };
+
+      setFotos(copy);
+    };
+  };
+
+  reader.readAsDataURL(file);
+}
 
   /* ================= UI ================= */
 
