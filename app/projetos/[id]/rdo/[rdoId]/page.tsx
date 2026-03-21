@@ -31,10 +31,19 @@ async function gerarPDF() {
       return;
     }
 
+    // 🔥 CORREÇÃO DO ERRO "lab" (Tailwind moderno)
+pdfRef.current.querySelectorAll("*").forEach((el) => {
+  const element = el as HTMLElement;
+
+  element.style.color = "#000000";
+  element.style.backgroundColor = "#ffffff";
+});
+
     const canvas = await html2canvas(pdfRef.current, {
-      scale: 1,
-      useCORS: true,
-    });
+  scale: 1,
+  useCORS: true,
+  backgroundColor: "#ffffff", // 🔥 ESSENCIAL
+});
 
     // 🔥 CONVERTE PARA BLOB (SOLUÇÃO REAL)
     const blob = await new Promise<Blob | null>((resolve) =>
@@ -51,12 +60,17 @@ async function gerarPDF() {
     reader.onloadend = () => {
       const base64data = reader.result as string;
 
-      const pdf = new jsPDF("p", "mm", "a4");
+const pdf = new jsPDF("p", "mm", "a4");
 
-      const imgWidth = 210;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+if (!canvas.width || !canvas.height) {
+  alert("Canvas inválido");
+  return;
+}
 
-      pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
+const imgWidth = 210;
+const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+pdf.addImage(base64data, "JPEG", 0, 0, imgWidth, imgHeight);
 
       pdf.save(`RDO_${projectName}.pdf`);
     };
