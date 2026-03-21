@@ -147,6 +147,42 @@ export default function MobileProjetoPage() {
           </div>
         </button>
 
+        {/* RELATÓRIO DIÁRIO DE OBRA */}
+<button
+  onClick={() =>
+    router.push(`/mobile/projetos/${projectId}/rdo`)
+  }
+  className="
+    w-full
+    rounded-2xl
+    p-5
+    bg-gray-200
+    text-gray-900
+    border border-gray-300
+    shadow-sm
+    active:scale-[0.96]
+    transition
+  "
+>
+  <div className="grid grid-cols-[1fr_auto] items-center">
+
+    <div className="text-left">
+      <div className="text-lg font-semibold tracking-tight">
+        Relatório Diário de Obra
+      </div>
+
+      <div className="text-sm text-gray-600 mt-1">
+        Registrar atividades e fotos do dia
+      </div>
+    </div>
+
+    <div className="text-xl opacity-70 pl-4">
+      🏗️
+    </div>
+
+  </div>
+</button>
+
       </div>
     </MobileShell>
   );
