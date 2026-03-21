@@ -20,6 +20,12 @@ type Perfil = {
   created_at: string;
 };
 
+type RDO = {
+  id: string;
+  data: string;
+  created_at: string;
+};
+
 export default function ProjetoPage() {
   const params = useParams();
   const router = useRouter();
@@ -27,6 +33,7 @@ export default function ProjetoPage() {
 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
+  const [rdos, setRdos] = useState<RDO[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobile, setMobile] = useState(false);
 
@@ -54,6 +61,15 @@ export default function ProjetoPage() {
     if (sd) setPerfis(sd);
 
     setLoading(false);
+
+    const { data: rdoData } = await supabase
+  .from("rdo_reports")
+  .select("id, data, created_at")
+  .eq("project_id", projectId)
+  .eq("draft", false)
+  .order("created_at", { ascending: false });
+
+if (rdoData) setRdos(rdoData);
   }
 
   async function createWorkOrder() {
@@ -247,6 +263,68 @@ export default function ProjetoPage() {
 
           </div>
         </div>
+
+        {/* RELATÓRIOS DIÁRIOS */}
+<div className="space-y-5">
+
+  <div>
+    <h2 className="text-2xl font-bold tracking-tight">
+      Relatórios diários
+    </h2>
+    <p className="text-sm text-gray-500">
+      Relatórios enviados pelo aplicativo de campo
+    </p>
+  </div>
+
+  <div className="bg-secondary rounded-3xl p-8 shadow-inner">
+
+    {rdos.length === 0 ? (
+      <p className="text-white/70">
+        Nenhum relatório finalizado.
+      </p>
+    ) : (
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
+        {rdos.map((r) => (
+          <Card
+            key={r.id}
+            onClick={() =>
+              router.push(`/projetos/${projectId}/rdo/${r.id}`)
+            }
+            className="
+            cursor-pointer
+            border-0
+            bg-gradient-to-br
+            from-[#1e3a5f]
+            to-[#2c5282]
+            text-white
+            shadow-xl
+            hover:shadow-2xl
+            hover:-translate-y-1
+            transition
+            rounded-2xl
+            "
+          >
+            <CardContent className="p-6 space-y-2">
+
+              <p className="font-semibold text-lg">
+                RDO - {r.data || "Sem data"}
+              </p>
+
+              <p className="text-sm opacity-80">
+                {new Date(r.created_at).toLocaleDateString()}
+              </p>
+
+            </CardContent>
+          </Card>
+        ))}
+
+      </div>
+    )}
+
+  </div>
+</div>
 
       </div>
     </AdminShell>
