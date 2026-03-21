@@ -89,71 +89,6 @@ const [draftId, setDraftId] = useState<string | null>(null);
     { atividade: "", empresa: "", status: "", obs: "" },
   ]);
 
-  {/* ================= SHEQ ================= */}
-<Section title="SHEQ">
-
-  {/* INCIDENTE */}
-  <div className="space-y-2">
-    <div className="text-sm font-semibold">Incidente/Acidente?</div>
-
-    <div className="flex gap-4 text-sm">
-      {["Sim", "Não", "N/A"].map((op) => (
-        <label key={op} className="flex items-center gap-1">
-          <input
-            type="radio"
-            name="incidente"
-            value={op}
-            checked={sheq.incidente === op}
-            onChange={(e) =>
-              setSheq({ ...sheq, incidente: e.target.value })
-            }
-          />
-          {op}
-        </label>
-      ))}
-    </div>
-
-    <Input
-      label="Observações"
-      value={sheq.incidenteObs}
-      onChange={(v: string) =>
-        setSheq({ ...sheq, incidenteObs: v })
-      }
-    />
-  </div>
-
-  {/* VAZAMENTO */}
-  <div className="space-y-2 mt-4">
-    <div className="text-sm font-semibold">Vazamento?</div>
-
-    <div className="flex gap-4 text-sm">
-      {["Sim", "Não", "N/A"].map((op) => (
-        <label key={op} className="flex items-center gap-1">
-          <input
-            type="radio"
-            name="vazamento"
-            value={op}
-            checked={sheq.vazamento === op}
-            onChange={(e) =>
-              setSheq({ ...sheq, vazamento: e.target.value })
-            }
-          />
-          {op}
-        </label>
-      ))}
-    </div>
-
-    <Input
-      label="Observações"
-      value={sheq.vazamentoObs}
-      onChange={(v: string) =>
-        setSheq({ ...sheq, vazamentoObs: v })
-      }
-    />
-  </div>
-
-</Section>
-
   /* ===== COMENTÁRIOS ===== */
   const [comentarios, setComentarios] = useState("");
 
@@ -498,6 +433,69 @@ async function gerarPDF() {
           </button>
 
         </Section>
+
+        {/* ================= SHEQ ================= */}
+<Section title="SHEQ">
+
+  <div className="space-y-2">
+    <div className="text-sm font-semibold">Incidente/Acidente?</div>
+
+    <div className="flex gap-4 text-sm">
+      {["Sim", "Não", "N/A"].map((op) => (
+        <label key={op} className="flex items-center gap-1">
+          <input
+            type="radio"
+            name="incidente"
+            value={op}
+            checked={sheq.incidente === op}
+            onChange={(e) =>
+              setSheq({ ...sheq, incidente: e.target.value })
+            }
+          />
+          {op}
+        </label>
+      ))}
+    </div>
+
+    <Input
+      label="Observações"
+      value={sheq.incidenteObs}
+      onChange={(v: string) =>
+        setSheq({ ...sheq, incidenteObs: v })
+      }
+    />
+  </div>
+
+  <div className="space-y-2 mt-4">
+    <div className="text-sm font-semibold">Vazamento?</div>
+
+    <div className="flex gap-4 text-sm">
+      {["Sim", "Não", "N/A"].map((op) => (
+        <label key={op} className="flex items-center gap-1">
+          <input
+            type="radio"
+            name="vazamento"
+            value={op}
+            checked={sheq.vazamento === op}
+            onChange={(e) =>
+              setSheq({ ...sheq, vazamento: e.target.value })
+            }
+          />
+          {op}
+        </label>
+      ))}
+    </div>
+
+    <Input
+      label="Observações"
+      value={sheq.vazamentoObs}
+      onChange={(v: string) =>
+        setSheq({ ...sheq, vazamentoObs: v })
+      }
+    />
+  </div>
+
+</Section>
 
         {/* ================= COMENTÁRIOS ================= */}
         <Section title="Comentários adicionais">
