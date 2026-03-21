@@ -227,10 +227,12 @@ async function gerarPDF() {
 
 alert("PDF REF OK");
 
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(requestAnimationFrame);
+await new Promise(requestAnimationFrame);
 
   pdfRef.current.style.height = "auto";
 pdfRef.current.style.maxHeight = "none";
+pdfRef.current.getBoundingClientRect();
 
 const canvas = await html2canvas(pdfRef.current, {
   scale: 0.8,
@@ -796,7 +798,9 @@ const canvas = await html2canvas(pdfRef.current, {
   <div className="grid grid-cols-2 gap-2">
     {fotos.map((f, i) => (
       <div key={i}>
-        {/* imagem removida para teste */}
+        {f.preview && (
+  <img src={f.preview} className="w-full border" />
+)}
         <p className="text-[10px]">{f.legenda}</p>
       </div>
     ))}
