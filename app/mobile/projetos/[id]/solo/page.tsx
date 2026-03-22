@@ -9,6 +9,8 @@ type Layer = {
   de: string;
   ate: string;
   tipo: string;
+  leitura_voc: string;
+  coloracao: string;
 };
 
 type FormData = {
@@ -28,63 +30,62 @@ type FormData = {
 };
 
 const tiposSolo = [
-
-"Areia",
-"Areia de granulação variada argilosa",
-"Areia de granulação variada pouco argilosa",
-"Areia de granulação variada pouco siltosa",
-"Areia de granulação variada silto argilosa",
-"Areia de granulação variada siltosa",
-"Areia de granulação variada muito argilosa",
-"Areia fina",
-"Areia fina argilosa",
-"Areia fina e média argilosa",
-"Areia fina e média pouco argilosa",
-"Areia fina e média pouco siltosa",
-"Areia fina e média silto argilosa",
-"Areia fina e média siltosa",
-"Areia fina e média muito argilosa",
-"Areia fina pouco argilosa",
-"Areia fina pouco siltosa",
-"Areia fina silto argilosa",
-"Areia fina siltosa",
-"Areia fina muito argilosa",
-"Areia grossa",
-"Areia grossa argilosa",
-"Areia grossa pouco argilosa",
-"Areia grossa pouco siltosa",
-"Areia grossa silto argilosa",
-"Areia grossa siltosa",
-"Areia grossa muito argilosa",
-"Areia média",
-"Argila",
-"Argila orgânica",
-"Argila plástica",
-"Argila silto arenosa",
-"Argila siltosa",
-"Argila siltosa pouco arenosa",
-"Argila siltosa muito arenosa",
-"Britas",
-"Concreto",
-"Rachão",
-"Silte",
-"Silte argilo arenoso",
-"Silte argiloso",
-"Silte areno argiloso",
-"Silte arenoso",
-"Silte muito arenoso"
-
+  "Areia",
+  "Areia de granulação variada argilosa",
+  "Areia de granulação variada pouco argilosa",
+  "Areia de granulação variada pouco siltosa",
+  "Areia de granulação variada silto argilosa",
+  "Areia de granulação variada siltosa",
+  "Areia de granulação variada muito argilosa",
+  "Areia fina",
+  "Areia fina argilosa",
+  "Areia fina e média argilosa",
+  "Areia fina e média pouco argilosa",
+  "Areia fina e média pouco siltosa",
+  "Areia fina e média silto argilosa",
+  "Areia fina e média siltosa",
+  "Areia fina e média muito argilosa",
+  "Areia fina pouco argilosa",
+  "Areia fina pouco siltosa",
+  "Areia fina silto argilosa",
+  "Areia fina siltosa",
+  "Areia fina muito argilosa",
+  "Areia grossa",
+  "Areia grossa argilosa",
+  "Areia grossa pouco argilosa",
+  "Areia grossa pouco siltosa",
+  "Areia grossa silto argilosa",
+  "Areia grossa siltosa",
+  "Areia grossa muito argilosa",
+  "Areia média",
+  "Argila",
+  "Argila orgânica",
+  "Argila plástica",
+  "Argila silto arenosa",
+  "Argila siltosa",
+  "Argila siltosa pouco arenosa",
+  "Argila siltosa muito arenosa",
+  "Aterro",
+  "Britas",
+  "Concreto",
+  "Rachão",
+  "Silte",
+  "Silte argilo arenoso",
+  "Silte argiloso",
+  "Silte areno argiloso",
+  "Silte arenoso",
+  "Silte muito arenoso"
 ];
 
 export default function SoloPage() {
-
   const params = useParams();
   const projectId = params.id as string;
 
   const [draftId, setDraftId] = useState<string | null>(null);
 
+  // --- ATUALIZAÇÃO: Estado das camadas agora inclui leitura_voc e coloracao ---
   const [layers, setLayers] = useState<Layer[]>([
-    { de: "", ate: "", tipo: "" }
+    { de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }
   ]);
 
   const [form, setForm] = useState<FormData>({
@@ -104,7 +105,6 @@ export default function SoloPage() {
   });
 
   async function loadDraft() {
-
     const { data } = await supabase
       .from("soil_descriptions")
       .select("*")
@@ -132,12 +132,18 @@ export default function SoloPage() {
       profundidade_total: data.profundidade_total ?? "",
     });
 
+    // Garante que rascunhos antigos não quebrem a tela por não terem os novos campos
     setLayers(
       data.layers && data.layers.length > 0
-        ? data.layers
-        : [{ de: "", ate: "", tipo: "" }]
+        ? data.layers.map((l: any) => ({
+            de: l.de || "",
+            ate: l.ate || "",
+            tipo: l.tipo || "",
+            leitura_voc: l.leitura_voc || "",
+            coloracao: l.coloracao || ""
+          }))
+        : [{ de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]
     );
-
   }
 
   useEffect(() => {
@@ -148,21 +154,22 @@ export default function SoloPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  // --- NOVA FUNÇÃO: Remover Camada ---
+  function removeLayer(index: number) {
+    setLayers((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function addLayer() {
-    setLayers((prev) => [...prev, { de: "", ate: "", tipo: "" }]);
+    setLayers((prev) => [...prev, { de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
   }
 
   async function salvar() {
-
     if (draftId) {
-
       await supabase
         .from("soil_descriptions")
         .update({ ...form, layers })
         .eq("id", draftId);
-
     } else {
-
       const { data } = await supabase
         .from("soil_descriptions")
         .insert({
@@ -175,21 +182,13 @@ export default function SoloPage() {
         .single();
 
       if (data) setDraftId(data.id);
-
     }
-
     await loadDraft();
-
     alert("Rascunho salvo.");
-
   }
 
   async function concluir() {
-
-    const ok = confirm(
-      "Concluir descrição de solo? Após isso não será possível editar."
-    );
-
+    const ok = confirm("Concluir descrição de solo? Após isso não será possível editar.");
     if (!ok) return;
 
     await supabase
@@ -202,12 +201,10 @@ export default function SoloPage() {
       });
 
     if (draftId) {
-
       await supabase
         .from("soil_descriptions")
         .delete()
         .eq("id", draftId);
-
     }
 
     setDraftId(null);
@@ -228,22 +225,15 @@ export default function SoloPage() {
       profundidade_total: "",
     });
 
-    setLayers([{ de: "", ate: "", tipo: "" }]);
-
+    setLayers([{ de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
     alert("Descrição concluída.");
-
   }
 
   return (
-
     <AppShell>
-
       <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-50">
-
         <div className="bg-[#391e2a] text-white px-4 py-4 shadow-md">
-
           <div className="flex justify-between items-center">
-
             <div>
               <h1 className="text-lg font-semibold tracking-wide">
                 Perfil Descritivo
@@ -252,168 +242,166 @@ export default function SoloPage() {
                 Registro técnico de sondagem
               </p>
             </div>
-
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#80b02d] text-white shadow">
               {draftId ? "Rascunho" : "Novo"}
             </span>
-
           </div>
-
         </div>
 
         <div className="px-4 py-6 space-y-6">
-
           <Section title="Dados da Sondagem">
-
             <Input label="Nome da Sondagem" value={form.nome_sondagem} onChange={(v) => setField("nome_sondagem", v)} />
-
             <div className="grid grid-cols-2 gap-3">
               <Input label="Data" value={form.data} onChange={(v) => setField("data", v)} />
               <Input label="Hora" value={form.hora} onChange={(v) => setField("hora", v)} />
             </div>
-
             <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v) => setField("tipo_sondagem", v)} />
             <Input label="Nível d’água (m)" value={form.nivel_agua} onChange={(v) => setField("nivel_agua", v)} />
             <Input label="Profundidade Total (m)" value={form.profundidade_total} onChange={(v) => setField("profundidade_total", v)} />
-
           </Section>
 
           <Section title="Construção do Poço">
-
             <Input label="Diâmetro da Sondagem (in)" value={form.diametro_sondagem} onChange={(v) => setField("diametro_sondagem", v)} />
             <Input label="Diâmetro do Poço (in)" value={form.diametro_poco} onChange={(v) => setField("diametro_poco", v)} />
             <Input label="Pré-filtro (Nível - m)" value={form.pre_filtro} onChange={(v) => setField("pre_filtro", v)} />
-
             <div className="grid grid-cols-2 gap-3">
               <Input label="Seção Filtrante Base (m)" value={form.secao_filtrante_base} onChange={(v) => setField("secao_filtrante_base", v)} />
               <Input label="Seção Filtrante Topo (m)" value={form.secao_filtrante_topo} onChange={(v) => setField("secao_filtrante_topo", v)} />
             </div>
-
           </Section>
 
           <Section title="Coordenadas">
-
             <div className="grid grid-cols-2 gap-3">
               <Input label="Coord. X" value={form.coord_x} onChange={(v) => setField("coord_x", v)} />
               <Input label="Coord. Y" value={form.coord_y} onChange={(v) => setField("coord_y", v)} />
             </div>
-
           </Section>
 
           <Section title="Camadas Estratigráficas">
+            <div className="space-y-4">
+              {layers.map((layer, i) => (
+                <div key={i} className="relative bg-gray-50 border border-gray-200 p-4 rounded-xl shadow-sm space-y-3">
+                  
+                  {/* --- BOTÃO DE EXCLUIR CAMADA --- */}
+                  <button
+                    onClick={() => removeLayer(i)}
+                    className="absolute -top-2 -right-2 bg-red-100 text-red-600 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center shadow-md border border-white z-10 active:scale-90 transition"
+                  >
+                    ✕
+                  </button>
 
-            {layers.map((layer, i) => (
+                  {/* Topo do Card: Profundidades */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      label="De (m)"
+                      value={layer.de}
+                      onChange={(v) => {
+                        const copy = [...layers];
+                        copy[i].de = v;
+                        setLayers(copy);
+                      }}
+                    />
+                    <Input
+                      label="Até (m)"
+                      value={layer.ate}
+                      onChange={(v) => {
+                        const copy = [...layers];
+                        copy[i].ate = v;
+                        setLayers(copy);
+                      }}
+                    />
+                  </div>
 
-              <div key={i} className="grid grid-cols-3 gap-3 items-end">
+                  {/* Meio do Card: Tipo do Solo */}
+                  <Select
+                    label="Tipo de Solo"
+                    value={layer.tipo}
+                    options={tiposSolo}
+                    onChange={(v) => {
+                      const copy = [...layers];
+                      copy[i].tipo = v;
+                      setLayers(copy);
+                    }}
+                  />
 
-                <Input
-                  label="De (m)"
-                  value={layer.de}
-                  onChange={(v) => {
-                    const copy = [...layers];
-                    copy[i].de = v;
-                    setLayers(copy);
-                  }}
-                />
+                  {/* Fundo do Card: Coloração e VOC */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      label="Coloração"
+                      value={layer.coloracao}
+                      onChange={(v) => {
+                        const copy = [...layers];
+                        copy[i].coloracao = v;
+                        setLayers(copy);
+                      }}
+                    />
+                    <Input
+                      label="Leitura VOC"
+                      value={layer.leitura_voc}
+                      onChange={(v) => {
+                        const copy = [...layers];
+                        copy[i].leitura_voc = v;
+                        setLayers(copy);
+                      }}
+                    />
+                  </div>
 
-                <Input
-                  label="Até (m)"
-                  value={layer.ate}
-                  onChange={(v) => {
-                    const copy = [...layers];
-                    copy[i].ate = v;
-                    setLayers(copy);
-                  }}
-                />
-
-                <Select
-                  label="Tipo de Solo"
-                  value={layer.tipo}
-                  options={tiposSolo}
-                  onChange={(v) => {
-                    const copy = [...layers];
-                    copy[i].tipo = v;
-                    setLayers(copy);
-                  }}
-                />
-
-              </div>
-
-            ))}
+                </div>
+              ))}
+            </div>
 
             <button
               onClick={addLayer}
-              className="w-full mt-3 bg-[#391e2a] text-white font-semibold py-2 rounded-lg shadow hover:opacity-90 transition"
+              className="w-full mt-4 bg-[#391e2a] text-white font-semibold py-3 rounded-xl shadow hover:opacity-90 transition"
             >
               + Adicionar Camada
             </button>
-
           </Section>
 
           <div className="space-y-4 pt-4">
-
             <button
               onClick={salvar}
               className="w-full bg-white border-2 border-[#391e2a] text-[#391e2a] font-semibold py-3 rounded-xl shadow-sm hover:bg-gray-100 transition"
             >
               Salvar Rascunho
             </button>
-
             <button
               onClick={concluir}
               className="w-full bg-[#80b02d] text-white font-bold py-3 rounded-xl shadow-lg hover:brightness-105 transition"
             >
               Concluir Perfil
             </button>
-
           </div>
-
         </div>
-
       </div>
-
     </AppShell>
-
   );
-
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-
   return (
     <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-5 space-y-4">
-
       <h2 className="text-sm font-semibold text-[#391e2a] tracking-wide uppercase border-b pb-2">
         {title}
       </h2>
-
       {children}
-
     </div>
   );
-
 }
 
 function Input({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-
   return (
-
-    <div className="flex flex-col gap-1">
-
-      <label className="text-xs font-semibold text-gray-600 tracking-wide">
+    <div className="flex flex-col gap-1 w-full">
+      <label className="text-[11px] font-bold text-gray-500 tracking-wide">
         {label}
       </label>
-
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-[38px] border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
+        className="w-full h-[40px] border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#80b02d] transition shadow-inner-sm"
       />
-
     </div>
-
   );
-
 }
 
 function Select({
@@ -427,33 +415,23 @@ function Select({
   options: string[];
   onChange: (value: string) => void;
 }) {
-
   return (
-
-    <div className="flex flex-col gap-1">
-
-      <label className="text-xs font-semibold text-gray-600 tracking-wide">
+    <div className="flex flex-col gap-1 w-full">
+      <label className="text-[11px] font-bold text-gray-500 tracking-wide">
         {label}
       </label>
-
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-[38px] border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
+        className="w-full h-[40px] border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#80b02d] transition shadow-inner-sm appearance-none"
       >
-
-        <option value="">Selecionar</option>
-
+        <option value="">Selecionar...</option>
         {options.map((o) => (
           <option key={o} value={o}>
             {o}
           </option>
         ))}
-
       </select>
-
     </div>
-
   );
-
 }
