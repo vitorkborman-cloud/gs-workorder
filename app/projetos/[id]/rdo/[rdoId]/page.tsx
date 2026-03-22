@@ -175,15 +175,20 @@ export default function RdoViewPage() {
     // --- 8. GALERIA DE FOTOS ---
     if (rdo.fotos?.length > 0) {
       sectionHeader("Registro Fotográfico");
-      const imgW = (contentWidth / 2) - 5;
-      const imgH = 45;
+      
+      const boxW = (contentWidth / 2) - 5; // Largura do container da foto
+      const boxH = 55; // Altura máxima do container
 
       // 🔥 IMPORTANTE: Usamos um loop 'for' tradicional para poder usar o 'await'
       for (let i = 0; i < rdo.fotos.length; i++) {
         const foto = rdo.fotos[i];
-        const xPos = i % 2 === 0 ? marginX : marginX + imgW + 10;
+        const isPar = i % 2 === 0;
+        const xPos = isPar ? marginX : marginX + boxW + 10;
         
-        checkPageBreak(imgH + 20);
+        // Verifica quebra de página antes de começar uma nova linha (quando é par)
+        if (isPar) {
+          checkPageBreak(boxH + 20);
+        }
         
         if (foto.storagePath) {
           try {
@@ -202,48 +207,77 @@ export default function RdoViewPage() {
               reader.readAsDataURL(blob);
             });
 
-            // 4. Desenha a borda e a imagem no PDF
-            doc.setDrawColor(230);
-            doc.rect(xPos, currentY, imgW, imgH, "S");
-            doc.addImage(base64, "JPEG", xPos + 1, currentY + 1, imgW - 2, imgH - 2);
+            // 🔥 4. CÁLCULO DE PROPORÇÃO (ASPECT RATIO)
+            const props = doc.getImageProperties(base64);
+            let imgRenderW = boxW;
+            let imgRenderH = (props.height * boxW) / props.width;
+
+            // Se a imagem calculada for mais alta que nossa caixa, limitamos a altura e recalculamos a largura
+            if (imgRenderH > boxH) {
+                imgRenderH = boxH;
+                imgRenderW = (props.width * boxH) / props.height;
+            }
+
+            // Centraliza a imagem dentro da nossa caixa (boxW x boxH)
+            const xOffset = xPos + (boxW - imgRenderW) / 2;
+            const yOffset = currentY + (boxH - imgRenderH) / 2;
+
+            // Fundo cinza claro
+            doc.setFillColor(248, 248, 248);
+            doc.rect(xPos, currentY, boxW, boxH, "F");
+
+            // Desenha a imagem centralizada e proporcional
+            doc.addImage(base64, "JPEG", xOffset, yOffset, imgRenderW, imgRenderH);
+            
+            // Borda ao redor do container
+            doc.setDrawColor(220);
+            doc.rect(xPos, currentY, boxW, boxH, "S");
             
           } catch (e) {
             console.error("Erro ao carregar imagem para o PDF:", e);
             // Se der erro, desenha um aviso no lugar da foto
             doc.setFillColor(240, 240, 240);
-            doc.rect(xPos, currentY, imgW, imgH, "F");
+            doc.rect(xPos, currentY, boxW, boxH, "F");
             doc.setFontSize(8);
             doc.setTextColor(200, 0, 0);
-            doc.text("Erro na foto", xPos + 5, currentY + (imgH / 2));
+            doc.text("Erro na foto", xPos + 5, currentY + (boxH / 2));
           }
         }
         
         // Escreve a legenda logo abaixo da foto
         doc.setFontSize(7);
         doc.setTextColor(120);
-        doc.text(foto.legenda || "Sem legenda", xPos, currentY + imgH + 4);
+        const legendaText = doc.splitTextToSize(foto.legenda || "Sem legenda", boxW);
+        doc.text(legendaText, xPos, currentY + boxH + 4);
 
         // Ajusta a altura (Y) apenas quando fechar a linha de 2 fotos ou for a última
-        if (i % 2 !== 0 || i === rdo.fotos.length - 1) {
-          currentY += imgH + 15;
+        if (!isPar || i === rdo.fotos.length - 1) {
+          currentY += boxH + 15;
         }
       }
     }
 
     // --- 9. ASSINATURAS ---
     if (rdo.assinaturas?.length > 0) {
+      // 🔥 FORÇA A CHECAGEM DE PÁGINA: Se não tiver 50 unidades de espaço, joga título e assinaturas pra página seguinte
+      checkPageBreak(50);
+
       sectionHeader("Assinaturas de Responsabilidade");
       currentY += 5;
+
       rdo.assinaturas.forEach((a: any, i: number) => {
         const xPos = i % 2 === 0 ? marginX : pageWidth / 2 + 5;
-        checkPageBreak(35);
+        checkPageBreak(35); // Mantém a checagem para as próximas linhas de assinaturas
+        
         if (a.assinatura) {
           try { doc.addImage(a.assinatura, "PNG", xPos + 10, currentY, 40, 15); } catch(e) {}
         }
+        
         doc.setDrawColor(180);
         doc.line(xPos, currentY + 16, xPos + 60, currentY + 16);
         doc.setFontSize(8);
         doc.text(a.empresa || "Responsável", xPos, currentY + 21);
+        
         if (i % 2 !== 0 || i === rdo.assinaturas.length - 1) currentY += 30;
       });
     }
