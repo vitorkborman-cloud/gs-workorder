@@ -39,7 +39,7 @@ export default function RdoViewPage() {
     // --- PALETA DE CORES ---
     const brandPurple: [number, number, number] = [57, 30, 42];
     const brandGreen: [number, number, number] = [128, 176, 45];
-    const textDark: [number, number, number] = [40, 40, 40];
+    const lightGray: [number, number, number] = [248, 248, 250];
 
     // --- HELPERS ---
     const checkPageBreak = (needed: number) => {
@@ -63,164 +63,118 @@ export default function RdoViewPage() {
       currentY += 10;
     };
 
-    // =========================================================
-    // --- 1. HEADER EXECUTIVO COM DEGRADÊ (GRADIENT) ---
-    // =========================================================
-    const headerHeight = 38;
-    
-    // Cores do Degradê (RGB)
-    const colorStart = [240, 240, 242]; // Cinza Claro (Esquerda)
-    const colorEnd = brandPurple;        // Roxo da Paleta (Direita)
+    // --- 1. HEADER EXECUTIVO ---
+    doc.setFillColor(...brandPurple);
+    doc.rect(0, 0, pageWidth, 35, "F");
+    try { doc.addImage("/logo.png", "PNG", marginX, 8, 35, 10); } catch (e) {}
 
-    // Lógica para desenhar o degradê (centenas de linhas finas)
-    doc.setLineWidth(0.1); 
-    for (let x = 0; x < pageWidth; x += 0.1) {
-      // Calcula a proporção atual (de 0 a 1)
-      const ratio = x / pageWidth;
-      
-      // Interpolação das cores RGB
-      const r = Math.round(colorStart[0] * (1 - ratio) + colorEnd[0] * ratio);
-      const g = Math.round(colorStart[1] * (1 - ratio) + colorEnd[1] * ratio);
-      const b = Math.round(colorStart[2] * (1 - ratio) + colorEnd[2] * ratio);
-      
-      // Define a cor e desenha uma linha vertical fina
-      doc.setDrawColor(r, g, b);
-      doc.line(x, 0, x, headerHeight);
-    }
-
-    // Linha de detalhe verde no final do header
-    doc.setFillColor(...brandGreen);
-    doc.rect(0, headerHeight - 1, pageWidth, 1, "F");
-
-    // -- CONTEÚDO DO HEADER --
-    try { 
-      // O logo agora aparece perfeitamente sobre o início do degradê (cinza claro)
-      doc.addImage("/logo.png", "PNG", marginX, 10, 38, 14); 
-    } catch (e) {
-      console.warn("Logo não carregado para o PDF");
-    }
-
-    // Título e Informações (Texto em Roxo para contraste)
-    doc.setTextColor(...brandPurple); 
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 16, { align: "right" });
-    
+    doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 15, { align: "right" });
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(80, 80, 80); // Um cinza escuro para os detalhes
-    doc.text(`${projectName}`, pageWidth - marginX, 23, { align: "right" });
-    doc.text(`DATA: ${rdo.data} | PERÍODO: ${rdo.inicio} às ${rdo.fim}`, pageWidth - marginX, 28, { align: "right" });
+    doc.text(`${projectName} | DATA: ${rdo.data}`, pageWidth - marginX, 22, { align: "right" });
+    doc.text(`HORÁRIO: ${rdo.inicio} às ${rdo.fim}`, pageWidth - marginX, 27, { align: "right" });
 
-    currentY = 50;
+    currentY = 45;
 
-    // =========================================================
-    // --- 2. RESTANTE DO DOCUMENTO (KPIs E TABELAS) ---
-    // =========================================================
-    
-    // Dashboard KPIs
+    // --- 2. DASHBOARD DE INDICADORES (KPIs) ---
     const colabTotal = rdo.envolvidos?.reduce((a: number, b: any) => a + (Number(b.colaboradores) || 0), 0) || 0;
     const cards = [
       { label: "EFETIVO TOTAL", val: `${colabTotal} PESSOAS` },
       { label: "CLIMA", val: rdo.clima?.[0]?.condicao || "N/A" },
-      { label: "SEGURANÇA (SHEQ)", val: rdo.sheq?.incidente === "Não" ? "OPER. SEGURA" : "ALERTA" }
+      { label: "STATUS SEGURANÇA", val: rdo.sheq?.incidente === "Não" ? "SEM OCORRÊNCIAS" : "ALERTA" }
     ];
 
     cards.forEach((card, i) => {
       const x = marginX + (i * (contentWidth / 3 + 2));
-      doc.setFillColor(250, 250, 250);
-      doc.setDrawColor(220, 220, 220);
-      doc.roundedRect(x, currentY, contentWidth / 3 - 4, 18, 1, 1, "FD");
+      doc.setFillColor(...lightGray);
+      doc.roundedRect(x, currentY, contentWidth / 3 - 4, 18, 1, 1, "F");
       doc.setFontSize(7);
-      doc.setTextColor(120);
+      doc.setTextColor(100);
       doc.text(card.label, x + 4, currentY + 6);
       doc.setFontSize(9);
       doc.setTextColor(...brandPurple);
       doc.setFont("helvetica", "bold");
       doc.text(card.val, x + 4, currentY + 13);
     });
-    currentY += 30;
+    currentY += 28;
 
     const tableConfig: any = {
       margin: { left: marginX, right: marginX },
-      styles: { fontSize: 8, cellPadding: 3, textColor: textDark },
+      styles: { fontSize: 8, cellPadding: 3 },
       headStyles: { fillColor: brandPurple, textColor: 255, fontStyle: "bold" },
       alternateRowStyles: { fillColor: [252, 252, 252] }
     };
 
-    // Tabelas Técnicas
-    if (rdo.clima?.length > 0) {
-      sectionHeader("Condições Climáticas");
-      autoTable(doc, {
-        ...tableConfig,
-        startY: currentY,
-        head: [["Período", "Tempo", "Condição", "Impacto/Razão"]],
-        body: rdo.clima?.map((c: any) => [c.periodo, c.tempo, c.condicao, c.razao || "-"])
-      });
-      currentY = (doc as any).lastAutoTable.finalY + 12;
-    }
+    // --- 3. TABELA DE CLIMA ---
+    sectionHeader("Condições Climáticas");
+    autoTable(doc, {
+      ...tableConfig,
+      startY: currentY,
+      head: [["Período", "Tempo", "Condição", "Impacto/Razão"]],
+      body: rdo.clima?.map((c: any) => [c.periodo, c.tempo, c.condicao, c.razao || "-"]) || []
+    });
+    currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    if (rdo.envolvidos?.length > 0) {
-      sectionHeader("Mão de Obra e Efetivo");
-      autoTable(doc, {
-        ...tableConfig,
-        startY: currentY,
-        head: [["Empresa Parceira", "N° Colaboradores", "Função Principal"]],
-        body: rdo.envolvidos?.map((e: any) => [e.empresa, e.colaboradores, e.funcao])
-      });
-      currentY = (doc as any).lastAutoTable.finalY + 12;
-    }
+    // --- 4. TABELA DE ENVOLVIDOS ---
+    sectionHeader("Mão de Obra e Efetivo");
+    autoTable(doc, {
+      ...tableConfig,
+      startY: currentY,
+      head: [["Empresa Parceira", "N° Colaboradores", "Função Principal"]],
+      body: rdo.envolvidos?.map((e: any) => [e.empresa, e.colaboradores, e.funcao]) || []
+    });
+    currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    if (rdo.atividades?.length > 0) {
-      sectionHeader("Cronograma de Atividades");
-      autoTable(doc, {
-        ...tableConfig,
-        startY: currentY,
-        head: [["Atividade", "Responsável", "Status", "Observações"]],
-        body: rdo.atividades?.map((a: any) => [a.atividade, a.empresa, a.status, a.obs || "-"]),
-        didParseCell: (data) => {
-          if (data.section === "body" && data.column.index === 2) {
-            const s = String(data.cell.raw).toLowerCase();
-            if (s.includes("conclu")) data.cell.styles.textColor = [0, 150, 0];
-            if (s.includes("andamento")) data.cell.styles.textColor = [180, 100, 0];
-          }
+    // --- 5. TABELA DE ATIVIDADES ---
+    sectionHeader("Progresso das Atividades");
+    autoTable(doc, {
+      ...tableConfig,
+      startY: currentY,
+      head: [["Atividade Realizada", "Responsável", "Status", "Observações"]],
+      body: rdo.atividades?.map((a: any) => [a.atividade, a.empresa, a.status, a.obs || "-"]) || [],
+      didParseCell: (data) => {
+        if (data.section === "body" && data.column.index === 2) {
+          const s = String(data.cell.raw).toLowerCase();
+          if (s.includes("conclu")) data.cell.styles.textColor = [0, 150, 0];
+          if (s.includes("andamento")) data.cell.styles.textColor = [200, 120, 0];
         }
-      });
-      currentY = (doc as any).lastAutoTable.finalY + 12;
-    }
+      }
+    });
+    currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    if (rdo.sheq) {
-      sectionHeader("Segurança e Meio Ambiente (SHEQ)");
-      autoTable(doc, {
-        ...tableConfig,
-        startY: currentY,
-        head: [["Ocorrência", "Registro", "Observação"]],
-        body: [
-          ["Incidentes de Segurança", rdo.sheq?.incidente || "Não", rdo.sheq?.incidenteObs || "-"],
-          ["Vazamentos / Meio Ambiente", rdo.sheq?.vazamento || "Não", rdo.sheq?.vazamentoObs || "-"]
-        ]
-      });
-      currentY = (doc as any).lastAutoTable.finalY + 12;
-    }
+    // --- 6. TABELA DE SHEQ ---
+    sectionHeader("Segurança, Saúde e Meio Ambiente (SHEQ)");
+    autoTable(doc, {
+      ...tableConfig,
+      startY: currentY,
+      head: [["Tipo de Ocorrência", "Houve Registro?", "Descrição/Observação"]],
+      body: [
+        ["Incidentes de Segurança", rdo.sheq?.incidente || "Não", rdo.sheq?.incidenteObs || "-"],
+        ["Vazamentos / Meio Ambiente", rdo.sheq?.vazamento || "Não", rdo.sheq?.vazamentoObs || "-"]
+      ]
+    });
+    currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    // Comentários
+    // --- 7. COMENTÁRIOS GERAIS ---
     if (rdo.comentarios) {
-      sectionHeader("Notas e Observações de Campo");
+      sectionHeader("Notas e Comentários Adicionais");
       const textLines = doc.splitTextToSize(rdo.comentarios, contentWidth - 10);
       const boxH = (textLines.length * 5) + 10;
       checkPageBreak(boxH);
-      doc.setFillColor(252, 252, 252);
+      doc.setFillColor(250, 250, 250);
       doc.setDrawColor(230, 230, 230);
       doc.rect(marginX, currentY, contentWidth, boxH, "FD");
-      doc.setTextColor(...textDark);
+      doc.setTextColor(60, 60, 60);
       doc.setFont("helvetica", "normal");
       doc.text(textLines, marginX + 5, currentY + 7);
       currentY += boxH + 15;
     }
 
-    // Fotos
+    // --- 8. GALERIA DE FOTOS ---
     if (rdo.fotos?.length > 0) {
-      sectionHeader("Evidências Fotográficas");
+      sectionHeader("Registro Fotográfico");
       const imgW = (contentWidth / 2) - 5;
       const imgH = 45;
 
@@ -229,9 +183,11 @@ export default function RdoViewPage() {
         checkPageBreak(imgH + 20);
         if (foto.preview) {
           try {
-            doc.addImage(foto.preview, "JPEG", xPos, currentY, imgW, imgH);
+            doc.setDrawColor(230);
+            doc.rect(xPos, currentY, imgW, imgH, "S");
+            doc.addImage(foto.preview, "JPEG", xPos + 1, currentY + 1, imgW - 2, imgH - 2);
             doc.setFontSize(7);
-            doc.setTextColor(150);
+            doc.setTextColor(120);
             doc.text(foto.legenda || "Sem legenda", xPos, currentY + imgH + 4);
           } catch (e) {}
         }
@@ -239,34 +195,34 @@ export default function RdoViewPage() {
       });
     }
 
-    // Assinaturas
+    // --- 9. ASSINATURAS ---
     if (rdo.assinaturas?.length > 0) {
-      sectionHeader("Validação e Assinaturas");
+      sectionHeader("Assinaturas de Responsabilidade");
       currentY += 5;
       rdo.assinaturas.forEach((a: any, i: number) => {
         const xPos = i % 2 === 0 ? marginX : pageWidth / 2 + 5;
         checkPageBreak(35);
         if (a.assinatura) {
-          try { doc.addImage(a.assinatura, "PNG", xPos + 10, currentY, 40, 12); } catch(e) {}
+          try { doc.addImage(a.assinatura, "PNG", xPos + 10, currentY, 40, 15); } catch(e) {}
         }
-        doc.setDrawColor(200);
-        doc.line(xPos, currentY + 14, xPos + 60, currentY + 14);
+        doc.setDrawColor(180);
+        doc.line(xPos, currentY + 16, xPos + 60, currentY + 16);
         doc.setFontSize(8);
-        doc.text(a.empresa || "Responsável", xPos, currentY + 19);
-        if (i % 2 !== 0 || i === rdo.assinaturas.length - 1) currentY += 25;
+        doc.text(a.empresa || "Responsável", xPos, currentY + 21);
+        if (i % 2 !== 0 || i === rdo.assinaturas.length - 1) currentY += 30;
       });
     }
 
-    // Rodapé
+    // RODAPÉ FINAL
     const totalP = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= totalP; i++) {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(180);
-      doc.text(`RDO ${projectName} - Página ${i} de ${totalP} - Emitido eletronicamente`, pageWidth / 2, 290, { align: "center" });
+      doc.text(`Documento gerado eletronicamente - Página ${i} de ${totalP}`, pageWidth / 2, 290, { align: "center" });
     }
 
-    doc.save(`RDO_GRADIENT_${projectName}_${rdo.data}.pdf`);
+    doc.save(`RDO_COMPLETO_${projectName}_${rdo.data}.pdf`);
   }
 
   if (!rdo) return <AdminShell><p className="p-10">Carregando...</p></AdminShell>;
@@ -275,26 +231,27 @@ export default function RdoViewPage() {
     <AdminShell>
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100">
-          <div className="p-8 border-b-4 border-[#80b02d] flex justify-between items-center bg-gray-50">
+          <div className="bg-[#391e2a] p-8 text-white flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-[#391e2a]">Relatório Executivo</h1>
-              <p className="text-gray-600 font-medium mt-1">{projectName} • {rdo.data}</p>
+              <h1 className="text-2xl font-bold tracking-tight">Visualização do Diário</h1>
+              <p className="text-[#80b02d] font-medium mt-1">{projectName} • {rdo.data}</p>
             </div>
-            <Button onClick={gerarPDF} className="bg-[#391e2a] hover:bg-[#2a161f] text-white px-10 h-12 rounded-lg font-bold shadow-lg transition-all active:scale-95">
-              BAIXAR RDO PREMIUM
+            <Button onClick={gerarPDF} className="bg-[#80b02d] hover:bg-[#6a9425] text-white px-8 h-12 rounded-lg font-bold shadow-lg transition-transform active:scale-95">
+              BAIXAR RDO COMPLETO
             </Button>
           </div>
           
-          <div className="p-10 text-center flex flex-col items-center">
-             <div className="inline-block p-4 rounded-full bg-purple-50 mb-4 border border-purple-100">
-                <svg className="w-10 h-10 text-[#391e2a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+          <div className="p-12 text-center bg-gray-50">
+             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 inline-block">
+                <p className="text-gray-600 mb-4">O PDF será gerado com:</p>
+                <ul className="text-left text-sm space-y-2 text-gray-500 mb-6">
+                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Dashboard de Indicadores</li>
+                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Todas as Tabelas Técnicas (Clima, Efetivo, Atividades, SHEQ)</li>
+                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Comentários e Notas de Campo</li>
+                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Galeria de Fotos e Assinaturas</li>
+                </ul>
+                <p className="text-xs text-gray-400 font-italic italic">Pronto para envio aos stakeholders.</p>
              </div>
-             <h2 className="text-lg font-semibold text-gray-800">Design de Alta Costura</h2>
-             <p className="text-gray-500 text-sm mt-2 max-w-sm">
-                O PDF agora conta com um cabeçalho em degradê que preserva o seu logo e traz a sofisticação da paleta roxa, mantendo todas as tabelas técnicas completas.
-             </p>
           </div>
         </div>
       </div>
