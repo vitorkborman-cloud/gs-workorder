@@ -178,21 +178,56 @@ export default function RdoViewPage() {
       const imgW = (contentWidth / 2) - 5;
       const imgH = 45;
 
-      rdo.fotos.forEach((foto: any, i: number) => {
+      // 🔥 IMPORTANTE: Usamos um loop 'for' tradicional para poder usar o 'await'
+      for (let i = 0; i < rdo.fotos.length; i++) {
+        const foto = rdo.fotos[i];
         const xPos = i % 2 === 0 ? marginX : marginX + imgW + 10;
+        
         checkPageBreak(imgH + 20);
-        if (foto.preview) {
+        
+        if (foto.storagePath) {
           try {
+            // 1. Pega a URL pública da foto no Supabase (já com o traço 'rdo-photos')
+            const { data: urlData } = supabase.storage.from('rdo-photos').getPublicUrl(foto.storagePath);
+            
+            // 2. Baixa a imagem do servidor
+            const response = await fetch(urlData.publicUrl);
+            const blob = await response.blob();
+            
+            // 3. Converte a imagem para Base64 (formato que o jsPDF entende)
+            const base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+
+            // 4. Desenha a borda e a imagem no PDF
             doc.setDrawColor(230);
             doc.rect(xPos, currentY, imgW, imgH, "S");
-            doc.addImage(foto.preview, "JPEG", xPos + 1, currentY + 1, imgW - 2, imgH - 2);
-            doc.setFontSize(7);
-            doc.setTextColor(120);
-            doc.text(foto.legenda || "Sem legenda", xPos, currentY + imgH + 4);
-          } catch (e) {}
+            doc.addImage(base64, "JPEG", xPos + 1, currentY + 1, imgW - 2, imgH - 2);
+            
+          } catch (e) {
+            console.error("Erro ao carregar imagem para o PDF:", e);
+            // Se der erro, desenha um aviso no lugar da foto
+            doc.setFillColor(240, 240, 240);
+            doc.rect(xPos, currentY, imgW, imgH, "F");
+            doc.setFontSize(8);
+            doc.setTextColor(200, 0, 0);
+            doc.text("Erro na foto", xPos + 5, currentY + (imgH / 2));
+          }
         }
-        if (i % 2 !== 0 || i === rdo.fotos.length - 1) currentY += imgH + 15;
-      });
+        
+        // Escreve a legenda logo abaixo da foto
+        doc.setFontSize(7);
+        doc.setTextColor(120);
+        doc.text(foto.legenda || "Sem legenda", xPos, currentY + imgH + 4);
+
+        // Ajusta a altura (Y) apenas quando fechar a linha de 2 fotos ou for a última
+        if (i % 2 !== 0 || i === rdo.fotos.length - 1) {
+          currentY += imgH + 15;
+        }
+      }
     }
 
     // --- 9. ASSINATURAS ---
