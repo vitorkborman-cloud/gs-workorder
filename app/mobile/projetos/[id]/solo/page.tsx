@@ -234,8 +234,8 @@ export default function SoloPage() {
     <AppShell>
       <div className="min-h-screen bg-gray-50 pb-28">
         
-        {/* HEADER EXECUTIVO */}
-        <div className="bg-[#391e2a] text-white px-5 py-5 shadow-md sticky top-0 z-30">
+        {/* HEADER EXECUTIVO (Agora sem o 'sticky' e sem a tag de novo/rascunho) */}
+        <div className="bg-[#391e2a] text-white px-5 py-5 shadow-md">
           <div className="flex justify-between items-center max-w-4xl mx-auto w-full">
             <div>
               <h1 className="text-xl font-bold tracking-wide">
@@ -245,9 +245,6 @@ export default function SoloPage() {
                 Registro Técnico de Sondagem
               </p>
             </div>
-            <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded-full shadow-sm border ${draftId ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'bg-[#80b02d]/20 text-[#80b02d] border-[#80b02d]/30'}`}>
-              {draftId ? "Rascunho Ativo" : "Novo Registro"}
-            </span>
           </div>
         </div>
 
@@ -258,11 +255,11 @@ export default function SoloPage() {
           <Section title="Dados da Sondagem" icon={<Icons.Clipboard />}>
             <div className="space-y-4">
               <Input label="Nome / Identificação da Sondagem *" value={form.nome_sondagem} onChange={(v: string) => setField("nome_sondagem", v)} placeholder="Ex: SP-01" />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 items-end">
                 <Input label="Data" value={form.data} type="date" onChange={(v: string) => setField("data", v)} />
                 <Input label="Hora" value={form.hora} type="time" onChange={(v: string) => setField("hora", v)} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 items-end">
                 <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v: string) => setField("tipo_sondagem", v)} placeholder="Ex: Trado manual" />
                 <Input label="Profundidade Total (m)" value={form.profundidade_total} type="number" onChange={(v: string) => setField("profundidade_total", v)} placeholder="0.00" />
               </div>
@@ -270,15 +267,16 @@ export default function SoloPage() {
             </div>
           </Section>
 
-          {/* POÇO */}
-          <Section title="Construção do Poço de Monitoramento" icon={<Icons.Ruler />}>
+          {/* POÇO (Nome Alterado) */}
+          <Section title="Dados de instalação" icon={<Icons.Ruler />}>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Adicionado items-end na grade para alinhar os inputs por baixo perfeitamente */}
+              <div className="grid grid-cols-2 gap-4 items-end">
                 <Input label="Diâmetro Sondagem (in)" value={form.diametro_sondagem} onChange={(v: string) => setField("diametro_sondagem", v)} placeholder="Ex: 4" />
                 <Input label="Diâmetro Poço (in)" value={form.diametro_poco} onChange={(v: string) => setField("diametro_poco", v)} placeholder="Ex: 2" />
               </div>
               <Input label="Nível do Pré-filtro (m)" value={form.pre_filtro} type="number" onChange={(v: string) => setField("pre_filtro", v)} placeholder="0.00" />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 items-end">
                 <Input label="Seção Filtrante - Topo (m)" value={form.secao_filtrante_topo} type="number" onChange={(v: string) => setField("secao_filtrante_topo", v)} placeholder="0.00" />
                 <Input label="Seção Filtrante - Base (m)" value={form.secao_filtrante_base} type="number" onChange={(v: string) => setField("secao_filtrante_base", v)} placeholder="0.00" />
               </div>
@@ -287,7 +285,7 @@ export default function SoloPage() {
 
           {/* COORDENADAS */}
           <Section title="Geolocalização" icon={<Icons.MapPin />}>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 items-end">
               <Input label="Coordenada X (UTM/Long)" value={form.coord_x} onChange={(v: string) => setField("coord_x", v)} placeholder="000000.00" />
               <Input label="Coordenada Y (UTM/Lat)" value={form.coord_y} onChange={(v: string) => setField("coord_y", v)} placeholder="0000000.00" />
             </div>
@@ -316,14 +314,14 @@ export default function SoloPage() {
                   </div>
 
                   {/* Formulário da Camada */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4 items-end">
                     <Input label="Prof. Inicial - De (m)" type="number" value={layer.de} onChange={(v: string) => { const copy = [...layers]; copy[i].de = v; setLayers(copy); }} placeholder="0.00" />
                     <Input label="Prof. Final - Até (m)" type="number" value={layer.ate} onChange={(v: string) => { const copy = [...layers]; copy[i].ate = v; setLayers(copy); }} placeholder="0.00" />
                   </div>
                   
                   <Select label="Classificação do Solo" value={layer.tipo} options={tiposSolo} onChange={(v: string) => { const copy = [...layers]; copy[i].tipo = v; setLayers(copy); }} />
                   
-                  <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+                  <div className="grid grid-cols-2 gap-4 items-end bg-gray-50/50 p-3 rounded-xl border border-gray-100">
                     <Input label="Coloração Visual" value={layer.coloracao} onChange={(v: string) => { const copy = [...layers]; copy[i].coloracao = v; setLayers(copy); }} placeholder="Ex: Marrom escuro" />
                     <Input label="Leitura VOC (ppm)" type="number" value={layer.leitura_voc} onChange={(v: string) => { const copy = [...layers]; copy[i].leitura_voc = v; setLayers(copy); }} placeholder="0.0" />
                   </div>
@@ -387,7 +385,7 @@ function Section({ title, icon, children }: { title: string; icon?: React.ReactN
 
 function Input({ label, value, onChange, type = "text", placeholder = "" }: { label: string; value: string; onChange: (val: string) => void; type?: string; placeholder?: string }) {
   return (
-    <div className="flex flex-col gap-1.5 w-full">
+    <div className="flex flex-col justify-end gap-1.5 w-full">
       <label className="text-[11px] font-bold text-gray-500 ml-1 tracking-tight">
         {label}
       </label>
@@ -404,7 +402,7 @@ function Input({ label, value, onChange, type = "text", placeholder = "" }: { la
 
 function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (val: string) => void }) {
   return (
-    <div className="flex flex-col gap-1.5 w-full">
+    <div className="flex flex-col justify-end gap-1.5 w-full">
       <label className="text-[11px] font-bold text-gray-500 ml-1 tracking-tight">
         {label}
       </label>
