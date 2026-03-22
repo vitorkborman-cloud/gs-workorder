@@ -63,14 +63,26 @@ export default function RdoViewPage() {
       currentY += 10;
     };
 
-    // --- 1. HEADER EXECUTIVO ---
+    // --- 1. HEADER EXECUTIVO COM BADGE PARA LOGO ---
     doc.setFillColor(...brandPurple);
-    doc.rect(0, 0, pageWidth, 35, "F");
-    try { doc.addImage("/logo.png", "PNG", marginX, 8, 35, 10); } catch (e) {}
+    doc.rect(0, 0, pageWidth, 35, "F"); // Fundo roxo do cabeçalho
+    
+    // Criando um "Badge" (Fundo Branco) para o Logo não sumir
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(marginX - 2, 7, 40, 16, 1, 1, "F"); 
+    
+    try { 
+      // O logo agora vai por cima do retângulo branco
+      doc.addImage("/logo.png", "PNG", marginX, 9, 36, 12); 
+    } catch (e) {
+      console.error("Erro ao carregar o logo:", e);
+    }
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
     doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 15, { align: "right" });
+    
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.text(`${projectName} | DATA: ${rdo.data}`, pageWidth - marginX, 22, { align: "right" });
