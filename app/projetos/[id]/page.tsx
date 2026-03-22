@@ -63,13 +63,13 @@ export default function ProjetoPage() {
     setLoading(false);
 
     const { data: rdoData } = await supabase
-  .from("rdo_reports")
-  .select("id, data, created_at")
-  .eq("project_id", projectId)
-  .eq("draft", false)
-  .order("created_at", { ascending: false });
+      .from("rdo_reports")
+      .select("id, data, created_at")
+      .eq("project_id", projectId)
+      .eq("draft", false)
+      .order("created_at", { ascending: false });
 
-if (rdoData) setRdos(rdoData);
+    if (rdoData) setRdos(rdoData);
   }
 
   async function createWorkOrder() {
@@ -100,13 +100,21 @@ if (rdoData) setRdos(rdoData);
     load();
   }
 
+  // NOVA FUNÇÃO: Deletar RDO
+  async function deleteRDO(id: string, dataRdo: string) {
+    const ok = confirm(`Excluir o relatório do dia ${dataRdo} permanentemente?`);
+    if (!ok) return;
+
+    await supabase.from("rdo_reports").delete().eq("id", id);
+    load();
+  }
+
   return (
     <AdminShell>
       <div className="space-y-10">
 
         {/* WORK ORDERS */}
         <div className="space-y-5">
-
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">
@@ -128,17 +136,14 @@ if (rdoData) setRdos(rdoData);
           </div>
 
           <div className="bg-secondary rounded-3xl p-8 shadow-inner">
-
             {loading ? (
               <p className="text-white/80">Carregando...</p>
             ) : workOrders.length === 0 ? (
               <p className="text-white/70">Nenhuma Work Order criada.</p>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-
                 {workOrders.map((wo) => (
                   <div key={wo.id} className="relative group">
-
                     {!mobile && (
                       <button
                         onClick={(e) => {
@@ -168,30 +173,23 @@ if (rdoData) setRdos(rdoData);
                       "
                     >
                       <CardContent className="p-6 space-y-2">
-
                         <p className="font-semibold text-lg">
                           {wo.title}
                         </p>
-
                         <p className="text-sm opacity-90">
                           {wo.finalized ? "Finalizada" : "Em andamento"}
                         </p>
-
                       </CardContent>
                     </Card>
-
                   </div>
                 ))}
-
               </div>
             )}
-
           </div>
         </div>
 
         {/* PERFIS DESCRITIVOS */}
         <div className="space-y-5">
-
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
               Perfis descritivos
@@ -202,18 +200,14 @@ if (rdoData) setRdos(rdoData);
           </div>
 
           <div className="bg-secondary rounded-3xl p-8 shadow-inner">
-
             {perfis.length === 0 ? (
               <p className="text-white/70">
                 Nenhum perfil gerado pelo aplicativo.
               </p>
             ) : (
-
               <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-
                 {perfis.map((p) => (
                   <div key={p.id} className="relative group">
-
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -243,88 +237,89 @@ if (rdoData) setRdos(rdoData);
                       "
                     >
                       <CardContent className="p-6 space-y-2">
-
                         <p className="font-semibold text-lg">
                           {p.nome_sondagem}
                         </p>
-
                         <p className="text-sm opacity-80">
                           {new Date(p.created_at).toLocaleDateString()}
                         </p>
-
                       </CardContent>
                     </Card>
-
                   </div>
                 ))}
-
               </div>
             )}
-
           </div>
         </div>
 
         {/* RELATÓRIOS DIÁRIOS */}
-<div className="space-y-5">
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">
+              Relatórios diários
+            </h2>
+            <p className="text-sm text-gray-500">
+              Relatórios enviados pelo aplicativo de campo
+            </p>
+          </div>
 
-  <div>
-    <h2 className="text-2xl font-bold tracking-tight">
-      Relatórios diários
-    </h2>
-    <p className="text-sm text-gray-500">
-      Relatórios enviados pelo aplicativo de campo
-    </p>
-  </div>
-
-  <div className="bg-secondary rounded-3xl p-8 shadow-inner">
-
-    {rdos.length === 0 ? (
-      <p className="text-white/70">
-        Nenhum relatório finalizado.
-      </p>
-    ) : (
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-
-        {rdos.map((r) => (
-          <Card
-            key={r.id}
-            onClick={() =>
-              router.push(`/projetos/${projectId}/rdo/${r.id}`)
-            }
-            className="
-            cursor-pointer
-            border-0
-            bg-gradient-to-br
-            from-[#80b02d]
-            to-[#5e8420]
-            text-white
-            shadow-xl
-            hover:shadow-2xl
-            hover:-translate-y-1
-            transition
-            rounded-2xl
-            "
-          >
-            <CardContent className="p-6 space-y-2">
-
-              <p className="font-semibold text-lg">
-                RDO - {r.data || "Sem data"}
+          <div className="bg-secondary rounded-3xl p-8 shadow-inner">
+            {rdos.length === 0 ? (
+              <p className="text-white/70">
+                Nenhum relatório finalizado.
               </p>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {rdos.map((r) => (
+                  // ADICIONADO: Wrapper div com 'relative group' para o hover funcionar
+                  <div key={r.id} className="relative group">
+                    
+                    {/* ADICIONADO: Botão de exclusão igual aos outros */}
+                    {!mobile && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteRDO(r.id, r.data || "Sem data");
+                        }}
+                        className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 opacity-0 group-hover:opacity-100 transition z-10"
+                      >
+                        ✕
+                      </button>
+                    )}
 
-              <p className="text-sm opacity-80">
-                {new Date(r.created_at).toLocaleDateString()}
-              </p>
-
-            </CardContent>
-          </Card>
-        ))}
-
-      </div>
-    )}
-
-  </div>
-</div>
+                    <Card
+                      onClick={() =>
+                        router.push(`/projetos/${projectId}/rdo/${r.id}`)
+                      }
+                      className="
+                      cursor-pointer
+                      border-0
+                      bg-gradient-to-br
+                      from-[#80b02d]
+                      to-[#5e8420]
+                      text-white
+                      shadow-xl
+                      hover:shadow-2xl
+                      hover:-translate-y-1
+                      transition
+                      rounded-2xl
+                      "
+                    >
+                      <CardContent className="p-6 space-y-2">
+                        <p className="font-semibold text-lg">
+                          RDO - {r.data || "Sem data"}
+                        </p>
+                        <p className="text-sm opacity-80">
+                          {new Date(r.created_at).toLocaleDateString()}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
       </div>
     </AdminShell>
