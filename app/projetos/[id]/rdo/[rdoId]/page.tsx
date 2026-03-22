@@ -27,7 +27,7 @@ export default function RdoViewPage() {
     if (proj) setProjectName(proj.name);
   }
 
-  async function gerarPDF() {
+async function gerarPDF() {
     if (!rdo) return;
 
     const doc = new jsPDF("p", "mm", "a4");
@@ -204,24 +204,27 @@ export default function RdoViewPage() {
     if (rdo.fotos?.length > 0) {
       sectionHeader("Evidências Fotográficas");
       
-      const boxW = (contentWidth / 2) - 5; 
-      const boxH = 55; 
+      const boxW = (contentWidth / 2) - 5; // Largura do "container" da foto
+      const boxH = 55; // Altura máxima do "container" da foto
 
       for (let i = 0; i < rdo.fotos.length; i++) {
         const foto = rdo.fotos[i];
         const isPar = i % 2 === 0;
         const xPos = isPar ? marginX : marginX + boxW + 10;
         
+        // Verifica quebra de página antes de começar uma nova linha (quando é par)
         if (isPar) {
             checkPageBreak(boxH + 20);
         }
         
         if (foto.storagePath) {
           try {
+            // Baixa a imagem do Supabase
             const { data: urlData } = supabase.storage.from('rdo-photos').getPublicUrl(foto.storagePath);
             const response = await fetch(urlData.publicUrl);
             const blob = await response.blob();
             
+            // Converte para Base64
             const base64 = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader();
               reader.onloadend = () => resolve(reader.result as string);
@@ -229,22 +232,29 @@ export default function RdoViewPage() {
               reader.readAsDataURL(blob);
             });
 
-            // Lógica de Aspect Ratio (Proporção real da imagem)
+            // 🔥 CÁLCULO DE PROPORÇÃO (ASPECT RATIO)
             const props = doc.getImageProperties(base64);
             let imgRenderW = boxW;
             let imgRenderH = (props.height * boxW) / props.width;
 
+            // Se a imagem calculada for mais alta que nossa caixa, limitamos a altura e recalculamos a largura
             if (imgRenderH > boxH) {
                 imgRenderH = boxH;
                 imgRenderW = (props.width * boxH) / props.height;
             }
 
+            // Centraliza a imagem dentro da nossa caixa (boxW x boxH)
             const xOffset = xPos + (boxW - imgRenderW) / 2;
             const yOffset = currentY + (boxH - imgRenderH) / 2;
 
+            // Fundo cinza claro para manter a grade alinhada visualmente
             doc.setFillColor(248, 248, 248);
             doc.rect(xPos, currentY, boxW, boxH, "F");
+
+            // Desenha a imagem centralizada e proporcional
             doc.addImage(base64, "JPEG", xOffset, yOffset, imgRenderW, imgRenderH);
+            
+            // Borda ao redor do container
             doc.setDrawColor(220);
             doc.rect(xPos, currentY, boxW, boxH, "S");
             
@@ -258,11 +268,13 @@ export default function RdoViewPage() {
           }
         }
         
+        // Legenda sempre alinhada com a caixa
         doc.setFontSize(7);
         doc.setTextColor(100);
         const legendaText = doc.splitTextToSize(foto.legenda || "Sem legenda", boxW);
         doc.text(legendaText, xPos, currentY + boxH + 5);
 
+        // Ajusta a altura (Y) apenas quando for o item ímpar (fecha a linha) ou for a última foto
         if (!isPar || i === rdo.fotos.length - 1) {
           currentY += boxH + 15;
         }
@@ -271,9 +283,8 @@ export default function RdoViewPage() {
 
     // --- 6. ASSINATURAS (COM PROTEÇÃO DE QUEBRA DE PÁGINA) ---
     if (rdo.assinaturas?.length > 0) {
-      
-      // Trava de segurança: Pede 50 pontos de espaço na página. 
-      // Se não tiver, joga Título + Assinaturas pra próxima folha juntos.
+      // 🔥 Força a checagem de página ANTES de imprimir o título
+      // Pede 50 de espaço: 10 pro título + 40 pra pelo menos 1 assinatura
       checkPageBreak(50); 
       
       sectionHeader("Validação e Assinaturas");
@@ -308,8 +319,6 @@ export default function RdoViewPage() {
 
     doc.save(`RDO_${projectName}_${rdo.data}.pdf`);
   }
-
-  // --- O RETORNO DA INTERFACE QUE TINHA SUMIDO ---
   if (!rdo) return <AdminShell><p className="p-10">Carregando...</p></AdminShell>;
 
   return (
