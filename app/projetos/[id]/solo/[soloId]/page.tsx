@@ -108,7 +108,7 @@ export default function SoloDetailPage() {
     setEditLayers(editLayers.filter((_, i) => i !== index));
   }
 
-  /* ================= CORES AUTOMÁTICAS E PDF (INTACTOS) ================= */
+  /* ================= CORES AUTOMÁTICAS E PDF ================= */
   function gerarCor(nome: string): [number, number, number] {
     const n = nome.toLowerCase();
     if (n.includes("concreto")) return [200, 200, 200];
@@ -145,7 +145,9 @@ export default function SoloDetailPage() {
     const brandPurple: [number, number, number] = [57, 30, 42];
     const brandGreen: [number, number, number] = [128, 176, 45];
 
-    // ================= PÁGINA 1 =================
+    // ================= PÁGINA 1: DADOS E TABELA =================
+    
+    // Header
     pdf.setFillColor(...brandPurple);
     pdf.rect(0, 0, pageWidth, 35, "F");
     pdf.setTextColor(255, 255, 255);
@@ -158,6 +160,7 @@ export default function SoloDetailPage() {
 
     let currentY = 45;
 
+    // Blocos de Informação
     autoTable(pdf, {
       startY: currentY,
       margin: { left: marginX, right: marginX },
@@ -170,6 +173,7 @@ export default function SoloDetailPage() {
       theme: 'grid',
       headStyles: { fillColor: brandPurple, textColor: 255, fontStyle: "bold", fontSize: 10, cellPadding: 3 },
       styles: { fontSize: 9, cellPadding: 4, valign: 'top', textColor: 40 },
+      //iteração 11: Fix para largura da coluna
       columnStyles: { 
         0: { cellWidth: (pageWidth - marginX * 2) / 3 }, 
         1: { cellWidth: (pageWidth - marginX * 2) / 3 }, 
@@ -179,10 +183,12 @@ export default function SoloDetailPage() {
 
     currentY = (pdf as any).lastAutoTable.finalY + 15;
 
+    // Tabela de Camadas
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(...brandPurple);
     pdf.text("4. Camadas Estratigráficas", marginX, currentY);
+    
     currentY += 5;
 
     autoTable(pdf, {
@@ -190,7 +196,11 @@ export default function SoloDetailPage() {
       margin: { left: marginX, right: marginX },
       head: [["De (m)", "Até (m)", "Tipo de Solo", "Coloração", "VOC (ppm)"]],
       body: layers.map(l => [
-        l.de || "-", l.ate || "-", l.tipo || "-", l.coloracao || "-", l.leitura_voc ? `${l.leitura_voc}` : "-"
+        l.de || "-", 
+        l.ate || "-", 
+        l.tipo || "-", 
+        l.coloracao || "-", 
+        l.leitura_voc ? `${l.leitura_voc}` : "-"
       ]),
       theme: 'striped',
       headStyles: { fillColor: brandGreen, textColor: 255, fontStyle: "bold", fontSize: 9 },
@@ -198,8 +208,9 @@ export default function SoloDetailPage() {
       alternateRowStyles: { fillColor: [248, 248, 248] }
     });
 
-    // ================= PÁGINA 2 =================
+    // ================= PÁGINA 2: PERFIL GRÁFICO =================
     pdf.addPage();
+
     pdf.setFontSize(16);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(...brandPurple);
@@ -208,12 +219,15 @@ export default function SoloDetailPage() {
     const topo = 35;
     const alturaMax = 170;
     const larguraPerfil = 40;
+
     const centro = pageWidth / 2 - 35; 
     const esquerdaPerfil = centro - larguraPerfil / 2;
     const direitaPerfil = centro + larguraPerfil / 2;
+
     const profundidadeTotal = parseFloat(data.profundidade_total || "1");
     const escala = alturaMax / profundidadeTotal;
 
+    // 1. Escala de Profundidade
     pdf.setFontSize(8);
     pdf.setTextColor(100);
     pdf.setDrawColor(150);
@@ -223,29 +237,36 @@ export default function SoloDetailPage() {
       pdf.text(`${i.toFixed(1)} m`, esquerdaPerfil - 25, yEscala + 2);
     }
 
+    // 2. Desenho das Camadas de Solo (com Texturas)
     layers.forEach((l) => {
       const de = parseFloat(l.de);
       const ate = parseFloat(l.ate);
+
       const altura = (ate - de) * escala;
       const yCamada = topo + de * escala;
+
       const [r, g, b] = gerarCor(l.tipo);
 
       pdf.setFillColor(r, g, b);
       pdf.rect(esquerdaPerfil, yCamada, larguraPerfil, altura, "F");
 
       const tipo = l.tipo.toLowerCase();
+
+      // Texturas do Perfil
       if (tipo.includes("brita")) {
         const espacamento = 3; const raio = 0.6; pdf.setDrawColor(0);
         for (let yDot = yCamada + 2; yDot < yCamada + altura; yDot += espacamento) {
           for (let xDot = esquerdaPerfil + 2; xDot < esquerdaPerfil + larguraPerfil; xDot += espacamento) pdf.circle(xDot, yDot, raio);
         }
       }
+
       if (tipo.includes("rachão") || tipo.includes("rachao")) {
         const espacamento = 4; const raio = 1; pdf.setDrawColor(0);
         for (let yDot = yCamada + 2; yDot < yCamada + altura; yDot += espacamento) {
           for (let xDot = esquerdaPerfil + 2; xDot < esquerdaPerfil + larguraPerfil; xDot += espacamento) pdf.circle(xDot, yDot, raio);
         }
       }
+
       if (tipo.includes("siltosa")) {
         const espacamento = 2; const tamanhoX = 0.33; pdf.setDrawColor(0);
         for (let yDot = yCamada + 1; yDot < yCamada + altura; yDot += espacamento) {
@@ -255,21 +276,27 @@ export default function SoloDetailPage() {
           }
         }
       }
+
       if (tipo.includes("areia") || tipo.includes("arenoso") || tipo.includes("arenosa")) {
         let espacamento = 1; let raio = 0.15;
         if (tipo.includes("fina")) { espacamento = 1; raio = 0.1; }
         if (tipo.includes("grossa")) { espacamento = 1; raio = 0.3; }
         pdf.setFillColor(0, 0, 0);
         for (let yDot = yCamada + 1; yDot < yCamada + altura; yDot += espacamento) {
-          for (let xDot = esquerdaPerfil + 1; xDot < esquerdaPerfil + larguraPerfil; xDot += espacamento) pdf.circle(xDot, yDot, raio, "F");
+          for (let xDot = esquerdaPerfil + 1; xDot < esquerdaPerfil + larguraPerfil; xDot += espacamento) {
+            pdf.circle(xDot, yDot, raio, "F");
+          }
         }
       }
 
+      // Anotações de VOC
       if (l.leitura_voc && l.leitura_voc.trim() !== "") {
         const yCenter = yCamada + (altura / 2);
+        
         pdf.setDrawColor(180);
         pdf.setLineWidth(0.3);
         pdf.line(direitaPerfil, yCenter, direitaPerfil + 4, yCenter);
+
         pdf.setFontSize(8);
         pdf.setTextColor(60, 60, 60);
         pdf.setFont("helvetica", "bold");
@@ -280,10 +307,12 @@ export default function SoloDetailPage() {
       }
     });
 
+    // Borda do perfil completo
     pdf.setDrawColor(0);
     pdf.setLineWidth(0.5);
     pdf.rect(esquerdaPerfil, topo, larguraPerfil, alturaMax);
 
+    // 3. Legenda (agora com Texturas!)
     let yLegenda = topo;
     pdf.setFontSize(8);
     pdf.setTextColor(80);
@@ -292,18 +321,91 @@ export default function SoloDetailPage() {
       const de = parseFloat(l.de);
       const ate = parseFloat(l.ate);
       const [r, g, b] = gerarCor(l.tipo);
+
       const xLegenda = direitaPerfil + 45; 
       const tamanhoLegenda = 6;
+
       pdf.setFillColor(r, g, b);
       pdf.setDrawColor(150);
       pdf.setLineWidth(0.2);
+      
+      // Desenha o retângulo colorido base da legenda
       pdf.rect(xLegenda, yLegenda, tamanhoLegenda, tamanhoLegenda, "FD");
+
+      const tipoLower = l.tipo.toLowerCase();
+
+      // 🔥 AJUSTE: Aplicando as mesmas texturas dentro do quadrado da legenda
+      
+      // --- Textura de Brita (Legenda) ---
+      if (tipoLower.includes("brita")) {
+        const espacamento = 1.5; // Espaçamento menor para o tamanho da legenda
+        const raio = 0.3;         // Raio menor
+        pdf.setDrawColor(0);
+        for (let yDot = yLegenda + 1; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
+          for (let xDot = xLegenda + 1; xDot < xLegenda + tamanhoLegenda; xDot += espacamento) {
+            pdf.circle(xDot, yDot, raio);
+          }
+        }
+      }
+
+      // --- Textura de Rachão (Legenda) ---
+      if (tipoLower.includes("rachão") || tipoLower.includes("rachao")) {
+        const espacamento = 2; // Espaçamento menor
+        const raio = 0.5;       // Raio menor
+        pdf.setDrawColor(0);
+        for (let yDot = yLegenda + 1; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
+          for (let xDot = xLegenda + 1; xDot < xLegenda + tamanhoLegenda; xDot += espacamento) {
+            pdf.circle(xDot, yDot, raio);
+          }
+        }
+      }
+
+      // --- Textura Siltosa (X) (Legenda) ---
+      if (tipoLower.includes("siltosa")) {
+        const espacamento = 1.2; // Espaçamento muito pequeno
+        const tamanhoX = 0.2; // Tamanho do X muito pequeno
+        pdf.setDrawColor(0);
+        for (let yDot = yLegenda + 0.5; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
+          for (let xDot = xLegenda + 0.5; xDot < xLegenda + tamanhoLegenda; xDot += espacamento) {
+            pdf.line(xDot - tamanhoX, yDot - tamanhoX, xDot + tamanhoX, yDot + tamanhoX);
+            pdf.line(xDot - tamanhoX, yDot + tamanhoX, xDot + tamanhoX, yDot - tamanhoX);
+          }
+        }
+      }
+
+      // --- Textura de Areia (Legenda) ---
+      if (tipoLower.includes("areia") || tipoLower.includes("arenoso") || tipoLower.includes("arenosa")) {
+        let espacamento = 1; // Espaçamento para a legenda
+        let raio = 0.1;       // Raio menor para a legenda
+        
+        if (tipoLower.includes("fina")) {
+          espacamento = 0.8;
+          raio = 0.08;
+        }
+        
+        if (tipoLower.includes("grossa")) {
+          espacamento = 1.2;
+          raio = 0.2;
+        }
+        
+        pdf.setFillColor(0, 0, 0);
+        for (let yDot = yLegenda + 0.5; yDot < yLegenda + tamanhoLegenda; yDot += espacamento) {
+          for (let xDot = xLegenda + 0.5; xDot < xLegenda + tamanhoLegenda; xDot += espacamento) {
+            pdf.circle(xDot, yDot, raio, "F");
+          }
+        }
+      }
+
+      // Desenha o texto da legenda
       pdf.text(`${de} a ${ate}m : ${l.tipo}`, xLegenda + 9, yLegenda + 4.5);
+
       yLegenda += 10;
     });
 
+    // 4. Tubo de PVC e Filtros
     const larguraTubo = 12;
     const esquerdaTubo = centro - larguraTubo / 2;
+
     pdf.setFillColor(255, 255, 255);
     pdf.setDrawColor(50);
     pdf.setLineWidth(0.3);
@@ -316,6 +418,7 @@ export default function SoloDetailPage() {
       const yTopoFiltro = topo + topoFiltro * escala;
       const yBaseFiltro = topo + baseFiltro * escala;
       const alturaFiltro = yBaseFiltro - yTopoFiltro;
+
       pdf.rect(esquerdaTubo, yTopoFiltro, larguraTubo, alturaFiltro);
       for (let i = 3; i < alturaFiltro; i += 3) {
         pdf.line(esquerdaTubo + 0.5, yTopoFiltro + i, esquerdaTubo + larguraTubo - 0.5, yTopoFiltro + i);
@@ -330,35 +433,43 @@ export default function SoloDetailPage() {
       const esquerdaPrefiltro = esquerdaTubo - larguraPrefiltro;
       const direitaPrefiltro = esquerdaTubo + larguraTubo;
 
+      // Areia acima do pré-filtro
       pdf.setFillColor(245, 222, 179);
       pdf.rect(esquerdaPrefiltro, topo, larguraPrefiltro, yInicioPrefiltro - topo, "F");
       pdf.rect(direitaPrefiltro, topo, larguraPrefiltro, yInicioPrefiltro - topo, "F");
+
       pdf.setDrawColor(0);
       pdf.setLineWidth(0.2);
       pdf.rect(esquerdaPrefiltro, topo, larguraPrefiltro, yInicioPrefiltro - topo);
       pdf.rect(direitaPrefiltro, topo, larguraPrefiltro, yInicioPrefiltro - topo);
 
+      // Pré-filtro
       pdf.setFillColor(210, 180, 140);
       pdf.rect(esquerdaPrefiltro, yInicioPrefiltro, larguraPrefiltro, alturaPrefiltro, "F");
       pdf.rect(direitaPrefiltro, yInicioPrefiltro, larguraPrefiltro, alturaPrefiltro, "F");
       pdf.rect(esquerdaPrefiltro, yInicioPrefiltro, larguraPrefiltro, alturaPrefiltro);
       pdf.rect(direitaPrefiltro, yInicioPrefiltro, larguraPrefiltro, alturaPrefiltro);
 
+      // Textura pré-filtro
       pdf.setFillColor(0, 0, 0);
       const espacamentoPF = 2.4;
       const raioBase = 0.25;
+
       for (let yDot = yInicioPrefiltro + 1; yDot < yInicioPrefiltro + alturaPrefiltro; yDot += espacamentoPF) {
         for (let xDot = esquerdaPrefiltro + 0.8; xDot < esquerdaPrefiltro + larguraPrefiltro - 0.8; xDot += espacamentoPF) {
           const jitterX = (Math.random() - 0.5) * 0.6; const jitterY = (Math.random() - 0.5) * 0.6;
-          pdf.circle(xDot + jitterX, yDot + jitterY, raioBase + (Math.random() - 0.5) * 0.1, "F");
+          const raio = raioBase + (Math.random() - 0.5) * 0.1;
+          pdf.circle(xDot + jitterX, yDot + jitterY, raio, "F");
         }
         for (let xDot = direitaPrefiltro + 0.8; xDot < direitaPrefiltro + larguraPrefiltro - 0.8; xDot += espacamentoPF) {
           const jitterX = (Math.random() - 0.5) * 0.6; const jitterY = (Math.random() - 0.5) * 0.6;
-          pdf.circle(xDot + jitterX, yDot + jitterY, raioBase + (Math.random() - 0.5) * 0.1, "F");
+          const raio = raioBase + (Math.random() - 0.5) * 0.1;
+          pdf.circle(xDot + jitterX, yDot + jitterY, raio, "F");
         }
       }
     }
 
+    // 5. Nível da Água
     if (data.nivel_agua) {
       const nivel = Number(String(data.nivel_agua).replace(",", "."));
       if (!isNaN(nivel)) {
@@ -366,29 +477,36 @@ export default function SoloDetailPage() {
         pdf.setDrawColor(135, 206, 235);
         pdf.setLineWidth(0.7);
         pdf.line(esquerdaPerfil - 10, yNivel, direitaPerfil + 10, yNivel);
+        const xTri = esquerdaPerfil - 12;
         pdf.setFillColor(135, 206, 235);
-        pdf.triangle(esquerdaPerfil - 12, yNivel, esquerdaPerfil - 15, yNivel - 2, esquerdaPerfil - 15, yNivel + 2, "F");
+        pdf.triangle(xTri, yNivel, xTri - 3, yNivel - 2, xTri - 3, yNivel + 2, "F");
       }
     }
 
+    // 6. Cotas de Diâmetro
     const yCota1 = topo + alturaMax + 10;
     const yCota2 = topo + alturaMax + 20;
+
     pdf.setDrawColor(0);
     pdf.setLineWidth(0.3);
     pdf.setTextColor(60);
 
     const diametroPoco = data.diametro_poco ?? "-";
-    pdf.line(esquerdaTubo, topo + alturaMax, esquerdaTubo, yCota1);
-    pdf.line(esquerdaTubo + larguraTubo, topo + alturaMax, esquerdaTubo + larguraTubo, yCota1);
-    pdf.line(esquerdaTubo, yCota1, esquerdaTubo + larguraTubo, yCota1);
+    const esquerdaCotaPoco = esquerdaTubo;
+    const direitaCotaPoco = esquerdaTubo + larguraTubo;
+    pdf.line(esquerdaCotaPoco, topo + alturaMax, esquerdaCotaPoco, yCota1);
+    pdf.line(direitaCotaPoco, topo + alturaMax, direitaCotaPoco, yCota1);
+    pdf.line(esquerdaCotaPoco, yCota1, direitaCotaPoco, yCota1);
     pdf.setFontSize(8);
-    pdf.text(`Ø ${diametroPoco} (Poço)`, esquerdaTubo + (larguraTubo/2), yCota1 + 4, { align: "center" });
+    pdf.text(`Ø ${diametroPoco} (Poço)`, (esquerdaCotaPoco + direitaCotaPoco) / 2, yCota1 + 4, { align: "center" });
 
     const diametroSondagem = data.diametro_sondagem ?? "-";
-    pdf.line(esquerdaPerfil, topo + alturaMax, esquerdaPerfil, yCota2);
-    pdf.line(direitaPerfil, topo + alturaMax, direitaPerfil, yCota2);
-    pdf.line(esquerdaPerfil, yCota2, direitaPerfil, yCota2);
-    pdf.text(`Ø ${diametroSondagem} (Furo)`, centro, yCota2 + 4, { align: "center" });
+    const esquerdaCotaSondagem = esquerdaPerfil;
+    const direitaCotaSondagem = direitaPerfil;
+    pdf.line(esquerdaCotaSondagem, topo + alturaMax, esquerdaCotaSondagem, yCota2);
+    pdf.line(direitaCotaSondagem, topo + alturaMax, direitaCotaSondagem, yCota2);
+    pdf.line(esquerdaCotaSondagem, yCota2, direitaCotaSondagem, yCota2);
+    pdf.text(`Ø ${diametroSondagem} (Furo)`, (esquerdaCotaSondagem + direitaCotaSondagem) / 2, yCota2 + 4, { align: "center" });
 
     pdf.save(`Perfil_Sondagem_${data.nome_sondagem}.pdf`);
   }
@@ -571,6 +689,7 @@ export default function SoloDetailPage() {
                   </table>
                 </div>
               </Section>
+
             </div>
           )}
         </div>
