@@ -250,7 +250,7 @@ export default function RdoViewPage() {
                   <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Comentários e Notas de Campo</li>
                   <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Galeria de Fotos e Assinaturas</li>
                 </ul>
-                <p className="text-xs text-gray-400 font-italic italic">Pronto para envio aos stakeholders.</p>
+                <p className="text-xs text-gray-400 font-italic italic">GreenSoil Group</p>
              </div>
           </div>
         </div>
