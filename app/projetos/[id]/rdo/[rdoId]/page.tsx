@@ -39,7 +39,7 @@ export default function RdoViewPage() {
     // --- PALETA DE CORES ---
     const brandPurple: [number, number, number] = [57, 30, 42];
     const brandGreen: [number, number, number] = [128, 176, 45];
-    const lightGray: [number, number, number] = [248, 248, 250];
+    const textDark: [number, number, number] = [40, 40, 40];
 
     // --- HELPERS ---
     const checkPageBreak = (needed: number) => {
@@ -63,138 +63,165 @@ export default function RdoViewPage() {
       currentY += 10;
     };
 
-    // --- 1. HEADER EXECUTIVO ---
-    doc.setFillColor(...brandPurple);
-    doc.rect(0, 0, pageWidth, 35, "F");
-    try { doc.addImage("/logo.png", "PNG", marginX, 8, 35, 10); } catch (e) {}
+    // --- 1. HEADER EXECUTIVO COM DEGRADÊ ---
+    const headerHeight = 38;
+    const colorStart = [240, 240, 242];
+    const colorEnd = brandPurple;
 
-    doc.setTextColor(255, 255, 255);
+    doc.setLineWidth(0.1); 
+    for (let x = 0; x < pageWidth; x += 0.1) {
+      const ratio = x / pageWidth;
+      const r = Math.round(colorStart[0] * (1 - ratio) + colorEnd[0] * ratio);
+      const g = Math.round(colorStart[1] * (1 - ratio) + colorEnd[1] * ratio);
+      const b = Math.round(colorStart[2] * (1 - ratio) + colorEnd[2] * ratio);
+      doc.setDrawColor(r, g, b);
+      doc.line(x, 0, x, headerHeight);
+    }
+
+    doc.setFillColor(...brandGreen);
+    doc.rect(0, headerHeight - 1, pageWidth, 1, "F");
+
+    try { 
+      doc.addImage("/logo.png", "PNG", marginX, 10, 38, 14); 
+    } catch (e) {
+      console.warn("Logo não carregado");
+    }
+
+    doc.setTextColor(...brandPurple); 
     doc.setFontSize(16);
-    doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 15, { align: "right" });
+    doc.setFont("helvetica", "bold");
+    doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 16, { align: "right" });
+    
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`${projectName} | DATA: ${rdo.data}`, pageWidth - marginX, 22, { align: "right" });
-    doc.text(`HORÁRIO: ${rdo.inicio} às ${rdo.fim}`, pageWidth - marginX, 27, { align: "right" });
+    doc.setTextColor(80, 80, 80);
+    doc.text(`${projectName}`, pageWidth - marginX, 23, { align: "right" });
+    doc.text(`DATA: ${rdo.data} | PERÍODO: ${rdo.inicio} às ${rdo.fim}`, pageWidth - marginX, 28, { align: "right" });
 
-    currentY = 45;
+    currentY = 50;
 
-    // --- 2. DASHBOARD DE INDICADORES (KPIs) ---
+    // --- 2. DASHBOARD KPIs ---
     const colabTotal = rdo.envolvidos?.reduce((a: number, b: any) => a + (Number(b.colaboradores) || 0), 0) || 0;
     const cards = [
       { label: "EFETIVO TOTAL", val: `${colabTotal} PESSOAS` },
       { label: "CLIMA", val: rdo.clima?.[0]?.condicao || "N/A" },
-      { label: "STATUS SEGURANÇA", val: rdo.sheq?.incidente === "Não" ? "SEM OCORRÊNCIAS" : "ALERTA" }
+      { label: "SEGURANÇA (SHEQ)", val: rdo.sheq?.incidente === "Não" ? "OPER. SEGURA" : "ALERTA" }
     ];
 
     cards.forEach((card, i) => {
       const x = marginX + (i * (contentWidth / 3 + 2));
-      doc.setFillColor(...lightGray);
-      doc.roundedRect(x, currentY, contentWidth / 3 - 4, 18, 1, 1, "F");
+      doc.setFillColor(250, 250, 250);
+      doc.setDrawColor(220, 220, 220);
+      doc.roundedRect(x, currentY, contentWidth / 3 - 4, 18, 1, 1, "FD");
       doc.setFontSize(7);
-      doc.setTextColor(100);
+      doc.setTextColor(120);
       doc.text(card.label, x + 4, currentY + 6);
       doc.setFontSize(9);
       doc.setTextColor(...brandPurple);
       doc.setFont("helvetica", "bold");
       doc.text(card.val, x + 4, currentY + 13);
     });
-    currentY += 28;
+    currentY += 30;
 
     const tableConfig: any = {
       margin: { left: marginX, right: marginX },
-      styles: { fontSize: 8, cellPadding: 3 },
+      styles: { fontSize: 8, cellPadding: 3, textColor: textDark },
       headStyles: { fillColor: brandPurple, textColor: 255, fontStyle: "bold" },
       alternateRowStyles: { fillColor: [252, 252, 252] }
     };
 
-    // --- 3. TABELA DE CLIMA ---
-    sectionHeader("Condições Climáticas");
-    autoTable(doc, {
-      ...tableConfig,
-      startY: currentY,
-      head: [["Período", "Tempo", "Condição", "Impacto/Razão"]],
-      body: rdo.clima?.map((c: any) => [c.periodo, c.tempo, c.condicao, c.razao || "-"]) || []
-    });
-    currentY = (doc as any).lastAutoTable.finalY + 12;
+    // --- 3. TABELAS ---
+    if (rdo.clima?.length > 0) {
+      sectionHeader("Condições Climáticas");
+      autoTable(doc, {
+        ...tableConfig,
+        startY: currentY,
+        head: [["Período", "Tempo", "Condição", "Impacto/Razão"]],
+        body: rdo.clima?.map((c: any) => [c.periodo, c.tempo, c.condicao, c.razao || "-"])
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 12;
+    }
 
-    // --- 4. TABELA DE ENVOLVIDOS ---
-    sectionHeader("Mão de Obra e Efetivo");
-    autoTable(doc, {
-      ...tableConfig,
-      startY: currentY,
-      head: [["Empresa Parceira", "N° Colaboradores", "Função Principal"]],
-      body: rdo.envolvidos?.map((e: any) => [e.empresa, e.colaboradores, e.funcao]) || []
-    });
-    currentY = (doc as any).lastAutoTable.finalY + 12;
+    if (rdo.envolvidos?.length > 0) {
+      sectionHeader("Mão de Obra e Efetivo");
+      autoTable(doc, {
+        ...tableConfig,
+        startY: currentY,
+        head: [["Empresa Parceira", "N° Colaboradores", "Função Principal"]],
+        body: rdo.envolvidos?.map((e: any) => [e.empresa, e.colaboradores, e.funcao])
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 12;
+    }
 
-    // --- 5. TABELA DE ATIVIDADES ---
-    sectionHeader("Progresso das Atividades");
-    autoTable(doc, {
-      ...tableConfig,
-      startY: currentY,
-      head: [["Atividade Realizada", "Responsável", "Status", "Observações"]],
-      body: rdo.atividades?.map((a: any) => [a.atividade, a.empresa, a.status, a.obs || "-"]) || [],
-      didParseCell: (data) => {
-        if (data.section === "body" && data.column.index === 2) {
-          const s = String(data.cell.raw).toLowerCase();
-          if (s.includes("conclu")) data.cell.styles.textColor = [0, 150, 0];
-          if (s.includes("andamento")) data.cell.styles.textColor = [200, 120, 0];
+    if (rdo.atividades?.length > 0) {
+      sectionHeader("Cronograma de Atividades");
+      autoTable(doc, {
+        ...tableConfig,
+        startY: currentY,
+        head: [["Atividade", "Responsável", "Status", "Observações"]],
+        body: rdo.atividades?.map((a: any) => [a.atividade, a.empresa, a.status, a.obs || "-"]),
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 2) {
+            const s = String(data.cell.raw).toLowerCase();
+            if (s.includes("conclu")) data.cell.styles.textColor = [0, 150, 0];
+            if (s.includes("andamento")) data.cell.styles.textColor = [180, 100, 0];
+          }
         }
-      }
-    });
-    currentY = (doc as any).lastAutoTable.finalY + 12;
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 12;
+    }
 
-    // --- 6. TABELA DE SHEQ ---
-    sectionHeader("Segurança, Saúde e Meio Ambiente (SHEQ)");
-    autoTable(doc, {
-      ...tableConfig,
-      startY: currentY,
-      head: [["Tipo de Ocorrência", "Houve Registro?", "Descrição/Observação"]],
-      body: [
-        ["Incidentes de Segurança", rdo.sheq?.incidente || "Não", rdo.sheq?.incidenteObs || "-"],
-        ["Vazamentos / Meio Ambiente", rdo.sheq?.vazamento || "Não", rdo.sheq?.vazamentoObs || "-"]
-      ]
-    });
-    currentY = (doc as any).lastAutoTable.finalY + 12;
+    if (rdo.sheq) {
+      sectionHeader("Segurança e Meio Ambiente (SHEQ)");
+      autoTable(doc, {
+        ...tableConfig,
+        startY: currentY,
+        head: [["Ocorrência", "Registro", "Observação"]],
+        body: [
+          ["Incidentes de Segurança", rdo.sheq?.incidente || "Não", rdo.sheq?.incidenteObs || "-"],
+          ["Vazamentos / Meio Ambiente", rdo.sheq?.vazamento || "Não", rdo.sheq?.vazamentoObs || "-"]
+        ]
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 12;
+    }
 
-    // --- 7. COMENTÁRIOS GERAIS ---
+    // --- 4. COMENTÁRIOS ---
     if (rdo.comentarios) {
-      sectionHeader("Notas e Comentários Adicionais");
+      sectionHeader("Notas e Observações de Campo");
       const textLines = doc.splitTextToSize(rdo.comentarios, contentWidth - 10);
       const boxH = (textLines.length * 5) + 10;
       checkPageBreak(boxH);
-      doc.setFillColor(250, 250, 250);
+      doc.setFillColor(252, 252, 252);
       doc.setDrawColor(230, 230, 230);
       doc.rect(marginX, currentY, contentWidth, boxH, "FD");
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(...textDark);
       doc.setFont("helvetica", "normal");
       doc.text(textLines, marginX + 5, currentY + 7);
       currentY += boxH + 15;
     }
 
-    // --- 8. GALERIA DE FOTOS ---
+    // --- 5. FOTOS (COM PROPORÇÃO CORRETA E AWAIT) ---
     if (rdo.fotos?.length > 0) {
-      sectionHeader("Registro Fotográfico");
-      const imgW = (contentWidth / 2) - 5;
-      const imgH = 45;
+      sectionHeader("Evidências Fotográficas");
+      
+      const boxW = (contentWidth / 2) - 5; 
+      const boxH = 55; 
 
-      // 🔥 IMPORTANTE: Usamos um loop 'for' tradicional para poder usar o 'await'
       for (let i = 0; i < rdo.fotos.length; i++) {
         const foto = rdo.fotos[i];
-        const xPos = i % 2 === 0 ? marginX : marginX + imgW + 10;
+        const isPar = i % 2 === 0;
+        const xPos = isPar ? marginX : marginX + boxW + 10;
         
-        checkPageBreak(imgH + 20);
+        if (isPar) {
+            checkPageBreak(boxH + 20);
+        }
         
         if (foto.storagePath) {
           try {
-            // 1. Pega a URL pública da foto no Supabase (já com o traço 'rdo-photos')
             const { data: urlData } = supabase.storage.from('rdo-photos').getPublicUrl(foto.storagePath);
-            
-            // 2. Baixa a imagem do servidor
             const response = await fetch(urlData.publicUrl);
             const blob = await response.blob();
             
-            // 3. Converte a imagem para Base64 (formato que o jsPDF entende)
             const base64 = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader();
               reader.onloadend = () => resolve(reader.result as string);
@@ -202,91 +229,113 @@ export default function RdoViewPage() {
               reader.readAsDataURL(blob);
             });
 
-            // 4. Desenha a borda e a imagem no PDF
-            doc.setDrawColor(230);
-            doc.rect(xPos, currentY, imgW, imgH, "S");
-            doc.addImage(base64, "JPEG", xPos + 1, currentY + 1, imgW - 2, imgH - 2);
+            // Lógica de Aspect Ratio (Proporção real da imagem)
+            const props = doc.getImageProperties(base64);
+            let imgRenderW = boxW;
+            let imgRenderH = (props.height * boxW) / props.width;
+
+            if (imgRenderH > boxH) {
+                imgRenderH = boxH;
+                imgRenderW = (props.width * boxH) / props.height;
+            }
+
+            const xOffset = xPos + (boxW - imgRenderW) / 2;
+            const yOffset = currentY + (boxH - imgRenderH) / 2;
+
+            doc.setFillColor(248, 248, 248);
+            doc.rect(xPos, currentY, boxW, boxH, "F");
+            doc.addImage(base64, "JPEG", xOffset, yOffset, imgRenderW, imgRenderH);
+            doc.setDrawColor(220);
+            doc.rect(xPos, currentY, boxW, boxH, "S");
             
           } catch (e) {
-            console.error("Erro ao carregar imagem para o PDF:", e);
-            // Se der erro, desenha um aviso no lugar da foto
+            console.error("Erro ao processar foto PDF:", e);
             doc.setFillColor(240, 240, 240);
-            doc.rect(xPos, currentY, imgW, imgH, "F");
+            doc.rect(xPos, currentY, boxW, boxH, "F");
             doc.setFontSize(8);
             doc.setTextColor(200, 0, 0);
-            doc.text("Erro na foto", xPos + 5, currentY + (imgH / 2));
+            doc.text("Erro ao carregar imagem", xPos + 5, currentY + (boxH / 2));
           }
         }
         
-        // Escreve a legenda logo abaixo da foto
         doc.setFontSize(7);
-        doc.setTextColor(120);
-        doc.text(foto.legenda || "Sem legenda", xPos, currentY + imgH + 4);
+        doc.setTextColor(100);
+        const legendaText = doc.splitTextToSize(foto.legenda || "Sem legenda", boxW);
+        doc.text(legendaText, xPos, currentY + boxH + 5);
 
-        // Ajusta a altura (Y) apenas quando fechar a linha de 2 fotos ou for a última
-        if (i % 2 !== 0 || i === rdo.fotos.length - 1) {
-          currentY += imgH + 15;
+        if (!isPar || i === rdo.fotos.length - 1) {
+          currentY += boxH + 15;
         }
       }
     }
 
-    // --- 9. ASSINATURAS ---
+    // --- 6. ASSINATURAS (COM PROTEÇÃO DE QUEBRA DE PÁGINA) ---
     if (rdo.assinaturas?.length > 0) {
-      sectionHeader("Assinaturas de Responsabilidade");
+      
+      // Trava de segurança: Pede 50 pontos de espaço na página. 
+      // Se não tiver, joga Título + Assinaturas pra próxima folha juntos.
+      checkPageBreak(50); 
+      
+      sectionHeader("Validação e Assinaturas");
       currentY += 5;
+
       rdo.assinaturas.forEach((a: any, i: number) => {
         const xPos = i % 2 === 0 ? marginX : pageWidth / 2 + 5;
         checkPageBreak(35);
+        
         if (a.assinatura) {
           try { doc.addImage(a.assinatura, "PNG", xPos + 10, currentY, 40, 15); } catch(e) {}
         }
-        doc.setDrawColor(180);
+        
+        doc.setDrawColor(200);
         doc.line(xPos, currentY + 16, xPos + 60, currentY + 16);
         doc.setFontSize(8);
+        doc.setTextColor(...textDark);
         doc.text(a.empresa || "Responsável", xPos, currentY + 21);
+        
         if (i % 2 !== 0 || i === rdo.assinaturas.length - 1) currentY += 30;
       });
     }
 
-    // RODAPÉ FINAL
+    // --- RODAPÉ ---
     const totalP = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= totalP; i++) {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(180);
-      doc.text(`Documento gerado eletronicamente - Página ${i} de ${totalP}`, pageWidth / 2, 290, { align: "center" });
+      doc.text(`RDO ${projectName} - Página ${i} de ${totalP} - Emitido eletronicamente`, pageWidth / 2, 290, { align: "center" });
     }
 
-    doc.save(`RDO_COMPLETO_${projectName}_${rdo.data}.pdf`);
+    doc.save(`RDO_${projectName}_${rdo.data}.pdf`);
   }
 
+  // --- O RETORNO DA INTERFACE QUE TINHA SUMIDO ---
   if (!rdo) return <AdminShell><p className="p-10">Carregando...</p></AdminShell>;
 
   return (
     <AdminShell>
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100">
-          <div className="bg-[#391e2a] p-8 text-white flex justify-between items-center">
+          <div className="p-8 border-b-4 border-[#80b02d] flex justify-between items-center bg-gray-50">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Visualização do Diário</h1>
-              <p className="text-[#80b02d] font-medium mt-1">{projectName} • {rdo.data}</p>
+              <h1 className="text-2xl font-bold text-[#391e2a]">Relatório Executivo</h1>
+              <p className="text-gray-600 font-medium mt-1">{projectName} • {rdo.data}</p>
             </div>
-            <Button onClick={gerarPDF} className="bg-[#80b02d] hover:bg-[#6a9425] text-white px-8 h-12 rounded-lg font-bold shadow-lg transition-transform active:scale-95">
-              BAIXAR RDO COMPLETO
+            <Button onClick={gerarPDF} className="bg-[#391e2a] hover:bg-[#2a161f] text-white px-10 h-12 rounded-lg font-bold shadow-lg transition-all active:scale-95">
+              BAIXAR RDO PREMIUM
             </Button>
           </div>
           
-          <div className="p-12 text-center bg-gray-50">
-             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 inline-block">
-                <p className="text-gray-600 mb-4">O PDF será gerado com:</p>
-                <ul className="text-left text-sm space-y-2 text-gray-500 mb-6">
-                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Dashboard de Indicadores</li>
-                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Todas as Tabelas Técnicas (Clima, Efetivo, Atividades, SHEQ)</li>
-                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Comentários e Notas de Campo</li>
-                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Galeria de Fotos e Assinaturas</li>
-                </ul>
-                <p className="text-xs text-gray-400 font-italic italic">GreenSoil Group</p>
+          <div className="p-10 text-center flex flex-col items-center">
+             <div className="inline-block p-4 rounded-full bg-purple-50 mb-4 border border-purple-100">
+                <svg className="w-10 h-10 text-[#391e2a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
              </div>
+             <h2 className="text-lg font-semibold text-gray-800">Pronto para Exportação</h2>
+             <p className="text-gray-500 text-sm mt-2 max-w-sm">
+                O PDF agora conta com fotos na proporção correta e quebra de página inteligente para as assinaturas!
+             </p>
           </div>
         </div>
       </div>
