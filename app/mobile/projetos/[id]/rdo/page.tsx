@@ -130,7 +130,7 @@ export default function RdoPage() {
         storagePath: f.storagePath, // O banco salva o path
         legenda: f.legenda,
         // Gera URL pública para preview
-        previewUrl: f.storagePath ? supabase.storage.from('rdo_photos').getPublicUrl(f.storagePath).data.publicUrl : "",
+        previewUrl: f.storagePath ? supabase.storage.from('rdo-photos').getPublicUrl(f.storagePath).data.publicUrl : "",
         file: null, // Sem arquivo para upload
         status: "success"
       }));
@@ -230,9 +230,9 @@ export default function RdoPage() {
         const fileExt = foto.file.name.split('.').pop();
         const fileName = `${projectId}/${dataRelatorio || 'rascunho'}/${Date.now()}_${i}.${fileExt}`;
         
-        // Upload para Bucket 'rdo_photos' (Necessário criar no Supabase)
+        // Upload para Bucket 'rdo-photos' (Necessário criar no Supabase)
         const { data, error } = await supabase.storage
-          .from('rdo_photos')
+          .from('rdo-photos')
           .upload(fileName, foto.file, { cacheControl: '3600', upsert: false });
 
         if (error) throw error;
@@ -259,7 +259,7 @@ export default function RdoPage() {
   async function deleteRemovedPhotosFromStorage() {
     if (fotosParaDeletar.length === 0) return;
     // Supabase permite deletar em lote enviando array de paths
-    const { error } = await supabase.storage.from('rdo_photos').remove(fotosParaDeletar);
+    const { error } = await supabase.storage.from('rdo-photos').remove(fotosParaDeletar);
     if (error) console.error("Erro ao limpar storage:", error);
     else setFotosParaDeletar([]); // Limpa lista de exclusão
   }
