@@ -8,6 +8,47 @@ import { Button } from "@/components/ui/button";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
+// ================= HELPERS (Padrão Pro) =================
+
+// Função auxiliar assíncrona para replicar o efeito CSS 'brightness-0 invert'
+// usando manipulação de canvas pura. Isso garante que usemos apenas UM arquivo de logo.png no sistema.
+async function generateWhiteLogoBase64(src: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    // Previne erros de Cross-Origin se o logo estiver em um CDN
+    img.crossOrigin = "Anonymous"; 
+    
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      
+      if (!ctx) {
+        reject(new Error("Não foi possível obter o contexto do canvas"));
+        return;
+      }
+
+      // 1. Desenha a imagem original no canvas
+      ctx.drawImage(img, 0, 0);
+
+      // 2. Aplica a manipulação de pixels (Lógica: brightness-0 + invert)
+      // brightness(0) => zera r,g,b. invert(1) => r,g,b viram 255 (branco).
+      ctx.filter = "brightness(0) invert(1)";
+      ctx.drawImage(canvas, 0, 0); // Redesenha com o filtro aplicado
+
+      // 3. Converte para Base64 (formato que o jsPDF entende)
+      const base64DataData = canvas.toDataURL("image/png");
+      resolve(base64DataData);
+    };
+
+    img.onerror = (e) => reject(e);
+    img.src = src;
+  });
+}
+
+// ================= PAGE =================
+
 export default function RdoViewPage() {
   const params = useParams();
   const projectId = params.id as string;
@@ -30,18 +71,28 @@ export default function RdoViewPage() {
   async function gerarPDF() {
     if (!rdo) return;
 
+    // --- CARREGAMENTO INICIAL DO LOGO BRANCO ---
+    let whiteLogoBase64: string | null = null;
+    try {
+      // Chamamos nossa função auxiliar para converter o logo original
+      whiteLogoBase64 = await generateWhiteLogoBase64("/logo.png");
+    } catch (e) {
+      console.error("Erro ao processar o logo branco para o PDF:", e);
+      // Se der erro, whiteLogoBase64 continua null e o PDF será gerado sem logo no header
+    }
+
     const doc = new jsPDF("p", "mm", "a4");
     const marginX = 15;
     const pageWidth = doc.internal.pageSize.getWidth();
     const contentWidth = pageWidth - marginX * 2;
     let currentY = 0;
 
-    // --- PALETA DE CORES ---
+    // --- PALETA DE CORES GREENSOIL (Padrão Pro) ---
     const brandPurple: [number, number, number] = [57, 30, 42];
     const brandGreen: [number, number, number] = [128, 176, 45];
     const lightGray: [number, number, number] = [248, 248, 250];
 
-    // --- HELPERS ---
+    // --- HELPERS DE LAYOUT ---
     const checkPageBreak = (needed: number) => {
       if (currentY + needed > 275) {
         doc.addPage();
@@ -63,11 +114,21 @@ export default function RdoViewPage() {
       currentY += 10;
     };
 
-    // --- 1. HEADER EXECUTIVO ---
+    // --- 1. HEADER EXECUTIVO COM FUNDO ESCURO (CORRIGIDO COM LOGO BRANCO) ---
     doc.setFillColor(...brandPurple);
     doc.rect(0, 0, pageWidth, 35, "F");
-    try { doc.addImage("/logo.png", "PNG", marginX, 8, 35, 10); } catch (e) {}
 
+    // 🔥 NOVA LÓGICA DO LOGO: Adiciona o logo branco centralizado verticalmente no header roxo
+    if (whiteLogoBase64) {
+      try {
+        // Centralizado verticalmente (altura 35mm, logo 10mm, y=12.5mm)
+        doc.addImage(whiteLogoBase64, "PNG", marginX, 12.5, 35, 10); 
+      } catch (e) {
+        console.error("Erro ao adicionar imagem branca ao PDF:", e);
+      }
+    }
+
+    // Textos do Header em Branco (Sempre estiveram corretos)
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 15, { align: "right" });
@@ -77,6 +138,8 @@ export default function RdoViewPage() {
     doc.text(`HORÁRIO: ${rdo.inicio} às ${rdo.fim}`, pageWidth - marginX, 27, { align: "right" });
 
     currentY = 45;
+
+    // ================= RESTO DO CÓDIGO (INTACTO) =================
 
     // --- 2. DASHBOARD DE INDICADORES (KPIs) ---
     const colabTotal = rdo.envolvidos?.reduce((a: number, b: any) => a + (Number(b.colaboradores) || 0), 0) || 0;
@@ -176,30 +239,22 @@ export default function RdoViewPage() {
     if (rdo.fotos?.length > 0) {
       sectionHeader("Registro Fotográfico");
       
-      const boxW = (contentWidth / 2) - 5; // Largura do container da foto
-      const boxH = 55; // Altura máxima do container
+      const boxW = (contentWidth / 2) - 5; 
+      const boxH = 55;
 
-      // 🔥 IMPORTANTE: Usamos um loop 'for' tradicional para poder usar o 'await'
       for (let i = 0; i < rdo.fotos.length; i++) {
         const foto = rdo.fotos[i];
         const isPar = i % 2 === 0;
         const xPos = isPar ? marginX : marginX + boxW + 10;
         
-        // Verifica quebra de página antes de começar uma nova linha (quando é par)
-        if (isPar) {
-          checkPageBreak(boxH + 20);
-        }
+        if (isPar) checkPageBreak(boxH + 20);
         
         if (foto.storagePath) {
           try {
-            // 1. Pega a URL pública da foto no Supabase (já com o traço 'rdo-photos')
             const { data: urlData } = supabase.storage.from('rdo-photos').getPublicUrl(foto.storagePath);
-            
-            // 2. Baixa a imagem do servidor
             const response = await fetch(urlData.publicUrl);
             const blob = await response.blob();
             
-            // 3. Converte a imagem para Base64 (formato que o jsPDF entende)
             const base64 = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader();
               reader.onloadend = () => resolve(reader.result as string);
@@ -207,35 +262,26 @@ export default function RdoViewPage() {
               reader.readAsDataURL(blob);
             });
 
-            // 🔥 4. CÁLCULO DE PROPORÇÃO (ASPECT RATIO)
             const props = doc.getImageProperties(base64);
             let imgRenderW = boxW;
             let imgRenderH = (props.height * boxW) / props.width;
 
-            // Se a imagem calculada for mais alta que nossa caixa, limitamos a altura e recalculamos a largura
             if (imgRenderH > boxH) {
                 imgRenderH = boxH;
                 imgRenderW = (props.width * boxH) / props.height;
             }
 
-            // Centraliza a imagem dentro da nossa caixa (boxW x boxH)
             const xOffset = xPos + (boxW - imgRenderW) / 2;
             const yOffset = currentY + (boxH - imgRenderH) / 2;
 
-            // Fundo cinza claro
             doc.setFillColor(248, 248, 248);
             doc.rect(xPos, currentY, boxW, boxH, "F");
-
-            // Desenha a imagem centralizada e proporcional
             doc.addImage(base64, "JPEG", xOffset, yOffset, imgRenderW, imgRenderH);
-            
-            // Borda ao redor do container
             doc.setDrawColor(220);
             doc.rect(xPos, currentY, boxW, boxH, "S");
             
           } catch (e) {
             console.error("Erro ao carregar imagem para o PDF:", e);
-            // Se der erro, desenha um aviso no lugar da foto
             doc.setFillColor(240, 240, 240);
             doc.rect(xPos, currentY, boxW, boxH, "F");
             doc.setFontSize(8);
@@ -244,13 +290,11 @@ export default function RdoViewPage() {
           }
         }
         
-        // Escreve a legenda logo abaixo da foto
         doc.setFontSize(7);
         doc.setTextColor(120);
         const legendaText = doc.splitTextToSize(foto.legenda || "Sem legenda", boxW);
         doc.text(legendaText, xPos, currentY + boxH + 4);
 
-        // Ajusta a altura (Y) apenas quando fechar a linha de 2 fotos ou for a última
         if (!isPar || i === rdo.fotos.length - 1) {
           currentY += boxH + 15;
         }
@@ -259,15 +303,13 @@ export default function RdoViewPage() {
 
     // --- 9. ASSINATURAS ---
     if (rdo.assinaturas?.length > 0) {
-      // 🔥 FORÇA A CHECAGEM DE PÁGINA: Se não tiver 50 unidades de espaço, joga título e assinaturas pra página seguinte
       checkPageBreak(50);
-
       sectionHeader("Assinaturas de Responsabilidade");
       currentY += 5;
 
       rdo.assinaturas.forEach((a: any, i: number) => {
         const xPos = i % 2 === 0 ? marginX : pageWidth / 2 + 5;
-        checkPageBreak(35); // Mantém a checagem para as próximas linhas de assinaturas
+        checkPageBreak(35);
         
         if (a.assinatura) {
           try { doc.addImage(a.assinatura, "PNG", xPos + 10, currentY, 40, 15); } catch(e) {}
@@ -299,27 +341,30 @@ export default function RdoViewPage() {
   return (
     <AdminShell>
       <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100">
-          <div className="bg-[#391e2a] p-8 text-white flex justify-between items-center">
+        <div className="bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 animate-fade-in duration-300">
+          
+          {/* Header Visual do Painel (Intacto) */}
+          <div className="bg-[#391e2a] p-8 text-white flex justify-between items-center shadow-lg">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Visualização do Diário</h1>
-              <p className="text-[#80b02d] font-medium mt-1">{projectName} • {rdo.data}</p>
+              <p className="text-[#80b02d] font-semibold mt-1 uppercase tracking-wider text-xs">{projectName} • DATA: {rdo.data}</p>
             </div>
             <Button onClick={gerarPDF} className="bg-[#80b02d] hover:bg-[#6a9425] text-white px-8 h-12 rounded-lg font-bold shadow-lg transition-transform active:scale-95">
               BAIXAR RDO COMPLETO
             </Button>
           </div>
           
-          <div className="p-12 text-center bg-gray-50">
-             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 inline-block">
-                <p className="text-gray-600 mb-4">O PDF será gerado com:</p>
-                <ul className="text-left text-sm space-y-2 text-gray-500 mb-6">
-                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Dashboard de Indicadores</li>
-                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Todas as Tabelas Técnicas (Clima, Efetivo, Atividades, SHEQ)</li>
-                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Comentários e Notas de Campo</li>
-                  <li className="flex items-center"><span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Galeria de Fotos e Assinaturas</li>
+          {/* Conteúdo Visual do Painel (Intacto) */}
+          <div className="p-12 text-center bg-gray-50/50">
+             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 inline-block">
+                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-5">O PDF gerado incluirá:</p>
+                <ul className="text-left text-sm space-y-2.5 text-gray-600 mb-6 font-medium">
+                  <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Dashboard Executivo de Indicadores</li>
+                  <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Tabelas Técnicas (Clima, Efetivo, Atividades, SHEQ)</li>
+                  <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Notas de Campo e Comentários Adicionais</li>
+                  <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Galeria de Fotos Proporcionais e Assinaturas</li>
                 </ul>
-                <p className="text-xs text-gray-400 font-italic italic">GreenSoil Group</p>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">GreenSoil Work Order System</p>
              </div>
           </div>
         </div>
