@@ -38,7 +38,7 @@ export default function AppAmostragemPage() {
 
   const [form, setForm] = useState({
     poco: "",
-    codigo_amostra: "", // NOVO CAMPO
+    codigo_amostra: "",
     data: "",
     hora_inicio: "",
     na_inicial: "",
@@ -64,7 +64,7 @@ export default function AppAmostragemPage() {
     setDraftId(data.id);
     setForm({
       poco: data.poco ?? "",
-      codigo_amostra: data.codigo_amostra ?? "", // NOVO CAMPO
+      codigo_amostra: data.codigo_amostra ?? "",
       data: data.data ?? "",
       hora_inicio: data.hora_inicio ?? "",
       na_inicial: data.na_inicial ?? "",
@@ -168,11 +168,14 @@ export default function AppAmostragemPage() {
               <Input label="Identificação do Poço *" value={form.poco} onChange={(v: string) => setField("poco", v)} placeholder="Ex: PM-01" />
               <Input label="Código da Amostra" value={form.codigo_amostra} onChange={(v: string) => setField("codigo_amostra", v)} placeholder="Ex: AM-01" />
               
-              <div className="grid grid-cols-2 gap-4">
+              {/* ALINHAMENTO POR BAIXO (items-end) */}
+              <div className="grid grid-cols-2 gap-4 items-end">
                 <Input label="Data" value={form.data} type="date" onChange={(v: string) => setField("data", v)} />
                 <Input label="Hora de Início" value={form.hora_inicio} type="time" onChange={(v: string) => setField("hora_inicio", v)} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* ALINHAMENTO POR BAIXO (items-end) */}
+              <div className="grid grid-cols-2 gap-4 items-end">
                 <Input label="Nível d'água Inicial (m)" value={form.na_inicial} type="number" onChange={(v: string) => setField("na_inicial", v)} placeholder="0.00" />
                 <Input label="Nível d'água Final (m)" value={form.na_final} type="number" onChange={(v: string) => setField("na_final", v)} placeholder="0.00" />
               </div>
@@ -184,7 +187,7 @@ export default function AppAmostragemPage() {
             <div className="space-y-4">
               
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
-                <span className="text-sm font-bold text-[#391e2a]">Presença de Fase Livre (FL) identificada?</span>
+                <span className="text-sm font-bold text-[#391e2a] pr-4 leading-tight">Presença de Fase Livre (FL) identificada?</span>
                 
                 {/* SWITCH MODERNO SIM/NÃO */}
                 <button
@@ -192,9 +195,9 @@ export default function AppAmostragemPage() {
                   onClick={() => {
                     const newValue = !form.fase_livre;
                     setField("fase_livre", newValue);
-                    if (!newValue) setField("espessura_fl", ""); // Limpa se desmarcar
+                    if (!newValue) setField("espessura_fl", ""); 
                   }}
-                  className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ease-in-out duration-200 focus:outline-none ${form.fase_livre ? 'bg-[#80b02d]' : 'bg-gray-300'}`}
+                  className={`shrink-0 relative inline-flex h-8 w-14 items-center rounded-full transition-colors ease-in-out duration-200 focus:outline-none ${form.fase_livre ? 'bg-[#80b02d]' : 'bg-gray-300'}`}
                 >
                   <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ease-in-out duration-200 ${form.fase_livre ? 'translate-x-7' : 'translate-x-1'}`} />
                 </button>
@@ -229,8 +232,8 @@ export default function AppAmostragemPage() {
                     )}
                   </div>
 
-                  {/* Campos da Leitura */}
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Campos da Leitura (Também alinhados por baixo) */}
+                  <div className="grid grid-cols-2 gap-4 items-end">
                     <Input label="Horário" type="time" value={reading.horario} onChange={(v: string) => { const r = [...readings]; r[i].horario = v; setReadings(r); }} />
                     <Input label="NA (m)" type="number" value={reading.na} placeholder="0.00" onChange={(v: string) => { const r = [...readings]; r[i].na = v; setReadings(r); }} />
                     <Input label="pH" type="number" value={reading.ph} placeholder="0.0" onChange={(v: string) => { const r = [...readings]; r[i].ph = v; setReadings(r); }} />
@@ -290,10 +293,11 @@ function Section({ title, icon, children }: { title: string; icon?: React.ReactN
   );
 }
 
+// O Input agora tem justify-end e h-full para forçar o input lá pra baixo sempre!
 function Input({ label, value, onChange, type = "text", placeholder = "" }: any) {
   return (
-    <div className="flex flex-col gap-1.5 w-full">
-      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">{label}</label>
+    <div className="flex flex-col justify-end gap-1.5 w-full h-full">
+      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide leading-tight">{label}</label>
       <input
         type={type}
         value={value}
