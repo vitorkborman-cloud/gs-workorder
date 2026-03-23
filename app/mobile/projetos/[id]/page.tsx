@@ -136,7 +136,7 @@ export default function MobileProjetoPage() {
               </div>
 
               <div className="text-sm opacity-90 mt-1">
-                EM CONSTRUÇÃO
+                Ficha de amostragem
               </div>
             </div>
 
