@@ -64,7 +64,7 @@ export default function RdoViewPage() {
     if (proj) setProjectName(proj.name);
   }
 
-  // --- FUNÇÃO PARA SALVAR NO SUPABASE (AGORA COM FOTOS) ---
+  // --- FUNÇÃO PARA SALVAR NO SUPABASE ---
   async function salvarAlteracoes() {
     setIsSaving(true);
     try {
@@ -79,7 +79,7 @@ export default function RdoViewPage() {
           atividades: rdo.atividades,
           envolvidos: rdo.envolvidos,
           sheq: rdo.sheq,
-          fotos: rdo.fotos // Adicionado para salvar as fotos modificadas/novas
+          fotos: rdo.fotos 
         })
         .eq("id", rdoId);
 
@@ -104,7 +104,7 @@ export default function RdoViewPage() {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `desktop_${Date.now()}.${fileExt}`;
-      const filePath = `rdo_${rdoId}/${fileName}`; // Estrutura de pasta recomendada
+      const filePath = `rdo_${rdoId}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('rdo-photos')
@@ -120,7 +120,6 @@ export default function RdoViewPage() {
       alert("Erro ao fazer upload da foto. Verifique as permissões do Supabase.");
     } finally {
       setIsUploadingPhoto(false);
-      // Limpa o input para permitir enviar a mesma imagem novamente se necessário
       e.target.value = '';
     }
   }
@@ -132,10 +131,21 @@ export default function RdoViewPage() {
     setRdo({ ...rdo, [arrayName]: newArray });
   };
 
+  const addArrayItem = (arrayName: string, emptyObj: any) => {
+    const currentArray = rdo[arrayName] || [];
+    setRdo({ ...rdo, [arrayName]: [...currentArray, emptyObj] });
+  };
+
+  const removeArrayItem = (arrayName: string, index: number) => {
+    const newArray = rdo[arrayName].filter((_: any, i: number) => i !== index);
+    setRdo({ ...rdo, [arrayName]: newArray });
+  };
+
   const updateSheq = (field: string, value: string) => {
     setRdo({ ...rdo, sheq: { ...rdo.sheq, [field]: value } });
   };
 
+  // --- GERAÇÃO DE PDF ---
   async function gerarPDF() {
     if (!rdo) return;
 
@@ -441,17 +451,24 @@ export default function RdoViewPage() {
                 <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Condições Climáticas</h3>
                 <div className="space-y-3">
                   {rdo.clima?.map((c: any, idx: number) => (
-                    <div key={idx} className="grid grid-cols-4 gap-3 bg-white p-3 border rounded-md shadow-sm">
-                      <input type="text" value={c.periodo || ""} onChange={(e) => updateArrayItem('clima', idx, 'periodo', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Período (Ex: Manhã)" />
-                      <input type="text" value={c.tempo || ""} onChange={(e) => updateArrayItem('clima', idx, 'tempo', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Tempo (Ex: Ensolarado)" />
-                      <select value={c.condicao || ""} onChange={(e) => updateArrayItem('clima', idx, 'condicao', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
+                    <div key={idx} className="flex gap-3 bg-white p-3 border rounded-md shadow-sm items-center">
+                      <input type="text" value={c.periodo || ""} onChange={(e) => updateArrayItem('clima', idx, 'periodo', e.target.value)} className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Período (Ex: Manhã)" />
+                      <input type="text" value={c.tempo || ""} onChange={(e) => updateArrayItem('clima', idx, 'tempo', e.target.value)} className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Tempo (Ex: Ensolarado)" />
+                      <select value={c.condicao || ""} onChange={(e) => updateArrayItem('clima', idx, 'condicao', e.target.value)} className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
                         <option value="Trabalhável">Trabalhável</option>
                         <option value="Parcialmente Trabalhável">Parcialmente Trabalhável</option>
                         <option value="Impraticável">Impraticável</option>
                       </select>
-                      <input type="text" value={c.razao || ""} onChange={(e) => updateArrayItem('clima', idx, 'razao', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Impacto/Razão (Se houver)" />
+                      <input type="text" value={c.razao || ""} onChange={(e) => updateArrayItem('clima', idx, 'razao', e.target.value)} className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Impacto/Razão" />
+                      <button onClick={() => removeArrayItem('clima', idx)} className="text-red-500 hover:bg-red-50 p-2 rounded transition" title="Remover linha">✕</button>
                     </div>
                   ))}
+                  <button 
+                    onClick={() => addArrayItem('clima', { periodo: "", tempo: "", condicao: "Trabalhável", razao: "" })}
+                    className="text-xs font-bold text-[#80b02d] hover:text-[#6a9425] transition flex items-center gap-1 mt-2"
+                  >
+                    + ADICIONAR CLIMA
+                  </button>
                 </div>
               </div>
 
@@ -460,17 +477,24 @@ export default function RdoViewPage() {
                 <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Atividades</h3>
                 <div className="space-y-3">
                   {rdo.atividades?.map((ativ: any, idx: number) => (
-                    <div key={idx} className="grid grid-cols-12 gap-3 bg-white p-3 border rounded-md shadow-sm">
-                      <input type="text" value={ativ.atividade || ""} onChange={(e) => updateArrayItem('atividades', idx, 'atividade', e.target.value)} className="col-span-4 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Atividade" />
-                      <input type="text" value={ativ.empresa || ""} onChange={(e) => updateArrayItem('atividades', idx, 'empresa', e.target.value)} className="col-span-3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Responsável" />
-                      <select value={ativ.status || ""} onChange={(e) => updateArrayItem('atividades', idx, 'status', e.target.value)} className="col-span-2 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
+                    <div key={idx} className="flex gap-3 bg-white p-3 border rounded-md shadow-sm items-center">
+                      <input type="text" value={ativ.atividade || ""} onChange={(e) => updateArrayItem('atividades', idx, 'atividade', e.target.value)} className="w-1/3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Atividade" />
+                      <input type="text" value={ativ.empresa || ""} onChange={(e) => updateArrayItem('atividades', idx, 'empresa', e.target.value)} className="w-1/4 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Responsável" />
+                      <select value={ativ.status || ""} onChange={(e) => updateArrayItem('atividades', idx, 'status', e.target.value)} className="w-1/6 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
                         <option value="Concluído">Concluído</option>
                         <option value="Em Andamento">Em Andamento</option>
                         <option value="Pendente">Pendente</option>
                       </select>
-                      <input type="text" value={ativ.obs || ""} onChange={(e) => updateArrayItem('atividades', idx, 'obs', e.target.value)} className="col-span-3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Observações" />
+                      <input type="text" value={ativ.obs || ""} onChange={(e) => updateArrayItem('atividades', idx, 'obs', e.target.value)} className="w-1/4 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Observações" />
+                      <button onClick={() => removeArrayItem('atividades', idx)} className="text-red-500 hover:bg-red-50 p-2 rounded transition" title="Remover linha">✕</button>
                     </div>
                   ))}
+                  <button 
+                    onClick={() => addArrayItem('atividades', { atividade: "", empresa: "", status: "Pendente", obs: "" })}
+                    className="text-xs font-bold text-[#80b02d] hover:text-[#6a9425] transition flex items-center gap-1 mt-2"
+                  >
+                    + ADICIONAR ATIVIDADE
+                  </button>
                 </div>
               </div>
 
@@ -479,12 +503,19 @@ export default function RdoViewPage() {
                 <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Mão de Obra</h3>
                 <div className="space-y-3">
                   {rdo.envolvidos?.map((env: any, idx: number) => (
-                    <div key={idx} className="grid grid-cols-3 gap-3 bg-white p-3 border rounded-md shadow-sm">
-                      <input type="text" value={env.empresa || ""} onChange={(e) => updateArrayItem('envolvidos', idx, 'empresa', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Empresa" />
-                      <input type="number" value={env.colaboradores || ""} onChange={(e) => updateArrayItem('envolvidos', idx, 'colaboradores', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Qtd. Colaboradores" />
-                      <input type="text" value={env.funcao || ""} onChange={(e) => updateArrayItem('envolvidos', idx, 'funcao', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Função" />
+                    <div key={idx} className="flex gap-3 bg-white p-3 border rounded-md shadow-sm items-center">
+                      <input type="text" value={env.empresa || ""} onChange={(e) => updateArrayItem('envolvidos', idx, 'empresa', e.target.value)} className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Empresa" />
+                      <input type="number" value={env.colaboradores || ""} onChange={(e) => updateArrayItem('envolvidos', idx, 'colaboradores', e.target.value)} className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Qtd. Colaboradores" />
+                      <input type="text" value={env.funcao || ""} onChange={(e) => updateArrayItem('envolvidos', idx, 'funcao', e.target.value)} className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Função" />
+                      <button onClick={() => removeArrayItem('envolvidos', idx)} className="text-red-500 hover:bg-red-50 p-2 rounded transition" title="Remover linha">✕</button>
                     </div>
                   ))}
+                  <button 
+                    onClick={() => addArrayItem('envolvidos', { empresa: "", colaboradores: "", funcao: "" })}
+                    className="text-xs font-bold text-[#80b02d] hover:text-[#6a9425] transition flex items-center gap-1 mt-2"
+                  >
+                    + ADICIONAR MÃO DE OBRA
+                  </button>
                 </div>
               </div>
 
@@ -528,10 +559,7 @@ export default function RdoViewPage() {
                         placeholder="Legenda da foto..." 
                       />
                       <button 
-                        onClick={() => {
-                          const novasFotos = rdo.fotos.filter((_: any, i: number) => i !== idx);
-                          setRdo({...rdo, fotos: novasFotos});
-                        }}
+                        onClick={() => removeArrayItem('fotos', idx)}
                         className="bg-red-50 text-red-600 px-3 py-2 rounded text-xs font-bold hover:bg-red-100 transition-colors"
                       >
                         Remover
@@ -569,18 +597,20 @@ export default function RdoViewPage() {
           )}
           
           {/* Conteúdo Visual do Painel (Intacto) */}
-          <div className="p-12 text-center bg-gray-50/50">
-             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 inline-block">
-                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-5">O PDF gerado incluirá:</p>
-                <ul className="text-left text-sm space-y-2.5 text-gray-600 mb-6 font-medium">
-                  <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Dashboard Executivo de Indicadores</li>
-                  <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Tabelas Técnicas (Clima, Efetivo, Atividades, SHEQ)</li>
-                  <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Notas de Campo e Comentários Adicionais</li>
-                  <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Galeria de Fotos Proporcionais e Assinaturas</li>
-                </ul>
-                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">GreenSoil Work Order System</p>
-             </div>
-          </div>
+          {!isEditing && (
+            <div className="p-12 text-center bg-gray-50/50">
+               <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 inline-block">
+                  <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-5">O PDF gerado incluirá:</p>
+                  <ul className="text-left text-sm space-y-2.5 text-gray-600 mb-6 font-medium">
+                    <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Dashboard Executivo de Indicadores</li>
+                    <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Tabelas Técnicas (Clima, Efetivo, Atividades, SHEQ)</li>
+                    <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Notas de Campo e Comentários Adicionais</li>
+                    <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Galeria de Fotos Proporcionais e Assinaturas</li>
+                  </ul>
+                  <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">GreenSoil Work Order System</p>
+               </div>
+            </div>
+          )}
         </div>
       </div>
     </AdminShell>
