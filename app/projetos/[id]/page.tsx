@@ -26,6 +26,11 @@ type RDO = {
   created_at: string;
 };
 
+type CampanhaFQ = {
+  data: string;
+  quantidade: number;
+};
+
 export default function ProjetoPage() {
   const params = useParams();
   const router = useRouter();
@@ -34,6 +39,7 @@ export default function ProjetoPage() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [rdos, setRdos] = useState<RDO[]>([]);
+  const [campanhasFQ, setCampanhasFQ] = useState<CampanhaFQ[]>([]); // NOVO ESTADO
   const [loading, setLoading] = useState(true);
   const [mobile, setMobile] = useState(false);
 
@@ -43,33 +49,56 @@ export default function ProjetoPage() {
   }, []);
 
   async function load() {
+    // 1. Work Orders
     const { data: wo } = await supabase
       .from("work_orders")
       .select("*")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
-
     if (wo) setWorkOrders(wo);
 
+    // 2. Perfis
     const { data: sd } = await supabase
       .from("soil_descriptions")
       .select("id, nome_sondagem, created_at")
       .eq("project_id", projectId)
       .eq("finalized", true)
       .order("created_at", { ascending: false });
-
     if (sd) setPerfis(sd);
 
-    setLoading(false);
-
+    // 3. RDOs
     const { data: rdoData } = await supabase
       .from("rdo_reports")
       .select("id, data, created_at")
       .eq("project_id", projectId)
       .eq("draft", false)
       .order("created_at", { ascending: false });
-
     if (rdoData) setRdos(rdoData);
+
+    // 4. Físico-Químicos (NOVO)
+    const { data: fqData } = await supabase
+      .from("water_samplings")
+      .select("id, data")
+      .eq("project_id", projectId)
+      .eq("finalized", true);
+
+    if (fqData) {
+      // Agrupa as fichas contando quantas ocorreram no mesmo dia
+      const grouped = fqData.reduce((acc: any, curr: any) => {
+        acc[curr.data] = (acc[curr.data] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Transforma o objeto agrupado em um array e ordena da data mais recente pra mais antiga
+      const formatadas = Object.keys(grouped).map(date => ({
+        data: date,
+        quantidade: grouped[date]
+      })).sort((a, b) => b.data.localeCompare(a.data));
+
+      setCampanhasFQ(formatadas);
+    }
+
+    setLoading(false);
   }
 
   async function createWorkOrder() {
@@ -80,14 +109,12 @@ export default function ProjetoPage() {
       title,
       project_id: projectId,
     });
-
     load();
   }
 
   async function deleteWorkOrder(id: string, title: string) {
     const ok = confirm(`Excluir a Work Order "${title}"?`);
     if (!ok) return;
-
     await supabase.from("work_orders").delete().eq("id", id);
     load();
   }
@@ -95,25 +122,29 @@ export default function ProjetoPage() {
   async function deletePerfil(id: string, nome: string) {
     const ok = confirm(`Excluir o perfil "${nome}" permanentemente?`);
     if (!ok) return;
-
     await supabase.from("soil_descriptions").delete().eq("id", id);
     load();
   }
 
-  // NOVA FUNÇÃO: Deletar RDO
   async function deleteRDO(id: string, dataRdo: string) {
     const ok = confirm(`Excluir o relatório do dia ${dataRdo} permanentemente?`);
     if (!ok) return;
-
     await supabase.from("rdo_reports").delete().eq("id", id);
     load();
+  }
+
+  // Função auxiliar para formatar a data visualmente
+  function formatDateBr(dateString: string) {
+    if (!dateString) return "Sem Data";
+    const [year, month, day] = dateString.split("-");
+    return `${day}/${month}/${year}`;
   }
 
   return (
     <AdminShell>
       <div className="space-y-10">
 
-        {/* WORK ORDERS */}
+        {/* ================= WORK ORDERS ================= */}
         <div className="space-y-5">
           <div className="flex justify-between items-center">
             <div>
@@ -139,7 +170,7 @@ export default function ProjetoPage() {
             {loading ? (
               <p className="text-white/80">Carregando...</p>
             ) : workOrders.length === 0 ? (
-              <p className="text-white/70">Nenhuma Work Order criada.</p>
+              <p className="text-white/70">Nenhum Work Order criado.</p>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {workOrders.map((wo) => (
@@ -158,19 +189,7 @@ export default function ProjetoPage() {
 
                     <Card
                       onClick={() => router.push(`/work-orders/${wo.id}`)}
-                      className="
-                      cursor-pointer
-                      border-0
-                      bg-gradient-to-br
-                      from-[#80b02d]
-                      to-[#5e8420]
-                      text-white
-                      shadow-xl
-                      hover:shadow-2xl
-                      hover:-translate-y-1
-                      transition
-                      rounded-2xl
-                      "
+                      className="cursor-pointer border-0 bg-gradient-to-br from-[#80b02d] to-[#5e8420] text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition rounded-2xl"
                     >
                       <CardContent className="p-6 space-y-2">
                         <p className="font-semibold text-lg">
@@ -188,7 +207,52 @@ export default function ProjetoPage() {
           </div>
         </div>
 
-        {/* PERFIS DESCRITIVOS */}
+        {/* ================= FÍSICO-QUÍMICOS (NOVO) ================= */}
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">
+              Físico-Químicos
+            </h2>
+            <p className="text-sm text-gray-500">
+              Amostragens de água subterrânea (Agrupadas por dia de campanha)
+            </p>
+          </div>
+
+          <div className="bg-secondary rounded-3xl p-8 shadow-inner">
+            {campanhasFQ.length === 0 ? (
+              <p className="text-white/70">
+                Nenhuma amostragem de físico-químicos recebida.
+              </p>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {campanhasFQ.map((campanha) => (
+                  <div key={campanha.data} className="relative group">
+                    <Card
+                      onClick={() =>
+                        router.push(`/projetos/${projectId}/fisico-quimicos`)
+                      }
+                      className="cursor-pointer border-0 bg-gradient-to-br from-[#2f7ea1] to-[#1f5c78] text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition rounded-2xl"
+                    >
+                      <CardContent className="p-6 space-y-2">
+                        <p className="font-semibold text-lg">
+                          Campanha FQ
+                        </p>
+                        <p className="text-sm opacity-90 font-medium">
+                          {formatDateBr(campanha.data)}
+                        </p>
+                        <div className="mt-4 inline-block bg-white/20 px-3 py-1 rounded-lg text-xs font-bold">
+                          {campanha.quantidade} {campanha.quantidade === 1 ? "poço amostrado" : "poços amostrados"}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ================= PERFIS DESCRITIVOS ================= */}
         <div className="space-y-5">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
@@ -222,19 +286,7 @@ export default function ProjetoPage() {
                       onClick={() =>
                         router.push(`/projetos/${projectId}/solo/${p.id}`)
                       }
-                      className="
-                      cursor-pointer
-                      border-0
-                      bg-gradient-to-br
-                      from-[#391e2a]
-                      to-[#2a1420]
-                      text-white
-                      shadow-xl
-                      hover:shadow-2xl
-                      hover:-translate-y-1
-                      transition
-                      rounded-2xl
-                      "
+                      className="cursor-pointer border-0 bg-gradient-to-br from-[#391e2a] to-[#2a1420] text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition rounded-2xl"
                     >
                       <CardContent className="p-6 space-y-2">
                         <p className="font-semibold text-lg">
@@ -252,7 +304,7 @@ export default function ProjetoPage() {
           </div>
         </div>
 
-        {/* RELATÓRIOS DIÁRIOS */}
+        {/* ================= RELATÓRIOS DIÁRIOS (RDO) ================= */}
         <div className="space-y-5">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
@@ -271,10 +323,7 @@ export default function ProjetoPage() {
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {rdos.map((r) => (
-                  // ADICIONADO: Wrapper div com 'relative group' para o hover funcionar
                   <div key={r.id} className="relative group">
-                    
-                    {/* ADICIONADO: Botão de exclusão igual aos outros */}
                     {!mobile && (
                       <button
                         onClick={(e) => {
@@ -291,19 +340,7 @@ export default function ProjetoPage() {
                       onClick={() =>
                         router.push(`/projetos/${projectId}/rdo/${r.id}`)
                       }
-                      className="
-                      cursor-pointer
-                      border-0
-                      bg-gradient-to-br
-                      from-[#80b02d]
-                      to-[#5e8420]
-                      text-white
-                      shadow-xl
-                      hover:shadow-2xl
-                      hover:-translate-y-1
-                      transition
-                      rounded-2xl
-                      "
+                      className="cursor-pointer border-0 bg-gradient-to-br from-[#80b02d] to-[#5e8420] text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition rounded-2xl"
                     >
                       <CardContent className="p-6 space-y-2">
                         <p className="font-semibold text-lg">
