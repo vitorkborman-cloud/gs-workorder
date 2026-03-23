@@ -38,7 +38,8 @@ export default function AppAmostragemPage() {
 
   const [form, setForm] = useState({
     poco: "",
-    codigo_amostra: "",
+    nomenclatura: "", // Renomeado
+    identificacao_codigo: "", // Novo campo
     data: "",
     hora_inicio: "",
     na_inicial: "",
@@ -64,7 +65,8 @@ export default function AppAmostragemPage() {
     setDraftId(data.id);
     setForm({
       poco: data.poco ?? "",
-      codigo_amostra: data.codigo_amostra ?? "",
+      nomenclatura: data.nomenclatura ?? "",
+      identificacao_codigo: data.identificacao_codigo ?? "",
       data: data.data ?? "",
       hora_inicio: data.hora_inicio ?? "",
       na_inicial: data.na_inicial ?? "",
@@ -166,7 +168,8 @@ export default function AppAmostragemPage() {
           <Section title="Dados Gerais" icon={<Icons.Droplet />}>
             <div className="space-y-4">
               <Input label="Identificação do Poço *" value={form.poco} onChange={(v: string) => setField("poco", v)} placeholder="Ex: PM-01" />
-              <Input label="Código da Amostra" value={form.codigo_amostra} onChange={(v: string) => setField("codigo_amostra", v)} placeholder="Ex: AM-01" />
+              <Input label="Nomenclatura" value={form.nomenclatura} onChange={(v: string) => setField("nomenclatura", v)} placeholder="Ex: Amostra 01" />
+              <Input label="Identificação (código)" value={form.identificacao_codigo} onChange={(v: string) => setField("identificacao_codigo", v)} placeholder="Ex: AM-01" />
               
               {/* ALINHAMENTO POR BAIXO (items-end) */}
               <div className="grid grid-cols-2 gap-4 items-end">
@@ -232,7 +235,7 @@ export default function AppAmostragemPage() {
                     )}
                   </div>
 
-                  {/* Campos da Leitura (Também alinhados por baixo) */}
+                  {/* Campos da Leitura */}
                   <div className="grid grid-cols-2 gap-4 items-end">
                     <Input label="Horário" type="time" value={reading.horario} onChange={(v: string) => { const r = [...readings]; r[i].horario = v; setReadings(r); }} />
                     <Input label="NA (m)" type="number" value={reading.na} placeholder="0.00" onChange={(v: string) => { const r = [...readings]; r[i].na = v; setReadings(r); }} />
@@ -293,7 +296,6 @@ function Section({ title, icon, children }: { title: string; icon?: React.ReactN
   );
 }
 
-// O Input agora tem justify-end e h-full para forçar o input lá pra baixo sempre!
 function Input({ label, value, onChange, type = "text", placeholder = "" }: any) {
   return (
     <div className="flex flex-col justify-end gap-1.5 w-full h-full">
