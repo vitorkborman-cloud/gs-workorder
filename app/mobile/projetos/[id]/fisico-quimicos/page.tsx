@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase"; // Ajuste o caminho se necessário
-import AppShell from "@/components/AppShell"; // Ajuste o caminho se necessário
+import { supabase } from "@/lib/supabase"; 
+import AppShell from "@/components/AppShell"; 
 
 // ================= ÍCONES =================
 const Icons = {
@@ -32,13 +32,13 @@ export default function AppAmostragemPage() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Começa com uma leitura vazia, conforme solicitado
   const [readings, setReadings] = useState<Reading[]>([
     { horario: "", na: "", ph: "", orp: "", od: "", condutividade: "" }
   ]);
 
   const [form, setForm] = useState({
     poco: "",
+    codigo_amostra: "", // NOVO CAMPO
     data: "",
     hora_inicio: "",
     na_inicial: "",
@@ -64,6 +64,7 @@ export default function AppAmostragemPage() {
     setDraftId(data.id);
     setForm({
       poco: data.poco ?? "",
+      codigo_amostra: data.codigo_amostra ?? "", // NOVO CAMPO
       data: data.data ?? "",
       hora_inicio: data.hora_inicio ?? "",
       na_inicial: data.na_inicial ?? "",
@@ -131,7 +132,7 @@ export default function AppAmostragemPage() {
       }
       
       alert("Amostragem enviada com sucesso!");
-      router.back(); // Volta para a tela anterior
+      router.back(); 
     } catch (e) {
       alert("Erro ao finalizar.");
     } finally {
@@ -143,8 +144,8 @@ export default function AppAmostragemPage() {
     <AppShell>
       <div className="min-h-screen bg-gray-50 pb-28">
         
-        {/* HEADER EXECUTIVO MOBILE */}
-        <div className="bg-[#391e2a] text-white px-5 py-5 shadow-md sticky top-0 z-30">
+        {/* HEADER EXECUTIVO MOBILE (DESFIXADO) */}
+        <div className="bg-[#391e2a] text-white px-5 py-5 shadow-md">
           <div className="flex justify-between items-center max-w-4xl mx-auto w-full">
             <div>
               <h1 className="text-xl font-bold tracking-wide">Físico-Químicos</h1>
@@ -165,6 +166,8 @@ export default function AppAmostragemPage() {
           <Section title="Dados Gerais" icon={<Icons.Droplet />}>
             <div className="space-y-4">
               <Input label="Identificação do Poço *" value={form.poco} onChange={(v: string) => setField("poco", v)} placeholder="Ex: PM-01" />
+              <Input label="Código da Amostra" value={form.codigo_amostra} onChange={(v: string) => setField("codigo_amostra", v)} placeholder="Ex: AM-01" />
+              
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Data" value={form.data} type="date" onChange={(v: string) => setField("data", v)} />
                 <Input label="Hora de Início" value={form.hora_inicio} type="time" onChange={(v: string) => setField("hora_inicio", v)} />
@@ -179,18 +182,23 @@ export default function AppAmostragemPage() {
           {/* SESSÃO 2: FASE LIVRE */}
           <Section title="Detecção de Fase Livre" icon={<Icons.Activity />}>
             <div className="space-y-4">
-              <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-gray-50 active:bg-gray-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={form.fase_livre}
-                  onChange={(e) => {
-                    setField("fase_livre", e.target.checked);
-                    if (!e.target.checked) setField("espessura_fl", ""); // Limpa se desmarcar
-                  }}
-                  className="w-5 h-5 text-[#80b02d] focus:ring-[#80b02d] rounded"
-                />
+              
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
                 <span className="text-sm font-bold text-[#391e2a]">Presença de Fase Livre (FL) identificada?</span>
-              </label>
+                
+                {/* SWITCH MODERNO SIM/NÃO */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newValue = !form.fase_livre;
+                    setField("fase_livre", newValue);
+                    if (!newValue) setField("espessura_fl", ""); // Limpa se desmarcar
+                  }}
+                  className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ease-in-out duration-200 focus:outline-none ${form.fase_livre ? 'bg-[#80b02d]' : 'bg-gray-300'}`}
+                >
+                  <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ease-in-out duration-200 ${form.fase_livre ? 'translate-x-7' : 'translate-x-1'}`} />
+                </button>
+              </div>
 
               {form.fase_livre && (
                 <div className="animate-in fade-in slide-in-from-top-2 duration-200">
