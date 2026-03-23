@@ -48,9 +48,10 @@ export default function RdoViewPage() {
   const [rdo, setRdo] = useState<any>(null);
   const [projectName, setProjectName] = useState("");
   
-  // --- NOVOS ESTADOS DE EDIÇÃO ---
+  // --- ESTADOS DE EDIÇÃO ---
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   useEffect(() => {
     load();
@@ -63,18 +64,22 @@ export default function RdoViewPage() {
     if (proj) setProjectName(proj.name);
   }
 
-  // --- NOVA FUNÇÃO PARA SALVAR NO SUPABASE ---
+  // --- FUNÇÃO PARA SALVAR NO SUPABASE (AGORA COM FOTOS) ---
   async function salvarAlteracoes() {
     setIsSaving(true);
     try {
       const { error } = await supabase
         .from("rdo_reports")
         .update({
+          data: rdo.data,
+          inicio: rdo.inicio,
+          fim: rdo.fim,
+          clima: rdo.clima,
           comentarios: rdo.comentarios,
           atividades: rdo.atividades,
           envolvidos: rdo.envolvidos,
-          clima: rdo.clima,
-          sheq: rdo.sheq
+          sheq: rdo.sheq,
+          fotos: rdo.fotos // Adicionado para salvar as fotos modificadas/novas
         })
         .eq("id", rdoId);
 
@@ -87,6 +92,36 @@ export default function RdoViewPage() {
       alert("Erro ao salvar as alterações.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  // --- FUNÇÃO PARA UPLOAD DE FOTO VIA DESKTOP ---
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `desktop_${Date.now()}.${fileExt}`;
+      const filePath = `rdo_${rdoId}/${fileName}`; // Estrutura de pasta recomendada
+
+      const { error: uploadError } = await supabase.storage
+        .from('rdo-photos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const newFoto = { storagePath: filePath, legenda: "" };
+      setRdo({ ...rdo, fotos: [...(rdo.fotos || []), newFoto] });
+      
+    } catch (error) {
+      console.error("Erro no upload da foto:", error);
+      alert("Erro ao fazer upload da foto. Verifique as permissões do Supabase.");
+    } finally {
+      setIsUploadingPhoto(false);
+      // Limpa o input para permitir enviar a mesma imagem novamente se necessário
+      e.target.value = '';
     }
   }
 
@@ -378,24 +413,62 @@ export default function RdoViewPage() {
             </div>
           </div>
 
-          {/* ÁREA DE EDIÇÃO INTERATIVA (Injetada sem alterar o resto) */}
+          {/* ÁREA DE EDIÇÃO INTERATIVA */}
           {isEditing && (
             <div className="p-8 border-b border-gray-100 bg-gray-50/30 space-y-8">
               
+              {/* Informações Gerais (Data e Horários) */}
+              <div>
+                <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Informações Gerais</h3>
+                <div className="grid grid-cols-3 gap-4 bg-white p-4 border rounded-md shadow-sm">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">Data do RDO</label>
+                    <input type="date" value={rdo.data || ""} onChange={(e) => setRdo({...rdo, data: e.target.value})} className="w-full text-sm border p-2 rounded outline-none focus:ring-1 focus:ring-[#80b02d]" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">Horário Início</label>
+                    <input type="time" value={rdo.inicio || ""} onChange={(e) => setRdo({...rdo, inicio: e.target.value})} className="w-full text-sm border p-2 rounded outline-none focus:ring-1 focus:ring-[#80b02d]" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">Horário Fim</label>
+                    <input type="time" value={rdo.fim || ""} onChange={(e) => setRdo({...rdo, fim: e.target.value})} className="w-full text-sm border p-2 rounded outline-none focus:ring-1 focus:ring-[#80b02d]" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Clima */}
+              <div>
+                <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Condições Climáticas</h3>
+                <div className="space-y-3">
+                  {rdo.clima?.map((c: any, idx: number) => (
+                    <div key={idx} className="grid grid-cols-4 gap-3 bg-white p-3 border rounded-md shadow-sm">
+                      <input type="text" value={c.periodo || ""} onChange={(e) => updateArrayItem('clima', idx, 'periodo', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Período (Ex: Manhã)" />
+                      <input type="text" value={c.tempo || ""} onChange={(e) => updateArrayItem('clima', idx, 'tempo', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Tempo (Ex: Ensolarado)" />
+                      <select value={c.condicao || ""} onChange={(e) => updateArrayItem('clima', idx, 'condicao', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
+                        <option value="Trabalhável">Trabalhável</option>
+                        <option value="Parcialmente Trabalhável">Parcialmente Trabalhável</option>
+                        <option value="Impraticável">Impraticável</option>
+                      </select>
+                      <input type="text" value={c.razao || ""} onChange={(e) => updateArrayItem('clima', idx, 'razao', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Impacto/Razão (Se houver)" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Atividades */}
               <div>
                 <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Atividades</h3>
                 <div className="space-y-3">
                   {rdo.atividades?.map((ativ: any, idx: number) => (
                     <div key={idx} className="grid grid-cols-12 gap-3 bg-white p-3 border rounded-md shadow-sm">
-                      <input type="text" value={ativ.atividade} onChange={(e) => updateArrayItem('atividades', idx, 'atividade', e.target.value)} className="col-span-4 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Atividade" />
-                      <input type="text" value={ativ.empresa} onChange={(e) => updateArrayItem('atividades', idx, 'empresa', e.target.value)} className="col-span-3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Responsável" />
-                      <select value={ativ.status} onChange={(e) => updateArrayItem('atividades', idx, 'status', e.target.value)} className="col-span-2 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
+                      <input type="text" value={ativ.atividade || ""} onChange={(e) => updateArrayItem('atividades', idx, 'atividade', e.target.value)} className="col-span-4 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Atividade" />
+                      <input type="text" value={ativ.empresa || ""} onChange={(e) => updateArrayItem('atividades', idx, 'empresa', e.target.value)} className="col-span-3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Responsável" />
+                      <select value={ativ.status || ""} onChange={(e) => updateArrayItem('atividades', idx, 'status', e.target.value)} className="col-span-2 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
                         <option value="Concluído">Concluído</option>
                         <option value="Em Andamento">Em Andamento</option>
                         <option value="Pendente">Pendente</option>
                       </select>
-                      <input type="text" value={ativ.obs} onChange={(e) => updateArrayItem('atividades', idx, 'obs', e.target.value)} className="col-span-3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Observações" />
+                      <input type="text" value={ativ.obs || ""} onChange={(e) => updateArrayItem('atividades', idx, 'obs', e.target.value)} className="col-span-3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Observações" />
                     </div>
                   ))}
                 </div>
@@ -407,9 +480,9 @@ export default function RdoViewPage() {
                 <div className="space-y-3">
                   {rdo.envolvidos?.map((env: any, idx: number) => (
                     <div key={idx} className="grid grid-cols-3 gap-3 bg-white p-3 border rounded-md shadow-sm">
-                      <input type="text" value={env.empresa} onChange={(e) => updateArrayItem('envolvidos', idx, 'empresa', e.target.value)} className="text-sm border p-2 rounded outline-none" placeholder="Empresa" />
-                      <input type="number" value={env.colaboradores} onChange={(e) => updateArrayItem('envolvidos', idx, 'colaboradores', e.target.value)} className="text-sm border p-2 rounded outline-none" placeholder="Qtd. Colaboradores" />
-                      <input type="text" value={env.funcao} onChange={(e) => updateArrayItem('envolvidos', idx, 'funcao', e.target.value)} className="text-sm border p-2 rounded outline-none" placeholder="Função" />
+                      <input type="text" value={env.empresa || ""} onChange={(e) => updateArrayItem('envolvidos', idx, 'empresa', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Empresa" />
+                      <input type="number" value={env.colaboradores || ""} onChange={(e) => updateArrayItem('envolvidos', idx, 'colaboradores', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Qtd. Colaboradores" />
+                      <input type="text" value={env.funcao || ""} onChange={(e) => updateArrayItem('envolvidos', idx, 'funcao', e.target.value)} className="text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Função" />
                     </div>
                   ))}
                 </div>
@@ -421,19 +494,62 @@ export default function RdoViewPage() {
                 <div className="grid grid-cols-2 gap-6 bg-white p-4 border rounded-md shadow-sm">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500">Incidentes de Segurança?</label>
-                    <select value={rdo.sheq?.incidente || "Não"} onChange={(e) => updateSheq('incidente', e.target.value)} className="w-full text-sm border p-2 rounded outline-none">
+                    <select value={rdo.sheq?.incidente || "Não"} onChange={(e) => updateSheq('incidente', e.target.value)} className="w-full text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
                       <option value="Não">Não</option>
                       <option value="Sim">Sim</option>
                     </select>
-                    <input type="text" value={rdo.sheq?.incidenteObs || ""} onChange={(e) => updateSheq('incidenteObs', e.target.value)} className="w-full text-sm border p-2 rounded outline-none" placeholder="Observação (se houver)" />
+                    <input type="text" value={rdo.sheq?.incidenteObs || ""} onChange={(e) => updateSheq('incidenteObs', e.target.value)} className="w-full text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Observação (se houver)" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500">Vazamentos / Impacto Ambiental?</label>
-                    <select value={rdo.sheq?.vazamento || "Não"} onChange={(e) => updateSheq('vazamento', e.target.value)} className="w-full text-sm border p-2 rounded outline-none">
+                    <select value={rdo.sheq?.vazamento || "Não"} onChange={(e) => updateSheq('vazamento', e.target.value)} className="w-full text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
                       <option value="Não">Não</option>
                       <option value="Sim">Sim</option>
                     </select>
-                    <input type="text" value={rdo.sheq?.vazamentoObs || ""} onChange={(e) => updateSheq('vazamentoObs', e.target.value)} className="w-full text-sm border p-2 rounded outline-none" placeholder="Observação (se houver)" />
+                    <input type="text" value={rdo.sheq?.vazamentoObs || ""} onChange={(e) => updateSheq('vazamentoObs', e.target.value)} className="w-full text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Observação (se houver)" />
+                  </div>
+                </div>
+              </div>
+
+              {/* FOTOS */}
+              <div>
+                <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Registro Fotográfico</h3>
+                <div className="space-y-3">
+                  {rdo.fotos?.map((foto: any, idx: number) => (
+                    <div key={idx} className="flex gap-3 bg-white p-3 border rounded-md shadow-sm items-center">
+                      <div className="text-xs text-gray-400 w-24 truncate" title={foto.storagePath}>
+                        Img {idx + 1}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={foto.legenda || ""} 
+                        onChange={(e) => updateArrayItem('fotos', idx, 'legenda', e.target.value)} 
+                        className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" 
+                        placeholder="Legenda da foto..." 
+                      />
+                      <button 
+                        onClick={() => {
+                          const novasFotos = rdo.fotos.filter((_: any, i: number) => i !== idx);
+                          setRdo({...rdo, fotos: novasFotos});
+                        }}
+                        className="bg-red-50 text-red-600 px-3 py-2 rounded text-xs font-bold hover:bg-red-100 transition-colors"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <div className="pt-2">
+                    <label className="cursor-pointer bg-[#80b02d] text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm hover:bg-[#6a9425] transition-colors inline-block">
+                      {isUploadingPhoto ? "Enviando..." : "+ ADICIONAR NOVA FOTO"}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handlePhotoUpload} 
+                        disabled={isUploadingPhoto} 
+                      />
+                    </label>
                   </div>
                 </div>
               </div>
