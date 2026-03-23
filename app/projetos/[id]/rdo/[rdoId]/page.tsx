@@ -10,12 +10,9 @@ import autoTable from "jspdf-autotable";
 
 // ================= HELPERS (Padrão Pro) =================
 
-// Função auxiliar assíncrona para replicar o efeito CSS 'brightness-0 invert'
-// usando manipulação de canvas pura. Isso garante que usemos apenas UM arquivo de logo.png no sistema.
 async function generateWhiteLogoBase64(src: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    // Previne erros de Cross-Origin se o logo estiver em um CDN
     img.crossOrigin = "Anonymous"; 
     
     img.onload = () => {
@@ -29,15 +26,9 @@ async function generateWhiteLogoBase64(src: string): Promise<string> {
         return;
       }
 
-      // 1. Desenha a imagem original no canvas
       ctx.drawImage(img, 0, 0);
-
-      // 2. Aplica a manipulação de pixels (Lógica: brightness-0 + invert)
-      // brightness(0) => zera r,g,b. invert(1) => r,g,b viram 255 (branco).
       ctx.filter = "brightness(0) invert(1)";
-      ctx.drawImage(canvas, 0, 0); // Redesenha com o filtro aplicado
-
-      // 3. Converte para Base64 (formato que o jsPDF entende)
+      ctx.drawImage(canvas, 0, 0); 
       const base64DataData = canvas.toDataURL("image/png");
       resolve(base64DataData);
     };
@@ -56,6 +47,10 @@ export default function RdoViewPage() {
 
   const [rdo, setRdo] = useState<any>(null);
   const [projectName, setProjectName] = useState("");
+  
+  // --- NOVOS ESTADOS DE EDIÇÃO ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     load();
@@ -68,17 +63,52 @@ export default function RdoViewPage() {
     if (proj) setProjectName(proj.name);
   }
 
+  // --- NOVA FUNÇÃO PARA SALVAR NO SUPABASE ---
+  async function salvarAlteracoes() {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("rdo_reports")
+        .update({
+          comentarios: rdo.comentarios,
+          atividades: rdo.atividades,
+          envolvidos: rdo.envolvidos,
+          clima: rdo.clima,
+          sheq: rdo.sheq
+        })
+        .eq("id", rdoId);
+
+      if (error) throw error;
+      
+      setIsEditing(false);
+      alert("Alterações salvas com sucesso! O PDF já pode ser gerado com os novos dados.");
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+      alert("Erro ao salvar as alterações.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  // --- HELPERS PARA ATUALIZAR ARRAYS E OBJETOS NO ESTADO ---
+  const updateArrayItem = (arrayName: string, index: number, field: string, value: string) => {
+    const newArray = [...rdo[arrayName]];
+    newArray[index] = { ...newArray[index], [field]: value };
+    setRdo({ ...rdo, [arrayName]: newArray });
+  };
+
+  const updateSheq = (field: string, value: string) => {
+    setRdo({ ...rdo, sheq: { ...rdo.sheq, [field]: value } });
+  };
+
   async function gerarPDF() {
     if (!rdo) return;
 
-    // --- CARREGAMENTO INICIAL DO LOGO BRANCO ---
     let whiteLogoBase64: string | null = null;
     try {
-      // Chamamos nossa função auxiliar para converter o logo original
       whiteLogoBase64 = await generateWhiteLogoBase64("/logo.png");
     } catch (e) {
       console.error("Erro ao processar o logo branco para o PDF:", e);
-      // Se der erro, whiteLogoBase64 continua null e o PDF será gerado sem logo no header
     }
 
     const doc = new jsPDF("p", "mm", "a4");
@@ -87,12 +117,10 @@ export default function RdoViewPage() {
     const contentWidth = pageWidth - marginX * 2;
     let currentY = 0;
 
-    // --- PALETA DE CORES GREENSOIL (Padrão Pro) ---
     const brandPurple: [number, number, number] = [57, 30, 42];
     const brandGreen: [number, number, number] = [128, 176, 45];
     const lightGray: [number, number, number] = [248, 248, 250];
 
-    // --- HELPERS DE LAYOUT ---
     const checkPageBreak = (needed: number) => {
       if (currentY + needed > 275) {
         doc.addPage();
@@ -114,21 +142,17 @@ export default function RdoViewPage() {
       currentY += 10;
     };
 
-    // --- 1. HEADER EXECUTIVO COM FUNDO ESCURO (CORRIGIDO COM LOGO BRANCO) ---
     doc.setFillColor(...brandPurple);
     doc.rect(0, 0, pageWidth, 35, "F");
 
-    // 🔥 NOVA LÓGICA DO LOGO: Adiciona o logo branco centralizado verticalmente no header roxo
     if (whiteLogoBase64) {
       try {
-        // Centralizado verticalmente (altura 35mm, logo 10mm, y=12.5mm)
         doc.addImage(whiteLogoBase64, "PNG", marginX, 12.5, 35, 10); 
       } catch (e) {
         console.error("Erro ao adicionar imagem branca ao PDF:", e);
       }
     }
 
-    // Textos do Header em Branco (Sempre estiveram corretos)
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 15, { align: "right" });
@@ -139,9 +163,6 @@ export default function RdoViewPage() {
 
     currentY = 45;
 
-    // ================= RESTO DO CÓDIGO (INTACTO) =================
-
-    // --- 2. DASHBOARD DE INDICADORES (KPIs) ---
     const colabTotal = rdo.envolvidos?.reduce((a: number, b: any) => a + (Number(b.colaboradores) || 0), 0) || 0;
     const cards = [
       { label: "EFETIVO TOTAL", val: `${colabTotal} PESSOAS` },
@@ -170,7 +191,6 @@ export default function RdoViewPage() {
       alternateRowStyles: { fillColor: [252, 252, 252] }
     };
 
-    // --- 3. TABELA DE CLIMA ---
     sectionHeader("Condições Climáticas");
     autoTable(doc, {
       ...tableConfig,
@@ -180,7 +200,6 @@ export default function RdoViewPage() {
     });
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    // --- 4. TABELA DE ENVOLVIDOS ---
     sectionHeader("Mão de Obra e Efetivo");
     autoTable(doc, {
       ...tableConfig,
@@ -190,7 +209,6 @@ export default function RdoViewPage() {
     });
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    // --- 5. TABELA DE ATIVIDADES ---
     sectionHeader("Progresso das Atividades");
     autoTable(doc, {
       ...tableConfig,
@@ -207,7 +225,6 @@ export default function RdoViewPage() {
     });
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    // --- 6. TABELA DE SHEQ ---
     sectionHeader("Segurança, Saúde e Meio Ambiente (SHEQ)");
     autoTable(doc, {
       ...tableConfig,
@@ -220,7 +237,6 @@ export default function RdoViewPage() {
     });
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    // --- 7. COMENTÁRIOS GERAIS ---
     if (rdo.comentarios) {
       sectionHeader("Notas e Comentários Adicionais");
       const textLines = doc.splitTextToSize(rdo.comentarios, contentWidth - 10);
@@ -235,7 +251,6 @@ export default function RdoViewPage() {
       currentY += boxH + 15;
     }
 
-    // --- 8. GALERIA DE FOTOS ---
     if (rdo.fotos?.length > 0) {
       sectionHeader("Registro Fotográfico");
       
@@ -245,7 +260,7 @@ export default function RdoViewPage() {
       for (let i = 0; i < rdo.fotos.length; i++) {
         const foto = rdo.fotos[i];
         const isPar = i % 2 === 0;
-        const xPos = isPar ? marginX : marginX + boxW + 10;
+        const xPos = isPar ? marginX : marginX + boxW + 10;   
         
         if (isPar) checkPageBreak(boxH + 20);
         
@@ -301,7 +316,6 @@ export default function RdoViewPage() {
       }
     }
 
-    // --- 9. ASSINATURAS ---
     if (rdo.assinaturas?.length > 0) {
       checkPageBreak(50);
       sectionHeader("Assinaturas de Responsabilidade");
@@ -324,7 +338,6 @@ export default function RdoViewPage() {
       });
     }
 
-    // RODAPÉ FINAL
     const totalP = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= totalP; i++) {
       doc.setPage(i);
@@ -340,19 +353,104 @@ export default function RdoViewPage() {
 
   return (
     <AdminShell>
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-5xl mx-auto p-6">
         <div className="bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 animate-fade-in duration-300">
           
-          {/* Header Visual do Painel (Intacto) */}
+          {/* Header Visual do Painel */}
           <div className="bg-[#391e2a] p-8 text-white flex justify-between items-center shadow-lg">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Visualização do Diário</h1>
               <p className="text-[#80b02d] font-semibold mt-1 uppercase tracking-wider text-xs">{projectName} • DATA: {rdo.data}</p>
             </div>
-            <Button onClick={gerarPDF} className="bg-[#80b02d] hover:bg-[#6a9425] text-white px-8 h-12 rounded-lg font-bold shadow-lg transition-transform active:scale-95">
-              BAIXAR RDO COMPLETO
-            </Button>
+            <div className="flex gap-3">
+              {isEditing ? (
+                <Button onClick={salvarAlteracoes} disabled={isSaving} className="bg-white text-[#391e2a] hover:bg-gray-100 h-12 px-6 font-bold shadow-sm">
+                  {isSaving ? "SALVANDO..." : "SALVAR ALTERAÇÕES"}
+                </Button>
+              ) : (
+                <Button onClick={() => setIsEditing(true)} className="bg-transparent border border-white/30 hover:bg-white/10 text-white h-12 px-6 font-bold shadow-sm">
+                  EDITAR DADOS
+                </Button>
+              )}
+              <Button onClick={gerarPDF} className="bg-[#80b02d] hover:bg-[#6a9425] text-white px-8 h-12 rounded-lg font-bold shadow-lg transition-transform active:scale-95">
+                BAIXAR RDO COMPLETO
+              </Button>
+            </div>
           </div>
+
+          {/* ÁREA DE EDIÇÃO INTERATIVA (Injetada sem alterar o resto) */}
+          {isEditing && (
+            <div className="p-8 border-b border-gray-100 bg-gray-50/30 space-y-8">
+              
+              {/* Atividades */}
+              <div>
+                <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Atividades</h3>
+                <div className="space-y-3">
+                  {rdo.atividades?.map((ativ: any, idx: number) => (
+                    <div key={idx} className="grid grid-cols-12 gap-3 bg-white p-3 border rounded-md shadow-sm">
+                      <input type="text" value={ativ.atividade} onChange={(e) => updateArrayItem('atividades', idx, 'atividade', e.target.value)} className="col-span-4 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Atividade" />
+                      <input type="text" value={ativ.empresa} onChange={(e) => updateArrayItem('atividades', idx, 'empresa', e.target.value)} className="col-span-3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Responsável" />
+                      <select value={ativ.status} onChange={(e) => updateArrayItem('atividades', idx, 'status', e.target.value)} className="col-span-2 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
+                        <option value="Concluído">Concluído</option>
+                        <option value="Em Andamento">Em Andamento</option>
+                        <option value="Pendente">Pendente</option>
+                      </select>
+                      <input type="text" value={ativ.obs} onChange={(e) => updateArrayItem('atividades', idx, 'obs', e.target.value)} className="col-span-3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Observações" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Equipe / Envolvidos */}
+              <div>
+                <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Mão de Obra</h3>
+                <div className="space-y-3">
+                  {rdo.envolvidos?.map((env: any, idx: number) => (
+                    <div key={idx} className="grid grid-cols-3 gap-3 bg-white p-3 border rounded-md shadow-sm">
+                      <input type="text" value={env.empresa} onChange={(e) => updateArrayItem('envolvidos', idx, 'empresa', e.target.value)} className="text-sm border p-2 rounded outline-none" placeholder="Empresa" />
+                      <input type="number" value={env.colaboradores} onChange={(e) => updateArrayItem('envolvidos', idx, 'colaboradores', e.target.value)} className="text-sm border p-2 rounded outline-none" placeholder="Qtd. Colaboradores" />
+                      <input type="text" value={env.funcao} onChange={(e) => updateArrayItem('envolvidos', idx, 'funcao', e.target.value)} className="text-sm border p-2 rounded outline-none" placeholder="Função" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* SHEQ */}
+              <div>
+                <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">SHEQ (Segurança e Meio Ambiente)</h3>
+                <div className="grid grid-cols-2 gap-6 bg-white p-4 border rounded-md shadow-sm">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500">Incidentes de Segurança?</label>
+                    <select value={rdo.sheq?.incidente || "Não"} onChange={(e) => updateSheq('incidente', e.target.value)} className="w-full text-sm border p-2 rounded outline-none">
+                      <option value="Não">Não</option>
+                      <option value="Sim">Sim</option>
+                    </select>
+                    <input type="text" value={rdo.sheq?.incidenteObs || ""} onChange={(e) => updateSheq('incidenteObs', e.target.value)} className="w-full text-sm border p-2 rounded outline-none" placeholder="Observação (se houver)" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500">Vazamentos / Impacto Ambiental?</label>
+                    <select value={rdo.sheq?.vazamento || "Não"} onChange={(e) => updateSheq('vazamento', e.target.value)} className="w-full text-sm border p-2 rounded outline-none">
+                      <option value="Não">Não</option>
+                      <option value="Sim">Sim</option>
+                    </select>
+                    <input type="text" value={rdo.sheq?.vazamentoObs || ""} onChange={(e) => updateSheq('vazamentoObs', e.target.value)} className="w-full text-sm border p-2 rounded outline-none" placeholder="Observação (se houver)" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Comentários */}
+              <div>
+                <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Comentários Gerais</h3>
+                <textarea 
+                  value={rdo.comentarios || ""} 
+                  onChange={(e) => setRdo({ ...rdo, comentarios: e.target.value })} 
+                  className="w-full text-sm border p-3 rounded-md shadow-sm min-h-[100px] focus:ring-1 focus:ring-[#80b02d] outline-none" 
+                  placeholder="Insira as notas de campo..."
+                />
+              </div>
+
+            </div>
+          )}
           
           {/* Conteúdo Visual do Painel (Intacto) */}
           <div className="p-12 text-center bg-gray-50/50">
