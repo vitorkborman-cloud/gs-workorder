@@ -168,8 +168,8 @@ export default function AppAmostragemPage() {
           <Section title="Dados Gerais" icon={<Icons.Droplet />}>
             <div className="space-y-4">
               <Input label="Identificação do Poço *" value={form.poco} onChange={(v: string) => setField("poco", v)} placeholder="Ex: PM-01" />
-              <Input label="Nomenclatura" value={form.nomenclatura} onChange={(v: string) => setField("nomenclatura", v)} placeholder="Ex: Amostra 01" />
-              <Input label="Identificação (código)" value={form.identificacao_codigo} onChange={(v: string) => setField("identificacao_codigo", v)} placeholder="Ex: AM-01" />
+              <Input label="Nomenclatura" value={form.nomenclatura} onChange={(v: string) => setField("nomenclatura", v)} placeholder="Ex: GS001-13" />
+              <Input label="Identificação (código)" value={form.identificacao_codigo} onChange={(v: string) => setField("identificacao_codigo", v)} placeholder="Código do frasco" />
               
               {/* ALINHAMENTO POR BAIXO (items-end) */}
               <div className="grid grid-cols-2 gap-4 items-end">
