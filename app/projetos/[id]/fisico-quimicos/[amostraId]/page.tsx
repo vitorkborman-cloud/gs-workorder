@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link"; // <-- IMPORTAÇÃO DO LINK ADICIONADA AQUI
 import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
@@ -96,7 +95,7 @@ export default function FisicoQuimicosDesktopPage() {
     return `${day}/${month}/${year}`;
   }
 
-  // ================= 1. GERAÇÃO DO PDF GERAL (TODOS OS POÇOS DO DIA) =================
+  // ================= 1. GERAÇÃO DO PDF GERAL =================
   async function gerarPDFGeral(dataCampanha: string, amostras: Sampling[]) {
     setGeneratingPdf(dataCampanha);
 
@@ -216,7 +215,7 @@ export default function FisicoQuimicosDesktopPage() {
 
   // ================= 2. GERAÇÃO DO PDF INDIVIDUAL =================
   async function gerarPDFIndividual(amostra: Sampling) {
-    setGeneratingPdf(amostra.id); // Trava só o botão desse poço
+    setGeneratingPdf(amostra.id); 
 
     try {
       let whiteLogoBase64: string | null = null;
@@ -385,7 +384,7 @@ export default function FisicoQuimicosDesktopPage() {
               const isGeneratingGeral = generatingPdf === dataCampanha;
 
               return (
-                <div key={dataCampanha} className="bg-white rounded-3xl shadow-md border border-gray-200 overflow-hidden group hover:shadow-lg transition-all duration-300">
+                <div key={dataCampanha} className="bg-white rounded-3xl shadow-md border border-gray-200 overflow-hidden group transition-all duration-300">
                   
                   {/* CABEÇALHO DO CARD (DATA) E BOTÃO DE PDF GERAL */}
                   <div className="bg-gray-50 border-b border-gray-200 px-8 py-5 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
@@ -421,7 +420,7 @@ export default function FisicoQuimicosDesktopPage() {
                           <th className="px-6 py-4">Início</th>
                           <th className="px-6 py-4">Fase Livre</th>
                           <th className="px-6 py-4">Qtd. Leituras</th>
-                          <th className="px-8 py-4 text-right">Ação</th>
+                          <th className="px-8 py-4 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -429,7 +428,7 @@ export default function FisicoQuimicosDesktopPage() {
                           const isGeneratingIndiv = generatingPdf === amostra.id;
                           
                           return (
-                            <tr key={amostra.id} className="hover:bg-gray-50/50 transition-colors group/row">
+                            <tr key={amostra.id} className="hover:bg-gray-50/50 transition-colors group">
                               <td className="px-8 py-4 font-bold text-[#391e2a]">
                                 {amostra.poco}
                               </td>
@@ -455,23 +454,22 @@ export default function FisicoQuimicosDesktopPage() {
                                 </span>
                               </td>
                               <td className="px-8 py-4 text-right">
-                                <div className="flex justify-end gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                   
                                   <button 
                                     onClick={() => gerarPDFIndividual(amostra)}
                                     disabled={isGeneratingIndiv}
-                                    className="text-gray-500 bg-white border border-gray-200 hover:text-[#391e2a] hover:border-[#391e2a] hover:bg-gray-50 font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                                    className="relative z-10 text-gray-500 bg-white border border-gray-200 hover:text-[#391e2a] hover:border-[#391e2a] hover:bg-gray-50 font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                                   >
                                     <Icons.Download /> {isGeneratingIndiv ? "..." : "Baixar"}
                                   </button>
 
-                                  {/* MÁGICA AQUI: O <Link> garante que a página abra sem travar */}
-                                  <Link 
-                                    href={`/projetos/${projectId}/fisico-quimicos/${amostra.id}`}
-                                    className="text-white bg-[#80b02d] hover:bg-[#6a9425] font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm"
+                                  <button 
+                                    onClick={() => router.push(`/projetos/${projectId}/fisico-quimicos/${amostra.id}`)}
+                                    className="relative z-10 text-white bg-[#80b02d] hover:bg-[#6a9425] font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm"
                                   >
                                     <Icons.Eye /> Ver Ficha
-                                  </Link>
+                                  </button>
 
                                 </div>
                               </td>
