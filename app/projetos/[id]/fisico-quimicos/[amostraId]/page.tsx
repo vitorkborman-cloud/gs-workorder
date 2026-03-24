@@ -95,7 +95,7 @@ export default function FisicoQuimicosDesktopPage() {
     return `${day}/${month}/${year}`;
   }
 
-  // ================= 1. GERAÇÃO DO PDF GERAL =================
+  // ================= 1. GERAÇÃO DO PDF GERAL (TODOS OS POÇOS DO DIA) =================
   async function gerarPDFGeral(dataCampanha: string, amostras: Sampling[]) {
     setGeneratingPdf(dataCampanha);
 
@@ -428,7 +428,7 @@ export default function FisicoQuimicosDesktopPage() {
                           const isGeneratingIndiv = generatingPdf === amostra.id;
                           
                           return (
-                            <tr key={amostra.id} className="hover:bg-gray-50/50 transition-colors group">
+                            <tr key={amostra.id} className="hover:bg-gray-50/50 transition-colors group/row">
                               <td className="px-8 py-4 font-bold text-[#391e2a]">
                                 {amostra.poco}
                               </td>
@@ -454,7 +454,9 @@ export default function FisicoQuimicosDesktopPage() {
                                 </span>
                               </td>
                               <td className="px-8 py-4 text-right">
-                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                
+                                {/* MÁGICA AQUI: O 'window.location.href' garante o clique sempre, independentemente da rota do Next */}
+                                <div className="flex justify-end gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                   
                                   <button 
                                     onClick={() => gerarPDFIndividual(amostra)}
@@ -465,8 +467,8 @@ export default function FisicoQuimicosDesktopPage() {
                                   </button>
 
                                   <button 
-                                    onClick={() => router.push(`/projetos/${projectId}/fisico-quimicos/${amostra.id}`)}
-                                    className="relative z-10 text-white bg-[#80b02d] hover:bg-[#6a9425] font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm"
+                                    onClick={() => { window.location.href = `/projetos/${projectId}/fisico-quimicos/${amostra.id}` }}
+                                    className="relative z-10 text-white bg-[#80b02d] hover:bg-[#6a9425] font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
                                   >
                                     <Icons.Eye /> Ver Ficha
                                   </button>
