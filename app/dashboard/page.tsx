@@ -155,7 +155,7 @@ export default function DashboardPage() {
               <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-[#391e2a] mb-6 group-hover:scale-110 transition-transform">
                 <Icons.Folder />
               </div>
-              <p className="text-sm font-bold text-gray-400 uppercase tracking-wider">Projetos Ativos</p>
+              <p className="text-sm font-bold text-gray-400 uppercase tracking-wider">Projetos</p>
               <p className="text-5xl font-black text-[#391e2a] mt-2">{totalProjects}</p>
             </CardContent>
             <div className="h-1.5 w-full bg-gradient-to-r from-[#391e2a] to-purple-800 absolute bottom-0 left-0 opacity-80" />
@@ -256,7 +256,7 @@ export default function DashboardPage() {
         <div className="animate-in fade-in slide-in-from-bottom-10 duration-1000 pt-6">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-[#391e2a] tracking-tight">
-              Portfólio de Projetos
+              Projetos
             </h2>
             <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">
               {projects.length} Registros
