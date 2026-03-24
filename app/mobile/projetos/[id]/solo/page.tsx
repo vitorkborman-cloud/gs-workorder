@@ -16,6 +16,7 @@ const Icons = {
   Check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>,
   Save: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
   Loader: () => <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+  Crosshair: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 22v-4M12 6V2M22 12h-4M6 12H2M12 12a4 4 0 100-8 4 4 0 000 8z" /></svg>,
 };
 
 // ================= TYPES =================
@@ -98,6 +99,7 @@ export default function SoloPage() {
 
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [fetchingLocation, setFetchingLocation] = useState(false);
 
   const [layers, setLayers] = useState<Layer[]>([
     { de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }
@@ -176,6 +178,35 @@ export default function SoloPage() {
     setLayers((prev) => [...prev, { de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
   }
 
+  function obterLocalizacaoAutomatica() {
+    if (!navigator.geolocation) {
+      alert("Geolocalização não é suportada pelo seu dispositivo/navegador.");
+      return;
+    }
+
+    setFetchingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+
+        setForm((prev) => ({ ...prev, coord_x: lng, coord_y: lat }));
+        setFetchingLocation(false);
+      },
+      (error) => {
+        console.error(error);
+        alert("Erro ao obter localização. Verifique se o GPS está ligado e se você deu permissão ao site.");
+        setFetchingLocation(false);
+      },
+      { 
+        enableHighAccuracy: true,
+        timeout: 15000, 
+        maximumAge: 0 
+      }
+    );
+  }
+
   async function salvar() {
     setSaving(true);
     try {
@@ -234,7 +265,7 @@ export default function SoloPage() {
     <AppShell>
       <div className="min-h-screen bg-gray-50 pb-28">
         
-        {/* HEADER EXECUTIVO (Agora sem o 'sticky' e sem a tag de novo/rascunho) */}
+        {/* HEADER EXECUTIVO */}
         <div className="bg-[#391e2a] text-white px-5 py-5 shadow-md">
           <div className="flex justify-between items-center max-w-4xl mx-auto w-full">
             <div>
@@ -267,10 +298,9 @@ export default function SoloPage() {
             </div>
           </Section>
 
-          {/* POÇO (Nome Alterado) */}
+          {/* POÇO */}
           <Section title="Dados de instalação" icon={<Icons.Ruler />}>
             <div className="space-y-4">
-              {/* Adicionado items-end na grade para alinhar os inputs por baixo perfeitamente */}
               <div className="grid grid-cols-2 gap-4 items-end">
                 <Input label="Diâmetro Sondagem (in)" value={form.diametro_sondagem} onChange={(v: string) => setField("diametro_sondagem", v)} placeholder="Ex: 4" />
                 <Input label="Diâmetro Poço (in)" value={form.diametro_poco} onChange={(v: string) => setField("diametro_poco", v)} placeholder="Ex: 2" />
@@ -285,9 +315,27 @@ export default function SoloPage() {
 
           {/* COORDENADAS */}
           <Section title="Geolocalização" icon={<Icons.MapPin />}>
-            <div className="grid grid-cols-2 gap-4 items-end">
-              <Input label="Coordenada X (UTM/Long)" value={form.coord_x} onChange={(v: string) => setField("coord_x", v)} placeholder="000000.00" />
-              <Input label="Coordenada Y (UTM/Lat)" value={form.coord_y} onChange={(v: string) => setField("coord_y", v)} placeholder="0000000.00" />
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 items-end">
+                <Input label="Coordenada X (UTM/Long)" value={form.coord_x} onChange={(v: string) => setField("coord_x", v)} placeholder="-46.000000" />
+                <Input label="Coordenada Y (UTM/Lat)" value={form.coord_y} onChange={(v: string) => setField("coord_y", v)} placeholder="-23.000000" />
+              </div>
+              
+              <button
+                onClick={obterLocalizacaoAutomatica}
+                disabled={fetchingLocation}
+                className="w-full bg-[#80b02d]/10 text-[#6a9425] hover:bg-[#80b02d]/20 py-3 rounded-xl border border-[#80b02d]/30 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition disabled:opacity-50"
+              >
+                {fetchingLocation ? (
+                  <>
+                    <Icons.Loader /> Buscando satélites...
+                  </>
+                ) : (
+                  <>
+                    <Icons.Crosshair /> Capturar Minha Localização Atual
+                  </>
+                )}
+              </button>
             </div>
           </Section>
 
