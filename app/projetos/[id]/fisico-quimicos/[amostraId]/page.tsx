@@ -59,7 +59,7 @@ export default function FisicoQuimicosDesktopPage() {
   const [projectName, setProjectName] = useState("Carregando...");
   const [groupedData, setGroupedData] = useState<{ [key: string]: Sampling[] }>({});
   const [loading, setLoading] = useState(true);
-  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null); // Armazena a data que está gerando PDF
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -95,7 +95,7 @@ export default function FisicoQuimicosDesktopPage() {
     return `${day}/${month}/${year}`;
   }
 
-  // ================= GERAÇÃO DO PDF GERAL DO DIA =================
+  // ================= 1. GERAÇÃO DO PDF GERAL (TODOS OS POÇOS DO DIA) =================
   async function gerarPDFGeral(dataCampanha: string, amostras: Sampling[]) {
     setGeneratingPdf(dataCampanha);
 
@@ -111,7 +111,6 @@ export default function FisicoQuimicosDesktopPage() {
       const brandPurple: [number, number, number] = [57, 30, 42];
       const brandGreen: [number, number, number] = [128, 176, 45];
 
-      // Função para desenhar o cabeçalho da página
       const drawPageHeader = () => {
         doc.setFillColor(...brandPurple);
         doc.rect(0, 0, pageWidth, 35, "F");
@@ -144,14 +143,11 @@ export default function FisicoQuimicosDesktopPage() {
         return false;
       };
 
-      // Loop para desenhar as informações de cada poço
       for (let i = 0; i < amostras.length; i++) {
         const amostra = amostras[i];
         
-        // Garante que o título do poço e a tabela caibam na página
         checkPageBreak(50); 
 
-        // Título do Poço
         doc.setFont("helvetica", "bold");
         doc.setFontSize(11);
         doc.setTextColor(...brandPurple);
@@ -162,7 +158,6 @@ export default function FisicoQuimicosDesktopPage() {
         doc.line(marginX, currentY + 2, marginX + 10, currentY + 2);
         currentY += 8;
 
-        // Dados base do poço em uma linha
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(80);
@@ -171,7 +166,6 @@ export default function FisicoQuimicosDesktopPage() {
         doc.text(infoLinha1, marginX, currentY);
         currentY += 5;
 
-        // Informação de Fase Livre
         if (amostra.fase_livre) {
           doc.setTextColor(200, 0, 0);
           doc.setFont("helvetica", "bold");
@@ -182,7 +176,6 @@ export default function FisicoQuimicosDesktopPage() {
         }
         currentY += 6;
 
-        // Tabela de leituras do poço atual
         autoTable(doc, {
           startY: currentY,
           margin: { left: marginX, right: marginX },
@@ -204,7 +197,6 @@ export default function FisicoQuimicosDesktopPage() {
         currentY = (doc as any).lastAutoTable.finalY + 15;
       }
 
-      // Numeração de Páginas no Rodapé
       const totalP = (doc as any).internal.getNumberOfPages();
       for (let i = 1; i <= totalP; i++) {
         doc.setPage(i);
@@ -215,8 +207,138 @@ export default function FisicoQuimicosDesktopPage() {
 
       doc.save(`Compilado_FQ_${projectName}_${dataCampanha}.pdf`);
     } catch (error) {
-      console.error(error);
       alert("Erro ao gerar o PDF Geral.");
+    } finally {
+      setGeneratingPdf(null);
+    }
+  }
+
+  // ================= 2. GERAÇÃO DO PDF INDIVIDUAL =================
+  async function gerarPDFIndividual(amostra: Sampling) {
+    setGeneratingPdf(amostra.id); // Trava só o botão desse poço
+
+    try {
+      let whiteLogoBase64: string | null = null;
+      try { whiteLogoBase64 = await generateWhiteLogoBase64("/logo.png"); } catch (e) {}
+
+      const doc = new jsPDF("p", "mm", "a4");
+      const marginX = 15;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const contentWidth = pageWidth - marginX * 2;
+      let currentY = 0;
+
+      const brandPurple: [number, number, number] = [57, 30, 42];
+      const brandGreen: [number, number, number] = [128, 176, 45];
+      const lightGray: [number, number, number] = [245, 245, 248];
+
+      doc.setFillColor(...brandPurple);
+      doc.rect(0, 0, pageWidth, 35, "F");
+
+      if (whiteLogoBase64) {
+        try { doc.addImage(whiteLogoBase64, "PNG", marginX, 12.5, 35, 10); } catch (e) {}
+      }
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("FICHA DE AMOSTRAGEM FÍSICO-QUÍMICA", pageWidth - marginX, 16, { align: "right" });
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text(`PROJETO: ${projectName}`, pageWidth - marginX, 23, { align: "right" });
+      doc.text(`DATA: ${formatDateBr(amostra.data)}`, pageWidth - marginX, 28, { align: "right" });
+
+      currentY = 45;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...brandPurple);
+      doc.text("DADOS GERAIS E IDENTIFICAÇÃO", marginX, currentY);
+      doc.setDrawColor(...brandGreen);
+      doc.setLineWidth(0.8);
+      doc.line(marginX, currentY + 2, marginX + 15, currentY + 2);
+      currentY += 8;
+
+      const boxWidth = contentWidth / 3 - 3;
+      const drawBox = (x: number, y: number, label: string, value: string) => {
+        doc.setFillColor(...lightGray);
+        doc.roundedRect(x, y, boxWidth, 15, 1, 1, "F");
+        doc.setFontSize(7);
+        doc.setTextColor(120);
+        doc.setFont("helvetica", "bold");
+        doc.text(label.toUpperCase(), x + 3, y + 5);
+        doc.setFontSize(9);
+        doc.setTextColor(40);
+        doc.setFont("helvetica", "bold");
+        doc.text(value || "-", x + 3, y + 11);
+      };
+
+      drawBox(marginX, currentY, "Identificação do Poço", amostra.poco);
+      drawBox(marginX + boxWidth + 4.5, currentY, "Nomenclatura", amostra.nomenclatura);
+      drawBox(marginX + (boxWidth * 2) + 9, currentY, "Código da Amostra", amostra.identificacao_codigo);
+      
+      currentY += 19;
+
+      drawBox(marginX, currentY, "Horário de Início", amostra.hora_inicio);
+      drawBox(marginX + boxWidth + 4.5, currentY, "Nível D'água Inicial", `${amostra.na_inicial || "-"} m`);
+      drawBox(marginX + (boxWidth * 2) + 9, currentY, "Nível D'água Final", `${amostra.na_final || "-"} m`);
+
+      currentY += 19;
+
+      doc.setFillColor(amostra.fase_livre ? 255 : 245, amostra.fase_livre ? 235 : 245, amostra.fase_livre ? 235 : 248);
+      doc.roundedRect(marginX, currentY, contentWidth, 15, 1, 1, "F");
+      doc.setFontSize(8);
+      doc.setTextColor(amostra.fase_livre ? 150 : 120, amostra.fase_livre ? 50 : 120, amostra.fase_livre ? 50 : 120);
+      doc.text("DETECÇÃO DE FASE LIVRE (FL)", marginX + 3, currentY + 5);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(amostra.fase_livre ? 200 : 80, amostra.fase_livre ? 0 : 80, amostra.fase_livre ? 0 : 80);
+      if (amostra.fase_livre) {
+        doc.text(`SIM - Espessura: ${amostra.espessura_fl || "Não informada"} m`, marginX + 3, currentY + 11);
+      } else {
+        doc.text("NÃO DETECTADA", marginX + 3, currentY + 11);
+      }
+
+      currentY += 25;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...brandPurple);
+      doc.text("PARÂMETROS DE PURGA (LEITURAS)", marginX, currentY);
+      doc.setDrawColor(...brandGreen);
+      doc.setLineWidth(0.8);
+      doc.line(marginX, currentY + 2, marginX + 15, currentY + 2);
+      currentY += 6;
+
+      autoTable(doc, {
+        startY: currentY,
+        margin: { left: marginX, right: marginX },
+        head: [["Horário", "NA (m)", "pH", "ORP (mV)", "OD (mg/L)", "Cond. (µS/cm)"]],
+        body: amostra.leituras?.map((l: any) => [
+          l.horario || "-", 
+          l.na || "-", 
+          l.ph || "-", 
+          l.orp || "-", 
+          l.od || "-", 
+          l.condutividade || "-"
+        ]) || [],
+        theme: 'striped',
+        headStyles: { fillColor: brandPurple, textColor: 255, fontStyle: "bold", fontSize: 9 },
+        styles: { fontSize: 9, cellPadding: 4, textColor: 50, halign: "center" },
+        alternateRowStyles: { fillColor: [250, 250, 252] }
+      });
+
+      const totalP = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalP; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(180);
+        doc.text(`Documento gerado eletronicamente - Página ${i} de ${totalP}`, pageWidth / 2, 290, { align: "center" });
+      }
+
+      doc.save(`Ficha_FQ_${amostra.poco}_${amostra.data}.pdf`);
+    } catch (error) {
+      alert("Erro ao gerar o PDF Individual.");
     } finally {
       setGeneratingPdf(null);
     }
@@ -259,7 +381,7 @@ export default function FisicoQuimicosDesktopPage() {
           <div className="space-y-8">
             {datasAgrupadas.map((dataCampanha) => {
               const amostrasDoDia = groupedData[dataCampanha];
-              const isGeneratingThisPdf = generatingPdf === dataCampanha;
+              const isGeneratingGeral = generatingPdf === dataCampanha;
 
               return (
                 <div key={dataCampanha} className="bg-white rounded-3xl shadow-md border border-gray-200 overflow-hidden group hover:shadow-lg transition-all duration-300">
@@ -280,11 +402,11 @@ export default function FisicoQuimicosDesktopPage() {
 
                     <Button 
                       onClick={() => gerarPDFGeral(dataCampanha, amostrasDoDia)}
-                      disabled={isGeneratingThisPdf}
+                      disabled={isGeneratingGeral}
                       className="bg-[#391e2a] hover:bg-[#2a161f] text-white font-bold rounded-xl h-11 px-6 shadow-sm flex items-center gap-2 transition-all w-full md:w-auto"
                     >
                       <Icons.Download /> 
-                      {isGeneratingThisPdf ? "Gerando..." : "Baixar PDF Geral"}
+                      {isGeneratingGeral ? "Gerando..." : "Baixar PDF Geral"}
                     </Button>
                   </div>
 
@@ -298,46 +420,63 @@ export default function FisicoQuimicosDesktopPage() {
                           <th className="px-6 py-4">Início</th>
                           <th className="px-6 py-4">Fase Livre</th>
                           <th className="px-6 py-4">Qtd. Leituras</th>
-                          <th className="px-8 py-4 text-right">Ação</th>
+                          <th className="px-8 py-4 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {amostrasDoDia.map((amostra) => (
-                          <tr key={amostra.id} className="hover:bg-gray-50/50 transition-colors group/row">
-                            <td className="px-8 py-4 font-bold text-[#391e2a]">
-                              {amostra.poco}
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col">
-                                <span className="font-bold text-gray-800">{amostra.nomenclatura || "-"}</span>
-                                <span className="text-xs text-gray-400">{amostra.identificacao_codigo || "-"}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 font-medium text-gray-600">
-                              {amostra.hora_inicio || "-"}
-                            </td>
-                            <td className="px-6 py-4">
-                              {amostra.fase_livre ? (
-                                <span className="bg-red-100 text-red-700 font-bold px-2.5 py-1 rounded-md text-xs">Sim</span>
-                              ) : (
-                                <span className="bg-gray-100 text-gray-600 font-bold px-2.5 py-1 rounded-md text-xs">Não</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="bg-[#80b02d]/10 text-[#80b02d] font-bold px-3 py-1 rounded-full text-xs">
-                                {amostra.leituras?.length || 0} leituras
-                              </span>
-                            </td>
-                            <td className="px-8 py-4 text-right">
-                              <button 
-                                onClick={() => router.push(`/projetos/${projectId}/fisico-quimicos/${amostra.id}`)}
-                                className="text-[#80b02d] hover:text-white hover:bg-[#80b02d] font-bold px-4 py-2 rounded-lg transition-all text-xs flex items-center gap-2 ml-auto opacity-0 group-hover/row:opacity-100"
-                              >
-                                <Icons.Eye /> Ver Ficha
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {amostrasDoDia.map((amostra) => {
+                          const isGeneratingIndiv = generatingPdf === amostra.id;
+                          
+                          return (
+                            <tr key={amostra.id} className="hover:bg-gray-50/50 transition-colors group/row">
+                              <td className="px-8 py-4 font-bold text-[#391e2a]">
+                                {amostra.poco}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-gray-800">{amostra.nomenclatura || "-"}</span>
+                                  <span className="text-xs text-gray-400">{amostra.identificacao_codigo || "-"}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 font-medium text-gray-600">
+                                {amostra.hora_inicio || "-"}
+                              </td>
+                              <td className="px-6 py-4">
+                                {amostra.fase_livre ? (
+                                  <span className="bg-red-100 text-red-700 font-bold px-2.5 py-1 rounded-md text-xs">Sim</span>
+                                ) : (
+                                  <span className="bg-gray-100 text-gray-600 font-bold px-2.5 py-1 rounded-md text-xs">Não</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="bg-[#80b02d]/10 text-[#80b02d] font-bold px-3 py-1 rounded-full text-xs">
+                                  {amostra.leituras?.length || 0} leituras
+                                </span>
+                              </td>
+                              <td className="px-8 py-4 text-right">
+                                {/* MÁGICA AQUI: Dois botões revelados no Hover */}
+                                <div className="flex justify-end gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                  
+                                  <button 
+                                    onClick={() => gerarPDFIndividual(amostra)}
+                                    disabled={isGeneratingIndiv}
+                                    className="text-gray-500 bg-white border border-gray-200 hover:text-[#391e2a] hover:border-[#391e2a] hover:bg-gray-50 font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                                  >
+                                    <Icons.Download /> {isGeneratingIndiv ? "..." : "Baixar"}
+                                  </button>
+
+                                  <button 
+                                    onClick={() => router.push(`/projetos/${projectId}/fisico-quimicos/${amostra.id}`)}
+                                    className="text-white bg-[#80b02d] hover:bg-[#6a9425] font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm"
+                                  >
+                                    <Icons.Eye /> Ver Ficha
+                                  </button>
+
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
