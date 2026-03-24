@@ -131,7 +131,7 @@ export default function DashboardPage() {
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Monitoramento Área Norte..."
+                  placeholder="Ex: 40xxx, ..."
                   className="h-12 border-gray-200 focus:border-[#80b02d] focus:ring-[#80b02d] rounded-xl bg-gray-50"
                 />
               </div>
