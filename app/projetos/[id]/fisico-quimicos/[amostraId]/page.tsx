@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link"; // Adicionado Link nativo do Next
 import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
@@ -53,7 +54,6 @@ type Sampling = {
 
 export default function FisicoQuimicosDesktopPage() {
   const params = useParams();
-  const router = useRouter();
   const projectId = params.id as string;
 
   const [projectName, setProjectName] = useState("Carregando...");
@@ -97,7 +97,7 @@ export default function FisicoQuimicosDesktopPage() {
 
   // ================= 1. GERAÇÃO DO PDF GERAL (TODOS OS POÇOS DO DIA) =================
   async function gerarPDFGeral(dataCampanha: string, amostras: Sampling[]) {
-    setGeneratingPdf(dataCampanha);
+    setGeneratingPdf(`geral_${dataCampanha}`);
 
     try {
       let whiteLogoBase64: string | null = null;
@@ -215,7 +215,7 @@ export default function FisicoQuimicosDesktopPage() {
 
   // ================= 2. GERAÇÃO DO PDF INDIVIDUAL =================
   async function gerarPDFIndividual(amostra: Sampling) {
-    setGeneratingPdf(amostra.id); // Trava só o botão desse poço
+    setGeneratingPdf(amostra.id);
 
     try {
       let whiteLogoBase64: string | null = null;
@@ -381,10 +381,10 @@ export default function FisicoQuimicosDesktopPage() {
           <div className="space-y-8">
             {datasAgrupadas.map((dataCampanha) => {
               const amostrasDoDia = groupedData[dataCampanha];
-              const isGeneratingGeral = generatingPdf === dataCampanha;
+              const isGeneratingGeral = generatingPdf === `geral_${dataCampanha}`;
 
               return (
-                <div key={dataCampanha} className="bg-white rounded-3xl shadow-md border border-gray-200 overflow-hidden group hover:shadow-lg transition-all duration-300">
+                <div key={dataCampanha} className="bg-white rounded-3xl shadow-md border border-gray-200 overflow-hidden group transition-all duration-300">
                   
                   {/* CABEÇALHO DO CARD (DATA) E BOTÃO DE PDF GERAL */}
                   <div className="bg-gray-50 border-b border-gray-200 px-8 py-5 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
@@ -428,7 +428,7 @@ export default function FisicoQuimicosDesktopPage() {
                           const isGeneratingIndiv = generatingPdf === amostra.id;
                           
                           return (
-                            <tr key={amostra.id} className="hover:bg-gray-50/50 transition-colors group/row">
+                            <tr key={amostra.id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-8 py-4 font-bold text-[#391e2a]">
                                 {amostra.poco}
                               </td>
@@ -454,8 +454,8 @@ export default function FisicoQuimicosDesktopPage() {
                                 </span>
                               </td>
                               <td className="px-8 py-4 text-right">
-                                {/* MÁGICA AQUI: Dois botões revelados no Hover */}
-                                <div className="flex justify-end gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                {/* Botões permanentemente visíveis para garantir o clique */}
+                                <div className="flex justify-end gap-2">
                                   
                                   <button 
                                     onClick={() => gerarPDFIndividual(amostra)}
@@ -465,12 +465,12 @@ export default function FisicoQuimicosDesktopPage() {
                                     <Icons.Download /> {isGeneratingIndiv ? "..." : "Baixar"}
                                   </button>
 
-                                  <button 
-                                    onClick={() => router.push(`/projetos/${projectId}/fisico-quimicos/${amostra.id}`)}
+                                  <Link 
+                                    href={`/projetos/${projectId}/fisico-quimicos/${amostra.id}`}
                                     className="text-white bg-[#80b02d] hover:bg-[#6a9425] font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm"
                                   >
                                     <Icons.Eye /> Ver Ficha
-                                  </button>
+                                  </Link>
 
                                 </div>
                               </td>
