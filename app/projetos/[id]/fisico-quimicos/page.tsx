@@ -5,6 +5,29 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+
+// ================= HELPERS (Logo Branco) =================
+async function generateWhiteLogoBase64(src: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "Anonymous"; 
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Erro no canvas")); return; }
+      ctx.drawImage(img, 0, 0);
+      ctx.filter = "brightness(0) invert(1)";
+      ctx.drawImage(canvas, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = (e) => reject(e);
+    img.src = src;
+  });
+}
 
 // ================= ÍCONES =================
 const Icons = {
@@ -21,7 +44,10 @@ type Sampling = {
   identificacao_codigo: string;
   data: string;
   hora_inicio: string;
+  na_inicial?: string; 
+  na_final?: string;
   fase_livre: boolean;
+  espessura_fl?: string;
   leituras: any[];
 };
 
@@ -33,6 +59,7 @@ export default function FisicoQuimicosDesktopPage() {
   const [projectName, setProjectName] = useState("Carregando...");
   const [groupedData, setGroupedData] = useState<{ [key: string]: Sampling[] }>({});
   const [loading, setLoading] = useState(true);
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -70,6 +97,124 @@ export default function FisicoQuimicosDesktopPage() {
     if (!dateString) return "Sem Data";
     const [year, month, day] = dateString.split("-");
     return `${day}/${month}/${year}`;
+  }
+
+  // ================= FUNÇÃO NOVA: GERA O PDF GERAL DO DIA =================
+  async function gerarPDFGeral(dataCampanha: string, amostras: Sampling[]) {
+    setGeneratingPdf(dataCampanha);
+
+    try {
+      let whiteLogoBase64: string | null = null;
+      try { whiteLogoBase64 = await generateWhiteLogoBase64("/logo.png"); } catch (e) {}
+
+      const doc = new jsPDF("p", "mm", "a4");
+      const marginX = 15;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let currentY = 0;
+
+      const brandPurple: [number, number, number] = [57, 30, 42];
+      const brandGreen: [number, number, number] = [128, 176, 45];
+
+      const drawPageHeader = () => {
+        doc.setFillColor(...brandPurple);
+        doc.rect(0, 0, pageWidth, 35, "F");
+
+        if (whiteLogoBase64) {
+          try { doc.addImage(whiteLogoBase64, "PNG", marginX, 12.5, 35, 10); } catch (e) {}
+        }
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("RELATÓRIO GERAL: FÍSICO-QUÍMICOS", pageWidth - marginX, 16, { align: "right" });
+        
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.text(`PROJETO: ${projectName}`, pageWidth - marginX, 23, { align: "right" });
+        doc.text(`DATA DA CAMPANHA: ${formatDateBr(dataCampanha)}`, pageWidth - marginX, 28, { align: "right" });
+
+        currentY = 45;
+      };
+
+      drawPageHeader();
+
+      const checkPageBreak = (needed: number) => {
+        if (currentY + needed > 275) {
+          doc.addPage();
+          drawPageHeader();
+          return true;
+        }
+        return false;
+      };
+
+      for (let i = 0; i < amostras.length; i++) {
+        const amostra = amostras[i];
+        
+        checkPageBreak(50); 
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(...brandPurple);
+        doc.text(`POÇO: ${amostra.poco} | ${amostra.nomenclatura || "Sem nomenclatura"}`, marginX, currentY);
+        
+        doc.setDrawColor(...brandGreen);
+        doc.setLineWidth(0.8);
+        doc.line(marginX, currentY + 2, marginX + 10, currentY + 2);
+        currentY += 8;
+
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80);
+        
+        const infoLinha1 = `Cód: ${amostra.identificacao_codigo || "-"}   |   Hora Início: ${amostra.hora_inicio || "-"}   |   NA Inicial: ${amostra.na_inicial || "-"} m   |   NA Final: ${amostra.na_final || "-"} m`;
+        doc.text(infoLinha1, marginX, currentY);
+        currentY += 5;
+
+        if (amostra.fase_livre) {
+          doc.setTextColor(200, 0, 0);
+          doc.setFont("helvetica", "bold");
+          doc.text(`Fase Livre: DETECTADA (Espessura: ${amostra.espessura_fl || "-"} m)`, marginX, currentY);
+        } else {
+          doc.setTextColor(120);
+          doc.text("Fase Livre: Não Detectada", marginX, currentY);
+        }
+        currentY += 6;
+
+        autoTable(doc, {
+          startY: currentY,
+          margin: { left: marginX, right: marginX },
+          head: [["Horário", "NA (m)", "pH", "ORP (mV)", "OD (mg/L)", "Cond. (µS/cm)"]],
+          body: amostra.leituras?.map((l: any) => [
+            l.horario || "-", 
+            l.na || "-", 
+            l.ph || "-", 
+            l.orp || "-", 
+            l.od || "-", 
+            l.condutividade || "-"
+          ]) || [],
+          theme: 'striped',
+          headStyles: { fillColor: brandPurple, textColor: 255, fontStyle: "bold", fontSize: 8 },
+          styles: { fontSize: 8, cellPadding: 3, textColor: 50, halign: "center" },
+          alternateRowStyles: { fillColor: [250, 250, 252] }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 15;
+      }
+
+      const totalP = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalP; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(180);
+        doc.text(`Documento gerado eletronicamente - Página ${i} de ${totalP}`, pageWidth / 2, 290, { align: "center" });
+      }
+
+      doc.save(`Compilado_FQ_${projectName}_${dataCampanha}.pdf`);
+    } catch (error) {
+      alert("Erro ao gerar o PDF Geral.");
+    } finally {
+      setGeneratingPdf(null);
+    }
   }
 
   if (loading) return <AdminShell><p className="p-10 text-gray-500 font-bold">Carregando compilados...</p></AdminShell>;
@@ -127,8 +272,13 @@ export default function FisicoQuimicosDesktopPage() {
                       </div>
                     </div>
 
-                    <Button className="bg-[#391e2a] hover:bg-[#2a161f] text-white font-bold rounded-xl h-11 px-6 shadow-sm hidden md:flex items-center gap-2">
-                      <Icons.Download /> Baixar Planilha Geral
+                    {/* BOTÃO ATUALIZADO CONFORME SEU PEDIDO */}
+                    <Button 
+                      onClick={() => gerarPDFGeral(dataCampanha, amostrasDoDia)}
+                      disabled={generatingPdf === dataCampanha}
+                      className="bg-[#391e2a] hover:bg-[#2a161f] text-white font-bold rounded-xl h-11 px-6 shadow-sm hidden md:flex items-center gap-2"
+                    >
+                      <Icons.Download /> {generatingPdf === dataCampanha ? "Gerando..." : "Baixar PDF Geral"}
                     </Button>
                   </div>
 
