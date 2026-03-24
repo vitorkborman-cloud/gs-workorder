@@ -605,9 +605,9 @@ export default function RdoViewPage() {
                     <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Dashboard Executivo de Indicadores</li>
                     <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Tabelas Técnicas (Clima, Efetivo, Atividades, SHEQ)</li>
                     <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Notas de Campo e Comentários Adicionais</li>
-                    <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Galeria de Fotos Proporcionais e Assinaturas</li>
+                    <li className="flex items-center"><span className="w-2.5 h-2.5 bg-[#80b02d] rounded-full mr-3 shadow"></span> Galeria de Fotos e Assinaturas</li>
                   </ul>
-                  <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">GreenSoil Work Order System</p>
+                  <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">GreenSoil Site System</p>
                </div>
             </div>
           )}
