@@ -39,7 +39,7 @@ export default function ProjetoPage() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [rdos, setRdos] = useState<RDO[]>([]);
-  const [campanhasFQ, setCampanhasFQ] = useState<CampanhaFQ[]>([]); // NOVO ESTADO
+  const [campanhasFQ, setCampanhasFQ] = useState<CampanhaFQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobile, setMobile] = useState(false);
 
@@ -75,7 +75,7 @@ export default function ProjetoPage() {
       .order("created_at", { ascending: false });
     if (rdoData) setRdos(rdoData);
 
-    // 4. Físico-Químicos (NOVO)
+    // 4. Físico-Químicos
     const { data: fqData } = await supabase
       .from("water_samplings")
       .select("id, data")
@@ -83,13 +83,11 @@ export default function ProjetoPage() {
       .eq("finalized", true);
 
     if (fqData) {
-      // Agrupa as fichas contando quantas ocorreram no mesmo dia
       const grouped = fqData.reduce((acc: any, curr: any) => {
         acc[curr.data] = (acc[curr.data] || 0) + 1;
         return acc;
       }, {});
 
-      // Transforma o objeto agrupado em um array e ordena da data mais recente pra mais antiga
       const formatadas = Object.keys(grouped).map(date => ({
         data: date,
         quantidade: grouped[date]
@@ -133,7 +131,21 @@ export default function ProjetoPage() {
     load();
   }
 
-  // Função auxiliar para formatar a data visualmente
+  // ================= NOVA FUNÇÃO: DELETAR CAMPANHA FÍSICO-QUÍMICO =================
+  async function deleteFisicoQuimico(dataCampanha: string) {
+    const ok = confirm(`Isso vai excluir permanentemente todas as amostragens do dia ${formatDateBr(dataCampanha)}. Tem certeza?`);
+    if (!ok) return;
+
+    // Deleta TODOS os poços que pertencem a este projeto e que têm essa mesma data
+    await supabase
+      .from("water_samplings")
+      .delete()
+      .eq("project_id", projectId)
+      .eq("data", dataCampanha);
+    
+    load(); // Recarrega a tela para sumir o card
+  }
+
   function formatDateBr(dateString: string) {
     if (!dateString) return "Sem Data";
     const [year, month, day] = dateString.split("-");
@@ -207,7 +219,7 @@ export default function ProjetoPage() {
           </div>
         </div>
 
-        {/* ================= FÍSICO-QUÍMICOS (NOVO) ================= */}
+        {/* ================= FÍSICO-QUÍMICOS (COM EXCLUSÃO) ================= */}
         <div className="space-y-5">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
@@ -227,6 +239,20 @@ export default function ProjetoPage() {
               <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {campanhasFQ.map((campanha) => (
                   <div key={campanha.data} className="relative group">
+                    
+                    {/* BOTÃO DE DELETAR IDÊNTICO AOS OUTROS */}
+                    {!mobile && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteFisicoQuimico(campanha.data);
+                        }}
+                        className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 opacity-0 group-hover:opacity-100 transition z-10"
+                      >
+                        ✕
+                      </button>
+                    )}
+
                     <Card
                       onClick={() =>
                         router.push(`/projetos/${projectId}/fisico-quimicos`)
