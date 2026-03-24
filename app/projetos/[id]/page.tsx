@@ -226,7 +226,7 @@ export default function ProjetoPage() {
               Físico-Químicos
             </h2>
             <p className="text-sm text-gray-500">
-              Amostragens de água subterrânea (Agrupadas por dia de campanha)
+              Amostragens de água subterrânea
             </p>
           </div>
 
@@ -285,14 +285,14 @@ export default function ProjetoPage() {
               Perfis descritivos
             </h2>
             <p className="text-sm text-gray-500">
-              Perfis estratigráficos gerados pelo aplicativo
+              Perfis estratigráficos
             </p>
           </div>
 
           <div className="bg-secondary rounded-3xl p-8 shadow-inner">
             {perfis.length === 0 ? (
               <p className="text-white/70">
-                Nenhum perfil gerado pelo aplicativo.
+                Nenhum perfil gerado.
               </p>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -337,7 +337,7 @@ export default function ProjetoPage() {
               Relatórios diários
             </h2>
             <p className="text-sm text-gray-500">
-              Relatórios enviados pelo aplicativo de campo
+              Relatórios de obra
             </p>
           </div>
 
