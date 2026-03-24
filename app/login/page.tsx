@@ -75,7 +75,7 @@ export default function LoginPage() {
               Green<span className="text-[#80b02d]">Soil</span>
             </h1>
             <p className="text-sm tracking-[0.4em] text-white/60 mt-2 uppercase font-bold">
-              Site System
+              Mobile System
             </p>
           </div>
 
@@ -174,7 +174,7 @@ export default function LoginPage() {
           </div>
 
           <p className="text-center text-white/30 text-xs font-medium mt-8 tracking-widest uppercase">
-            GreenSoil Work Order System
+            GreenSoil Mobile System
           </p>
 
         </div>
