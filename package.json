@@ -21,6 +21,7 @@
     "next": "16.1.6",
     "next-pwa": "^5.6.0",
     "pdf-lib": "^1.17.1",
+    "puppeteer": "^24.40.0",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
