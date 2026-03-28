@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
 import fs from 'fs';
 import path from 'path';
 
-// Interface para o TypeScript não reclamar do erro no .map
+// Configuração para permitir execuções longas (Vercel/Serverless)
+export const maxDuration = 60;
+
 interface Layer {
   de: string | number;
   ate: string | number;
@@ -13,23 +16,41 @@ interface Layer {
 }
 
 export async function POST(request: Request) {
+  // Definimos como 'any' para evitar conflitos de versão do Puppeteer
+  let browser: any = null;
+
   try {
     const body = await request.json();
-    const { data, layers }: { data: any, layers: Layer[] } = body;
+    const { data, layers }: { data: any; layers: Layer[] } = body;
+
+    const isLocal = process.env.NODE_ENV === 'development';
+
+    // --- CONFIGURAÇÃO DO BROWSER (COM CASTING DIRETO PARA EVITAR ERROS NO VS CODE) ---
+    browser = await puppeteer.launch({
+      args: isLocal ? ['--no-sandbox', '--disable-setuid-sandbox'] : (chromium as any).args,
+      defaultViewport: isLocal ? { width: 1280, height: 720 } : (chromium as any).defaultViewport,
+      executablePath: isLocal
+        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' // Ajuste se usar Mac/Linux
+        : await (chromium as any).executablePath(),
+      headless: isLocal ? true : (chromium as any).headless,
+    });
+
+    const page = await browser.newPage();
 
     // --- CARREGAMENTO DO LOGO ---
     let logoBase64 = "";
     try {
       const logoPath = path.join(process.cwd(), 'public', 'logo.png');
-      const logoBuffer = fs.readFileSync(logoPath);
-      logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+      if (fs.existsSync(logoPath)) {
+        const logoBuffer = fs.readFileSync(logoPath);
+        logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+      }
     } catch (e) {
       console.error("Erro ao carregar logo:", e);
     }
 
-    // ESCALA: 0.75x (60 * 0.75 = 45)
+    // --- LÓGICA DE CÁLCULO E ESCALA ---
     const ESCALA = 45; 
-    
     const preFiltroTopo = parseFloat(data.pre_filtro);
     const filtroTopo = parseFloat(data.secao_filtrante_topo);
     const filtroBase = parseFloat(data.secao_filtrante_base);
@@ -143,9 +164,7 @@ export async function POST(request: Request) {
         `;
     }
 
-    const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
-    const page = await browser.newPage();
-
+    // --- MONTAGEM DO HTML ---
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -238,13 +257,30 @@ export async function POST(request: Request) {
     `;
 
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '30px', right: '30px', bottom: '30px', left: '30px' } });
+    
+    // Geração do PDF Buffer
+    const pdfBuffer: Buffer = await page.pdf({ 
+      format: 'A4', 
+      printBackground: true, 
+      margin: { top: '30px', right: '30px', bottom: '30px', left: '30px' } 
+    });
+
     await browser.close();
 
+    // Convertemos para Uint8Array para o Response do Next.js
     const pdfUint8Array = new Uint8Array(pdfBuffer);
-    return new Response(pdfUint8Array, { status: 200, headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="Perfil_${data.nome_sondagem}.pdf"` } });
+
+    return new Response(pdfUint8Array, { 
+      status: 200, 
+      headers: { 
+        'Content-Type': 'application/pdf', 
+        'Content-Disposition': `attachment; filename="Perfil_${data.nome_sondagem}.pdf"` 
+      } 
+    });
+
   } catch (error: any) {
     console.error("Erro ao gerar PDF:", error);
+    if (browser) await browser.close();
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
