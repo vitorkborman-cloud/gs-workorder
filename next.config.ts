@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   experimental: {
-    // @ts-ignore: Essa propriedade é experimental e necessária para o Chromium na Vercel
+    // @ts-ignore: Impede a Vercel de apagar o Chromium no build
     outputFileTracingIncludes: {
       '/api/gerar-pdf': ['./node_modules/@sparticuz/chromium/bin/*'],
     },
