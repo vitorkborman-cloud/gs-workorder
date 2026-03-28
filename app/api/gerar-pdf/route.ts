@@ -4,8 +4,9 @@ import puppeteer from 'puppeteer-core';
 import fs from 'fs';
 import path from 'path';
 
-// Configuração para permitir execuções longas (Vercel/Serverless)
+// Configurações de execução para ambiente Serverless (Vercel)
 export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
 interface Layer {
   de: string | number;
@@ -16,23 +17,31 @@ interface Layer {
 }
 
 export async function POST(request: Request) {
-  // Definimos como 'any' para evitar conflitos de versão do Puppeteer
+  // Tratamos o browser como 'any' para evitar conflitos de versão do Puppeteer
   let browser: any = null;
 
   try {
     const body = await request.json();
     const { data, layers }: { data: any; layers: Layer[] } = body;
 
-    const isLocal = process.env.NODE_ENV === 'development';
+    // Forçamos o tipo boolean para o isLocal
+    const isLocal: boolean = process.env.NODE_ENV === 'development';
 
-    // --- CONFIGURAÇÃO DO BROWSER (COM CASTING DIRETO PARA EVITAR ERROS NO VS CODE) ---
+    // Criamos um atalho 'any' para o objeto chromium para silenciar erros de tipagem do VS Code
+    const chrome: any = chromium;
+
+    // --- CONFIGURAÇÃO DO BROWSER ---
     browser = await puppeteer.launch({
-      args: isLocal ? ['--no-sandbox', '--disable-setuid-sandbox'] : (chromium as any).args,
-      defaultViewport: isLocal ? { width: 1280, height: 720 } : (chromium as any).defaultViewport,
+      args: isLocal 
+        ? ['--no-sandbox', '--disable-setuid-sandbox'] 
+        : [...chrome.args, '--hide-scrollbars', '--disable-web-security'],
+      defaultViewport: isLocal 
+        ? { width: 1280, height: 720 } 
+        : chrome.defaultViewport,
       executablePath: isLocal
         ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' // Ajuste se usar Mac/Linux
-        : await (chromium as any).executablePath(),
-      headless: isLocal ? true : (chromium as any).headless,
+        : await chrome.executablePath(),
+      headless: isLocal ? true : chrome.headless,
     });
 
     const page = await browser.newPage();
@@ -46,125 +55,125 @@ export async function POST(request: Request) {
         logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
       }
     } catch (e) {
-      console.error("Erro ao carregar logo:", e);
+      console.warn("Logo não encontrado, gerando PDF sem imagem.");
     }
 
-    // --- LÓGICA DE CÁLCULO E ESCALA ---
-    const ESCALA = 45; 
+    // --- LÓGICA DE CÁLCULO E ESTILOS ---
+    const ESCALA = 45;
     const preFiltroTopo = parseFloat(data.pre_filtro);
     const filtroTopo = parseFloat(data.secao_filtrante_topo);
     const filtroBase = parseFloat(data.secao_filtrante_base);
     const nivelAgua = parseFloat(data.nivel_agua);
     const hasWell = !isNaN(filtroTopo) || !isNaN(preFiltroTopo);
-    const TOP_OFFSET = hasWell ? 18 : 0; 
+    const TOP_OFFSET = hasWell ? 18 : 0;
 
     const getY = (depth: string | number) => {
-        let y = TOP_OFFSET;
-        let d = parseFloat(String(depth));
-        if (isNaN(d)) return TOP_OFFSET;
-        for (let l of layers) {
-            let de = parseFloat(String(l.de));
-            let ate = parseFloat(String(l.ate));
-            let hOrig = (ate - de) * ESCALA;
-            let hStretched = Math.max(40, hOrig); 
-            if (d <= de) break;
-            if (d >= ate) y += hStretched;
-            else {
-                y += ((d - de) / (ate - de)) * hStretched;
-                break;
-            }
+      let y = TOP_OFFSET;
+      let d = parseFloat(String(depth));
+      if (isNaN(d)) return TOP_OFFSET;
+      for (let l of layers) {
+        let de = parseFloat(String(l.de));
+        let ate = parseFloat(String(l.ate));
+        let hOrig = (ate - de) * ESCALA;
+        let hStretched = Math.max(40, hOrig);
+        if (d <= de) break;
+        if (d >= ate) y += hStretched;
+        else {
+          y += ((d - de) / (ate - de)) * hStretched;
+          break;
         }
-        return y;
+      }
+      return y;
     };
 
     const getEstiloSolo = (tipo: string) => {
-        if (!tipo) return "background-color: #f0f0f0;";
-        const t = tipo.toLowerCase().trim();
-        let bgColor = "#e0e0e0";
-        if (t.includes("brita") || t.includes("rach") || t.includes("concreto") || t.includes("cascalho")) bgColor = "#cccccc";
-        else if (t.includes("aterro") || t.includes("orgânica") || t.includes("turfa")) bgColor = "#8b7355";
-        else if (t.startsWith("areia")) {
-            bgColor = t.includes("argil") ? "#E6C27A" : t.includes("silt") ? "#EEDD82" : "#FCE663";
-        }
-        else if (t.startsWith("silte")) {
-            bgColor = t.includes("aren") ? "#D1B280" : t.includes("argil") ? "#B88655" : "#C19A6B";
-        }
-        else if (t.startsWith("argila")) {
-            bgColor = t.includes("aren") ? "#CC6B58" : t.includes("silt") ? "#B86554" : "#D47A6A";
-        }
+      if (!tipo) return "background-color: #f0f0f0;";
+      const t = tipo.toLowerCase().trim();
+      let bgColor = "#e0e0e0";
+      if (t.includes("brita") || t.includes("rach") || t.includes("concreto") || t.includes("cascalho")) bgColor = "#cccccc";
+      else if (t.includes("aterro") || t.includes("orgânica") || t.includes("turfa")) bgColor = "#8b7355";
+      else if (t.startsWith("areia")) {
+        bgColor = t.includes("argil") ? "#E6C27A" : t.includes("silt") ? "#EEDD82" : "#FCE663";
+      }
+      else if (t.startsWith("silte")) {
+        bgColor = t.includes("aren") ? "#D1B280" : t.includes("argil") ? "#B88655" : "#C19A6B";
+      }
+      else if (t.startsWith("argila")) {
+        bgColor = t.includes("aren") ? "#CC6B58" : t.includes("silt") ? "#B86554" : "#D47A6A";
+      }
 
-        let texturas: string[] = [];
-        let sizes: string[] = [];
-        if (t.includes("brita") || t.includes("rach") || t.includes("cascalho")) {
-            texturas.push("radial-gradient(circle at 30% 30%, #777 20%, transparent 22%)", "radial-gradient(circle at 70% 70%, #666 22%, transparent 24%)");
-            const size = t.includes("rach") ? "24px 24px" : "14px 14px";
-            sizes.push(size, size);
-        }
-        if (t.includes("areia") || t.includes("arenos")) {
-            texturas.push("radial-gradient(circle, rgba(0,0,0,0.35) 1px, transparent 1px)");
-            sizes.push("6px 6px");
-        }
-        if (t.includes("argila") || t.includes("argilos")) {
-            texturas.push("repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(0,0,0,0.2) 6px, rgba(0,0,0,0.2) 7px)");
-            sizes.push("100% 100%");
-        }
-        if (t.includes("silte") || t.includes("siltos")) {
-            texturas.push("repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.15) 5px, rgba(0,0,0,0.15) 6px)");
-            sizes.push("100% 100%");
-        }
-        return `background-color: ${bgColor}; background-image: ${texturas.join(', ')}; background-size: ${sizes.join(', ')};`;
+      let texturas: string[] = [];
+      let sizes: string[] = [];
+      if (t.includes("brita") || t.includes("rach") || t.includes("cascalho")) {
+        texturas.push("radial-gradient(circle at 30% 30%, #777 20%, transparent 22%)", "radial-gradient(circle at 70% 70%, #666 22%, transparent 24%)");
+        const size = t.includes("rach") ? "24px 24px" : "14px 14px";
+        sizes.push(size, size);
+      }
+      if (t.includes("areia") || t.includes("arenos")) {
+        texturas.push("radial-gradient(circle, rgba(0,0,0,0.35) 1px, transparent 1px)");
+        sizes.push("6px 6px");
+      }
+      if (t.includes("argila") || t.includes("argilos")) {
+        texturas.push("repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(0,0,0,0.2) 6px, rgba(0,0,0,0.2) 7px)");
+        sizes.push("100% 100%");
+      }
+      if (t.includes("silte") || t.includes("siltos")) {
+        texturas.push("repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.15) 5px, rgba(0,0,0,0.15) 6px)");
+        sizes.push("100% 100%");
+      }
+      return `background-color: ${bgColor}; background-image: ${texturas.join(', ')}; background-size: ${sizes.join(', ')};`;
     };
 
     let construtivoHTML = '';
     const profTotal = parseFloat(data.profundidade_total) || (layers.length ? parseFloat(String(layers[layers.length - 1].ate)) : 10);
 
     if (hasWell) {
-        const leftPoco = 65, widthPoco = 50, leftTubo = 80, widthTubo = 20;
-        const yF = getY(profTotal);
+      const leftPoco = 65, widthPoco = 50, leftTubo = 80, widthTubo = 20;
+      const yF = getY(profTotal);
 
-        if (!isNaN(preFiltroTopo)) {
-            const ySolo = getY(0), hBentonita = getY(preFiltroTopo) - ySolo;
-            construtivoHTML += `<div style="position: absolute; left: ${leftPoco}px; width: ${widthPoco}px; top: ${ySolo}px; height: ${hBentonita}px; background-color: #c98a51; border-left: 0.5px solid #333; border-right: 0.5px solid #333; z-index: 4;"></div>`;
-            const hPreFiltro = yF - getY(preFiltroTopo);
-            construtivoHTML += `<div style="position: absolute; left: ${leftPoco}px; width: ${widthPoco}px; top: ${getY(preFiltroTopo)}px; height: ${hPreFiltro}px; background-color: #fce663; background-image: radial-gradient(black 1px, transparent 1px); background-size: 6px 6px; border-left: 0.5px solid #333; border-right: 0.5px solid #333; border-bottom: 0.5px solid #333; z-index: 4;"></div>`;
-        }
-        if (!isNaN(filtroTopo)) {
-            construtivoHTML += `<div style="position: absolute; left: ${leftTubo - 8}px; width: ${widthTubo + 16}px; top: 0px; height: 10px; background-color: #888; border: 1.5px solid #333; z-index: 6;"></div>`;
-            construtivoHTML += `<div style="position: absolute; left: ${leftTubo}px; width: ${widthTubo}px; top: 10px; height: ${getY(filtroTopo) - 10}px; background-color: white; border: 1.5px solid #333; border-top: none; z-index: 5;"></div>`;
-        }
-        if (!isNaN(filtroTopo) && !isNaN(filtroBase)) {
-            const yTF = getY(filtroTopo), yBF = getY(filtroBase);
-            construtivoHTML += `<div style="position: absolute; left: ${leftTubo}px; width: ${widthTubo}px; top: ${yTF}px; height: ${yBF - yTF}px; background-color: white; background-image: repeating-linear-gradient(0deg, transparent, transparent 3px, #333 3px, #333 4px); border: 1.5px solid #333; border-top: none; border-bottom: none; z-index: 5;"></div>`;
-            construtivoHTML += `
-                <div style="position: absolute; left: 115px; width: 10px; top: ${yTF}px; border-top: 0.5px dashed #333; z-index: 10;"></div>
-                <div style="position: absolute; left: 128px; top: ${yTF - 8}px; background-color: white; border: 0.5px solid #333; padding: 2px 4px; font-size: 9px; font-weight: bold; border-radius: 3px; z-index: 11; box-shadow: 1px 1px 2px rgba(0,0,0,0.1);">${filtroTopo}m</div>
-                <div style="position: absolute; left: 115px; width: 10px; top: ${yBF}px; border-top: 0.5px dashed #333; z-index: 10;"></div>
-                <div style="position: absolute; left: 128px; top: ${yBF - 8}px; background-color: white; border: 0.5px solid #333; padding: 2px 4px; font-size: 9px; font-weight: bold; border-radius: 3px; z-index: 11; box-shadow: 1px 1px 2px rgba(0,0,0,0.1);">${filtroBase}m</div>
-            `;
-            if (getY(profTotal) - yBF > 0) {
-                construtivoHTML += `<div style="position: absolute; left: ${leftTubo}px; width: ${widthTubo}px; top: ${yBF}px; height: ${getY(profTotal) - yBF}px; background-color: white; border: 1.5px solid #333; border-top: none; border-bottom: none; z-index: 5;"></div>`;
-            }
-            construtivoHTML += `<div style="position: absolute; left: ${leftTubo}px; width: ${widthTubo}px; top: ${getY(profTotal) - 5}px; height: 5px; background-color: #333; z-index: 6;"></div>`;
-        }
-        const dS = data.diametro_sondagem || 'Furo', dP = data.diametro_poco || 'Tubo';
+      if (!isNaN(preFiltroTopo)) {
+        const ySolo = getY(0), hBentonita = getY(preFiltroTopo) - ySolo;
+        construtivoHTML += `<div style="position: absolute; left: ${leftPoco}px; width: ${widthPoco}px; top: ${ySolo}px; height: ${hBentonita}px; background-color: #c98a51; border-left: 0.5px solid #333; border-right: 0.5px solid #333; z-index: 4;"></div>`;
+        const hPreFiltro = yF - getY(preFiltroTopo);
+        construtivoHTML += `<div style="position: absolute; left: ${leftPoco}px; width: ${widthPoco}px; top: ${getY(preFiltroTopo)}px; height: ${hPreFiltro}px; background-color: #fce663; background-image: radial-gradient(black 1px, transparent 1px); background-size: 6px 6px; border-left: 0.5px solid #333; border-right: 0.5px solid #333; border-bottom: 0.5px solid #333; z-index: 4;"></div>`;
+      }
+      if (!isNaN(filtroTopo)) {
+        construtivoHTML += `<div style="position: absolute; left: ${leftTubo - 8}px; width: ${widthTubo + 16}px; top: 0px; height: 10px; background-color: #888; border: 1.5px solid #333; z-index: 6;"></div>`;
+        construtivoHTML += `<div style="position: absolute; left: ${leftTubo}px; width: ${widthTubo}px; top: 10px; height: ${getY(filtroTopo) - 10}px; background-color: white; border: 1.5px solid #333; border-top: none; z-index: 5;"></div>`;
+      }
+      if (!isNaN(filtroTopo) && !isNaN(filtroBase)) {
+        const yTF = getY(filtroTopo), yBF = getY(filtroBase);
+        construtivoHTML += `<div style="position: absolute; left: ${leftTubo}px; width: ${widthTubo}px; top: ${yTF}px; height: ${yBF - yTF}px; background-color: white; background-image: repeating-linear-gradient(0deg, transparent, transparent 3px, #333 3px, #333 4px); border: 1.5px solid #333; border-top: none; border-bottom: none; z-index: 5;"></div>`;
         construtivoHTML += `
-            <div style="position: absolute; left: 80px; width: 20px; top: ${yF}px; border-left: 0.5px solid #333; border-right: 0.5px solid #333; border-bottom: 0.5px solid #333; height: 8px; z-index: 10;"></div>
-            <div style="position: absolute; left: 90px; top: ${yF + 11}px; transform: translateX(-50%); background-color: white; border: 0.5px solid #333; padding: 2px 4px; font-size: 8px; font-weight: bold; z-index: 11; white-space: nowrap; border-radius: 2px;">Ø ${dP}</div>
-            <div style="position: absolute; left: 65px; width: 50px; top: ${yF + 20}px; border-left: 0.5px solid #333; border-right: 0.5px solid #333; border-bottom: 0.5px solid #333; height: 8px; z-index: 10;"></div>
-            <div style="position: absolute; left: 90px; top: ${yF + 31}px; transform: translateX(-50%); background-color: white; border: 0.5px solid #333; padding: 2px 4px; font-size: 8px; font-weight: bold; z-index: 11; white-space: nowrap; border-radius: 2px;">Ø ${dS}</div>
+            <div style="position: absolute; left: 115px; width: 10px; top: ${yTF}px; border-top: 0.5px dashed #333; z-index: 10;"></div>
+            <div style="position: absolute; left: 128px; top: ${yTF - 8}px; background-color: white; border: 0.5px solid #333; padding: 2px 4px; font-size: 9px; font-weight: bold; border-radius: 3px; z-index: 11; box-shadow: 1px 1px 2px rgba(0,0,0,0.1);">${filtroTopo}m</div>
+            <div style="position: absolute; left: 115px; width: 10px; top: ${yBF}px; border-top: 0.5px dashed #333; z-index: 10;"></div>
+            <div style="position: absolute; left: 128px; top: ${yBF - 8}px; background-color: white; border: 0.5px solid #333; padding: 2px 4px; font-size: 9px; font-weight: bold; border-radius: 3px; z-index: 11; box-shadow: 1px 1px 2px rgba(0,0,0,0.1);">${filtroBase}m</div>
         `;
+        if (getY(profTotal) - yBF > 0) {
+          construtivoHTML += `<div style="position: absolute; left: ${leftTubo}px; width: ${widthTubo}px; top: ${yBF}px; height: ${getY(profTotal) - yBF}px; background-color: white; border: 1.5px solid #333; border-top: none; border-bottom: none; z-index: 5;"></div>`;
+        }
+        construtivoHTML += `<div style="position: absolute; left: ${leftTubo}px; width: ${widthTubo}px; top: ${getY(profTotal) - 5}px; height: 5px; background-color: #333; z-index: 6;"></div>`;
+      }
+      const dS = data.diametro_sondagem || 'Furo', dP = data.diametro_poco || 'Tubo';
+      construtivoHTML += `
+          <div style="position: absolute; left: 80px; width: 20px; top: ${yF}px; border-left: 0.5px solid #333; border-right: 0.5px solid #333; border-bottom: 0.5px solid #333; height: 8px; z-index: 10;"></div>
+          <div style="position: absolute; left: 90px; top: ${yF + 11}px; transform: translateX(-50%); background-color: white; border: 0.5px solid #333; padding: 2px 4px; font-size: 8px; font-weight: bold; z-index: 11; white-space: nowrap; border-radius: 2px;">Ø ${dP}</div>
+          <div style="position: absolute; left: 65px; width: 50px; top: ${yF + 20}px; border-left: 0.5px solid #333; border-right: 0.5px solid #333; border-bottom: 0.5px solid #333; height: 8px; z-index: 10;"></div>
+          <div style="position: absolute; left: 90px; top: ${yF + 31}px; transform: translateX(-50%); background-color: white; border: 0.5px solid #333; padding: 2px 4px; font-size: 8px; font-weight: bold; z-index: 11; white-space: nowrap; border-radius: 2px;">Ø ${dS}</div>
+      `;
     }
 
     if (!isNaN(nivelAgua)) {
-        const yNA = getY(nivelAgua);
-        construtivoHTML += `
-            <div style="position: absolute; left: 10px; width: 160px; top: ${yNA}px; border-top: 1.5px solid #005fcc; z-index: 10;"></div>
-            <div style="position: absolute; left: 25px; top: ${yNA - 6}px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #005fcc; z-index: 11;"></div>
-            <div style="position: absolute; left: 12px; top: ${yNA - 22}px; background-color: white; border: 1px solid #005fcc; padding: 2px 4px; color: #005fcc; font-size: 10px; font-weight: bold; border-radius: 3px; z-index: 11; box-shadow: 1px 1px 2px rgba(0,0,0,0.1);">NA: ${nivelAgua}m</div>
-        `;
+      const yNA = getY(nivelAgua);
+      construtivoHTML += `
+          <div style="position: absolute; left: 10px; width: 160px; top: ${yNA}px; border-top: 1.5px solid #005fcc; z-index: 10;"></div>
+          <div style="position: absolute; left: 25px; top: ${yNA - 6}px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #005fcc; z-index: 11;"></div>
+          <div style="position: absolute; left: 12px; top: ${yNA - 22}px; background-color: white; border: 1px solid #005fcc; padding: 2px 4px; color: #005fcc; font-size: 10px; font-weight: bold; border-radius: 3px; z-index: 11; box-shadow: 1px 1px 2px rgba(0,0,0,0.1);">NA: ${nivelAgua}m</div>
+      `;
     }
 
-    // --- MONTAGEM DO HTML ---
+    // --- CONSTRUÇÃO DO HTML FINAL ---
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -265,12 +274,7 @@ export async function POST(request: Request) {
       margin: { top: '30px', right: '30px', bottom: '30px', left: '30px' } 
     });
 
-    await browser.close();
-
-    // Convertemos para Uint8Array para o Response do Next.js
-    const pdfUint8Array = new Uint8Array(pdfBuffer);
-
-    return new Response(pdfUint8Array, { 
+    return new Response(new Uint8Array(pdfBuffer), { 
       status: 200, 
       headers: { 
         'Content-Type': 'application/pdf', 
@@ -279,8 +283,13 @@ export async function POST(request: Request) {
     });
 
   } catch (error: any) {
-    console.error("Erro ao gerar PDF:", error);
+    console.error("ERRO NA GERAÇÃO DO PDF:", error);
+    return NextResponse.json({ 
+        error: "Erro no servidor", 
+        details: error.message 
+    }, { status: 500 });
+  } finally {
+    // Garante que o processo do Chrome seja fechado mesmo se houver erro
     if (browser) await browser.close();
-    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
