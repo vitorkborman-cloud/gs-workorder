@@ -23,13 +23,12 @@ type Clima = { periodo: string; tempo: string; condicao: string; razao: string; 
 type Envolvido = { empresa: string; colaboradores: string; funcao: string; };
 type Atividade = { atividade: string; empresa: string; status: string; obs: string; };
 
-// Nova estrutura de Foto otimizada para Storage e Memória
 type FotoMobile = {
-  id: string; // ID único temporário
-  previewUrl: string; // Blob URL temporária (leve)
-  storagePath: string | null; // Caminho no Supabase Storage se já subiu
+  id: string; 
+  previewUrl: string; 
+  storagePath: string | null; 
   legenda: string;
-  file: File | null; // Arquivo comprimido pronto para upload
+  file: File | null; 
   status: "idle" | "uploading" | "success" | "error";
 };
 
@@ -40,12 +39,6 @@ type Assinatura = { empresa: string; assinatura?: string; };
 const tempos = ["Claro", "Chuva", "Tempestade", "Nublado"];
 const condicoes = ["Praticável", "Não praticável", "Parcial"];
 const statusList = ["Concluído", "Em andamento", "Não iniciado", "Impedido"];
-
-// Cores da Marca Greensoil
-const colors = {
-  purple: "#391e2a",
-  green: "#80b02d",
-};
 
 /* ================= PAGE ================= */
 
@@ -78,9 +71,7 @@ export default function RdoPage() {
   const [comentarios, setComentarios] = useState("");
   const [assinaturas, setAssinaturas] = useState<Assinatura[]>([{ empresa: "Greensoil" }]);
 
-  // 🔥 ESTADO DE FOTOS OTIMIZADO (SEM BASE64)
   const [fotos, setFotos] = useState<FotoMobile[]>([]);
-  // Lista para rastrear fotos que precisam ser deletadas do storage ao salvar
   const [fotosParaDeletar, setFotosParaDeletar] = useState<string[]>([]);
 
   useEffect(() => {
@@ -123,15 +114,13 @@ export default function RdoPage() {
     setComentarios(data.comentarios || "");
     if (data.assinaturas) setAssinaturas(data.assinaturas);
 
-    // Carregar fotos existentes do banco (salvas como storage paths)
     if (data.fotos && Array.isArray(data.fotos)) {
       const fotosExistentes: FotoMobile[] = data.fotos.map((f: any, index: number) => ({
         id: `existente_${index}`,
-        storagePath: f.storagePath, // O banco salva o path
+        storagePath: f.storagePath, 
         legenda: f.legenda,
-        // Gera URL pública para preview
         previewUrl: f.storagePath ? supabase.storage.from('rdo-photos').getPublicUrl(f.storagePath).data.publicUrl : "",
-        file: null, // Sem arquivo para upload
+        file: null, 
         status: "success"
       }));
       setFotos(fotosExistentes);
@@ -140,29 +129,25 @@ export default function RdoPage() {
 
   // ================= FOTOS: LÓGICA DE MEMÓRIA E UPLOAD =================
 
-  // 1. Seleção e Compressão (Retorna Blob leve, não Base64)
   async function handleFileSelection(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const novosArquivos = Array.from(files);
     
-    // Feedback visual imediato
     alert(`Processando e comprimindo ${novosArquivos.length} imagens...`);
 
     for (const file of novosArquivos) {
       try {
         const compressedBlob = await compressImageProcess(file);
-        
-        // Cria um objeto File a partir do Blob comprimido
         const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
 
         const novaFoto: FotoMobile = {
           id: `new_${Date.now()}_${Math.random()}`,
-          previewUrl: URL.createObjectURL(compressedFile), // URL temporária browser (leve)
+          previewUrl: URL.createObjectURL(compressedFile), 
           storagePath: null,
           legenda: "",
-          file: compressedFile, // Mantém referência do arquivo para upload
+          file: compressedFile, 
           status: "idle",
         };
 
@@ -172,11 +157,9 @@ export default function RdoPage() {
       }
     }
     
-    // Limpa o input para permitir selecionar as mesmas fotos
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  // Função Promissificada de Compressão (Canvas) -> Retorna Blob
   function compressImageProcess(file: File): Promise<Blob> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -186,15 +169,13 @@ export default function RdoPage() {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          // 🔥 Nível extremamente profissional: Resolução equilibrada
-          const MAX_WIDTH = 1200; // Aumentado para melhor qualidade no PDF, mas ainda otimizado
+          const MAX_WIDTH = 1200; 
           const scale = Math.min(1, MAX_WIDTH / img.width);
           canvas.width = img.width * scale;
           canvas.height = img.height * scale;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
           
-          // 🔥 Retorna Blob binário comprimido (Jpeg 0.7)
           canvas.toBlob((blob) => {
             if (blob) resolve(blob);
             else reject(new Error("Falha na compressão"));
@@ -205,7 +186,6 @@ export default function RdoPage() {
     });
   }
 
-  // 2. Upload em lote para o Storage (Orquestração)
   async function uploadPendingPhotos(): Promise<{ storagePath: string, legenda: string }[]> {
     const fotosAtualizadas = [...fotos];
     const resultadosFinal: { storagePath: string, legenda: string }[] = [];
@@ -213,24 +193,19 @@ export default function RdoPage() {
     for (let i = 0; i < fotosAtualizadas.length; i++) {
       const foto = fotosAtualizadas[i];
 
-      // Se já tem path, é existente, só adiciona ao resultado
       if (foto.storagePath) {
         resultadosFinal.push({ storagePath: foto.storagePath, legenda: foto.legenda });
         continue;
       }
 
-      // Se não tem arquivo, ignora (segurança)
       if (!foto.file) continue;
 
-      // Inicia Upload visual
       updateFotoStatus(foto.id, "uploading");
 
       try {
-        // 🔥 Nome único profissional: projeto/data/timestamp_nome
         const fileExt = foto.file.name.split('.').pop();
         const fileName = `${projectId}/${dataRelatorio || 'rascunho'}/${Date.now()}_${i}.${fileExt}`;
         
-        // Upload para Bucket 'rdo-photos' (Necessário criar no Supabase)
         const { data, error } = await supabase.storage
           .from('rdo-photos')
           .upload(fileName, foto.file, { cacheControl: '3600', upsert: false });
@@ -250,58 +225,59 @@ export default function RdoPage() {
     return resultadosFinal;
   }
 
-  // Helper para atualizar status da foto na UI
   const updateFotoStatus = (id: string, status: FotoMobile["status"], path: string | null = null) => {
     setFotos(prev => prev.map(f => f.id === id ? { ...f, status, storagePath: path || f.storagePath } : f));
   };
 
-  // 3. Deletar fotos removidas do Storage (Limpeza)
   async function deleteRemovedPhotosFromStorage() {
     if (fotosParaDeletar.length === 0) return;
-    // Supabase permite deletar em lote enviando array de paths
     const { error } = await supabase.storage.from('rdo-photos').remove(fotosParaDeletar);
     if (error) console.error("Erro ao limpar storage:", error);
-    else setFotosParaDeletar([]); // Limpa lista de exclusão
+    else setFotosParaDeletar([]); 
   }
 
   function removerFotoUI(index: number) {
     const foto = fotos[index];
-    // Se a foto já estava salva no storage, adiciona à lista de exclusão física
     if (foto.storagePath) {
       setFotosParaDeletar(prev => [...prev, foto.storagePath!]);
     }
-    // Se for Blob URL, libera memória
     if (foto.previewUrl.startsWith('blob:')) {
       URL.revokeObjectURL(foto.previewUrl);
     }
     removeItem(setFotos, index, fotos);
   }
 
-  // ================= SALVAR / FINALIZAR (ORQUESTRADO) =================
+  // ================= SALVAR / FINALIZAR =================
 
   async function handleSalvar(finalizar = false) {
     if (finalizar && !confirm("Deseja finalizar o RDO? Não será mais possível editar.")) return;
     
     setSaving(true);
     try {
-      // 1. 🔥 Processo Crítico: Upload de fotos novas
       const fotosDataForDB = await uploadPendingPhotos();
       
-      // 2. Limpeza física do storage
       await deleteRemovedPhotosFromStorage();
 
-      // 3. Preparar dados para o banco (Banco salva o Path, não Base64)
+      // 🔥 Lógica de captura automática do horário de término
+      let horaTermino = fim;
+      if (finalizar) {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        horaTermino = `${h}:${m}`;
+      }
+
       const rdoData = {
         project_id: projectId,
         data: dataRelatorio,
         inicio,
-        fim,
+        fim: horaTermino, // Salva a hora calculada (se finalizar) ou o valor do rascunho
         clima,
         envolvidos,
         atividades,
         sheq,
         comentarios,
-        fotos: fotosDataForDB, // Array de {storagePath, legenda}
+        fotos: fotosDataForDB, 
         assinaturas,
         draft: !finalizar,
       };
@@ -321,7 +297,7 @@ export default function RdoPage() {
       alert(finalizar ? "RDO Finalizado com sucesso!" : "Rascunho salvo com sucesso!");
       
       if (finalizar) router.push(`/mobile/projetos/${projectId}`);
-      else await loadDraft(); // Recarrega para limpar arquivos da memória e pegar paths
+      else await loadDraft(); 
 
      } catch (error: any) {
       alert("Erro ao salvar: " + error.message);
@@ -353,13 +329,11 @@ export default function RdoPage() {
     >
       <div className="space-y-6 pb-20 bg-gray-50 -m-4 p-4 min-h-screen">
 
-        {/* ================= INFORMAÇÕES GERAIS (Layout Cardizado) ================= */}
+        {/* ================= INFORMAÇÕES GERAIS ================= */}
         <FormSection title="Logística e Período" icon={<Icons.Calendar />}>
           <InputMobile label="Data do Relatório *" type="date" value={dataRelatorio} onChange={setDataRelatorio} icon={<Icons.Calendar />} />
-          <div className="grid grid-cols-2 gap-4">
-            <InputMobile label="Hora Início *" type="time" value={inicio} onChange={setInicio} icon={<Icons.Clock />} />
-            <InputMobile label="Hora Término *" type="time" value={fim} onChange={setFim} icon={<Icons.Clock />} />
-          </div>
+          <InputMobile label="Hora Início *" type="time" value={inicio} onChange={setInicio} icon={<Icons.Clock />} />
+          {/* Campo "Hora Término" removido daqui */}
         </FormSection>
 
         {/* ================= CLIMA ================= */}
@@ -400,11 +374,10 @@ export default function RdoPage() {
           </div>
         </FormSection>
 
-        {/* ================= ATIVIDADES (Layout Dinâmico com Cores) ================= */}
+        {/* ================= ATIVIDADES ================= */}
         <FormSection title="Relato de Atividades" icon={<Icons.Loader />}>
           <div className="space-y-4">
             {atividades.map((a, i) => {
-              // 🔥 Nível Diretoria: Cor de borda baseada no status
               const statusColor = a.status === "Concluído" ? "border-l-green-500" : a.status === "Em andamento" ? "border-l-yellow-500" : a.status === "Impedido" ? "border-l-red-500" : "border-l-gray-300";
               
               return (
@@ -446,10 +419,8 @@ export default function RdoPage() {
           />
         </FormSection>
 
-        {/* ================= FOTOS (Solução 10+ Fotos e Memória) ================= */}
+        {/* ================= FOTOS ================= */}
         <FormSection title={`Evidências Fotográficas (${fotos.length})`} icon={<Icons.Photo />}>
-          
-          {/* 🔥 Grade Profissional de Fotos (2 colunas) */}
           <div className="grid grid-cols-2 gap-4">
             {fotos.map((f, i) => (
               <div key={f.id} className="relative group border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col">
@@ -462,13 +433,12 @@ export default function RdoPage() {
                     <Icons.Photo />
                   )}
 
-                  {/* 🔥 Feedback visual de Upload individual */}
                   {f.status === "uploading" && (
                     <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white text-xs gap-2">
                       <Icons.Loader /> Subindo...
                     </div>
                   )}
-                  {f.status === "success" && f.file && ( // Só mostra check em fotos que acabaram de subir
+                  {f.status === "success" && f.file && (
                     <div className="absolute top-2 left-2 bg-green-500 text-white rounded-full p-1 shadow">
                       <Icons.Check />
                     </div>
@@ -493,7 +463,6 @@ export default function RdoPage() {
             ))}
           </div>
 
-          {/* Botão de Upload Escondido acionado pelo AddButton */}
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -524,7 +493,6 @@ export default function RdoPage() {
                     </div>
                   ) : assinaturaAberta === i ? (
                     <div className="w-full space-y-2">
-                      {/* 🔥 SignaturePad adaptado para Mobile */}
                       <div className="border-2 border-purple-200 rounded-lg overflow-hidden bg-gray-50">
                         <SignaturePad onSave={(dataUrl: string) => { const copy = [...assinaturas]; copy[i].assinatura = dataUrl; setAssinaturas(copy); setAssinaturaAberta(null); }} />
                       </div>
@@ -542,7 +510,7 @@ export default function RdoPage() {
           </div>
         </FormSection>
 
-        {/* ================= BARRA DE AÇÕES FIXA (Mobile First) ================= */}
+        {/* ================= BARRA DE AÇÕES FIXA ================= */}
         <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm p-4 border-t shadow-lg flex gap-3 z-40 max-w-md mx-auto">
           <button
             onClick={() => handleSalvar(false)}
@@ -567,9 +535,8 @@ export default function RdoPage() {
   );
 }
 
-/* ================= COMPONENTES DE UI ATUALIZADOS (EXTREMAMENTE PROFISSIONAIS) ================= */
+/* ================= COMPONENTES DE UI ================= */
 
-// Botão flutuante de remoção moderno
 function RemoveButtonMobile({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -581,7 +548,6 @@ function RemoveButtonMobile({ onClick }: { onClick: () => void }) {
   );
 }
 
-// Seção estilo "Card" com header elegante
 function FormSection({ title, icon, children }: any) {
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 space-y-5 overflow-hidden">
@@ -600,7 +566,6 @@ function FormSection({ title, icon, children }: any) {
   );
 }
 
-// Input moderno com ícone e estados
 function InputMobile({ label, value, onChange, icon, ...props }: any) {
   return (
     <div className="flex flex-col gap-1.5 w-full">
@@ -618,7 +583,6 @@ function InputMobile({ label, value, onChange, icon, ...props }: any) {
   );
 }
 
-// Select moderno
 function SelectMobile({ label, value, options, onChange }: any) {
   return (
     <div className="flex flex-col gap-1.5 w-full">
@@ -642,7 +606,6 @@ function SelectMobile({ label, value, options, onChange }: any) {
   );
 }
 
-// Radio Group estilo "Segmented Control" profissional
 function RadioGroupMobile({ label, value, options, onChange }: any) {
   return (
     <div className="flex flex-col gap-2">
@@ -650,7 +613,6 @@ function RadioGroupMobile({ label, value, options, onChange }: any) {
       <div className="flex border border-gray-200 rounded-xl overflow-hidden bg-gray-50 p-1 shadow-inner-sm">
         {options.map((op: string) => {
           const isActive = value === op;
-          // Cor especial para "Sim" em SHEQ
           const activeBg = op === "Sim" && isActive ? "bg-red-500 text-white" : isActive ? "bg-[#391e2a] text-white" : "text-gray-600 hover:bg-gray-100";
           
           return (
@@ -672,7 +634,6 @@ function RadioGroupMobile({ label, value, options, onChange }: any) {
   );
 }
 
-// Botão "Adicionar" secundário e elegante
 function AddButton({ label, onClick, icon }: any) {
   return (
     <button
