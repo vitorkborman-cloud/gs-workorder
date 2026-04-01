@@ -7,6 +7,8 @@ import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 // ================= HELPERS (Logo Branco) =================
 async function generateWhiteLogoBase64(src: string): Promise<string> {
@@ -33,7 +35,8 @@ async function generateWhiteLogoBase64(src: string): Promise<string> {
 const Icons = {
   Calendar: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
   Droplet: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>,
-  Download: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+  DownloadPDF: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11v6m0 0l-2-2m2 2l2-2" /></svg>,
+  DownloadExcel: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
   Eye: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
 };
 
@@ -60,17 +63,16 @@ export default function FisicoQuimicosDesktopPage() {
   const [groupedData, setGroupedData] = useState<{ [key: string]: Sampling[] }>({});
   const [loading, setLoading] = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
+  const [generatingExcel, setGeneratingExcel] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
 
   async function loadData() {
-    // 1. Busca o nome do projeto
     const { data: proj } = await supabase.from("projects").select("name").eq("id", projectId).single();
     if (proj) setProjectName(proj.name);
 
-    // 2. Busca todas as amostragens finalizadas deste projeto
     const { data: samplings } = await supabase
       .from("water_samplings")
       .select("*")
@@ -79,30 +81,26 @@ export default function FisicoQuimicosDesktopPage() {
       .order("data", { ascending: false });
 
     if (samplings) {
-      // 3. MÁGICA: Agrupar as amostragens pela data (YYYY-MM-DD)
       const grouped = samplings.reduce((acc: any, curr: Sampling) => {
         const dateKey = curr.data;
         if (!acc[dateKey]) acc[dateKey] = [];
         acc[dateKey].push(curr);
         return acc;
       }, {});
-      
       setGroupedData(grouped);
     }
     setLoading(false);
   }
 
-  // Helper para formatar a data (Ex: 2026-03-23 -> 23/03/2026)
   function formatDateBr(dateString: string) {
     if (!dateString) return "Sem Data";
     const [year, month, day] = dateString.split("-");
     return `${day}/${month}/${year}`;
   }
 
-  // ================= FUNÇÃO NOVA: GERA O PDF GERAL DO DIA =================
+  // ================= GERAR PDF =================
   async function gerarPDFGeral(dataCampanha: string, amostras: Sampling[]) {
     setGeneratingPdf(dataCampanha);
-
     try {
       let whiteLogoBase64: string | null = null;
       try { whiteLogoBase64 = await generateWhiteLogoBase64("/logo.png"); } catch (e) {}
@@ -185,12 +183,7 @@ export default function FisicoQuimicosDesktopPage() {
           margin: { left: marginX, right: marginX },
           head: [["Horário", "NA (m)", "pH", "ORP (mV)", "OD (mg/L)", "Cond. (µS/cm)"]],
           body: amostra.leituras?.map((l: any) => [
-            l.horario || "-", 
-            l.na || "-", 
-            l.ph || "-", 
-            l.orp || "-", 
-            l.od || "-", 
-            l.condutividade || "-"
+            l.horario || "-", l.na || "-", l.ph || "-", l.orp || "-", l.od || "-", l.condutividade || "-"
           ]) || [],
           theme: 'striped',
           headStyles: { fillColor: brandPurple, textColor: 255, fontStyle: "bold", fontSize: 8 },
@@ -217,9 +210,106 @@ export default function FisicoQuimicosDesktopPage() {
     }
   }
 
+  // ================= GERAR EXCEL (A MÁGICA ACONTECE AQUI) =================
+  async function gerarExcelGeral(dataCampanha: string, amostras: Sampling[]) {
+    setGeneratingExcel(dataCampanha);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Físico-Químicos", {
+        views: [{ showGridLines: false }] // Esconde as linhas de grade padrão do Excel para ficar mais limpo
+      });
+
+      // Largura das Colunas
+      sheet.columns = [
+        { width: 15 }, // Horário
+        { width: 12 }, // NA
+        { width: 12 }, // pH
+        { width: 15 }, // ORP
+        { width: 15 }, // OD
+        { width: 25 }, // Condutividade
+      ];
+
+      // Cabeçalho Principal (Verde GreenSoil)
+      const titleRow = sheet.addRow(["RELATÓRIO DE PARÂMETROS FÍSICO-QUÍMICOS"]);
+      sheet.mergeCells("A1:F1");
+      titleRow.height = 30;
+      titleRow.font = { name: 'Arial', size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+      titleRow.alignment = { vertical: "middle", horizontal: "center" };
+      titleRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF80B02D" } }; // Verde
+
+      // Subtítulo (Projeto e Data)
+      const subRow = sheet.addRow([`PROJETO: ${projectName}   |   DATA: ${formatDateBr(dataCampanha)}`]);
+      sheet.mergeCells("A2:F2");
+      subRow.height = 20;
+      subRow.font = { name: 'Arial', size: 10, bold: true, color: { argb: "FF391E2A" } }; // Roxo escuro
+      subRow.alignment = { vertical: "middle", horizontal: "center" };
+      
+      sheet.addRow([]); // Espaço
+
+      // Iterando sobre as amostras (Poços)
+      amostras.forEach((amostra) => {
+        // Linha do Título do Poço
+        const pocoTitle = sheet.addRow([`POÇO: ${amostra.poco} / ${amostra.nomenclatura || "-"}`]);
+        sheet.mergeCells(`A${pocoTitle.number}:F${pocoTitle.number}`);
+        pocoTitle.font = { name: 'Arial', size: 12, bold: true, color: { argb: "FFFFFFFF" } };
+        pocoTitle.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } }; // Roxo escuro
+        pocoTitle.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+
+        // Linha de Informações Extras do Poço
+        const info1 = `Cód: ${amostra.identificacao_codigo || "-"}   |   Hora Início: ${amostra.hora_inicio || "-"}`;
+        const info2 = `NA Inicial: ${amostra.na_inicial || "-"}m   |   NA Final: ${amostra.na_final || "-"}m`;
+        const fl = amostra.fase_livre ? `Fase Livre: Sim (${amostra.espessura_fl}m)` : "Fase Livre: Não";
+        
+        const infoRow = sheet.addRow([`${info1}   |   ${info2}   |   ${fl}`]);
+        sheet.mergeCells(`A${infoRow.number}:F${infoRow.number}`);
+        infoRow.font = { name: 'Arial', size: 9, italic: true, color: { argb: "FF555555" } };
+        infoRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } }; // Cinza clarinho
+        infoRow.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+
+        // Cabeçalho da Tabela de Leituras
+        const headerRow = sheet.addRow(["Horário", "NA (m)", "pH", "ORP (mV)", "OD (mg/L)", "Cond. (µS/cm)"]);
+        headerRow.font = { name: 'Arial', size: 10, bold: true };
+        headerRow.eachCell((cell) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } }; // Cinza médio
+          cell.alignment = { vertical: "middle", horizontal: "center" };
+          cell.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+        });
+
+        // Inserindo as Leituras
+        if (amostra.leituras && amostra.leituras.length > 0) {
+          amostra.leituras.forEach((l: any) => {
+            const row = sheet.addRow([l.horario || "-", l.na || "-", l.ph || "-", l.orp || "-", l.od || "-", l.condutividade || "-"]);
+            row.eachCell((cell) => {
+              cell.alignment = { vertical: "middle", horizontal: "center" };
+              cell.border = { top: { style: "thin", color: { argb: "FFEEEEEE" } }, bottom: { style: "thin", color: { argb: "FFEEEEEE" } }, left: { style: "thin", color: { argb: "FFEEEEEE" } }, right: { style: "thin", color: { argb: "FFEEEEEE" } } };
+            });
+          });
+        } else {
+          const emptyRow = sheet.addRow(["Nenhuma leitura registrada para este poço."]);
+          sheet.mergeCells(`A${emptyRow.number}:F${emptyRow.number}`);
+          emptyRow.font = { italic: true, color: { argb: "FFAAAAAA" } };
+          emptyRow.alignment = { horizontal: "center" };
+        }
+
+        sheet.addRow([]); // Espaço entre um poço e outro
+      });
+
+      // Gerar e Baixar
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      saveAs(blob, `Compilado_FQ_${projectName}_${dataCampanha}.xlsx`);
+
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao gerar o arquivo Excel.");
+    } finally {
+      setGeneratingExcel(null);
+    }
+  }
+
   if (loading) return <AdminShell><p className="p-10 text-gray-500 font-bold">Carregando compilados...</p></AdminShell>;
 
-  const datasAgrupadas = Object.keys(groupedData).sort((a, b) => b.localeCompare(a)); // Ordena da mais recente pra mais antiga
+  const datasAgrupadas = Object.keys(groupedData).sort((a, b) => b.localeCompare(a)); 
 
   return (
     <AdminShell>
@@ -272,14 +362,24 @@ export default function FisicoQuimicosDesktopPage() {
                       </div>
                     </div>
 
-                    {/* BOTÃO ATUALIZADO CONFORME SEU PEDIDO */}
-                    <Button 
-                      onClick={() => gerarPDFGeral(dataCampanha, amostrasDoDia)}
-                      disabled={generatingPdf === dataCampanha}
-                      className="bg-[#391e2a] hover:bg-[#2a161f] text-white font-bold rounded-xl h-11 px-6 shadow-sm hidden md:flex items-center gap-2"
-                    >
-                      <Icons.Download /> {generatingPdf === dataCampanha ? "Gerando..." : "Baixar PDF Geral"}
-                    </Button>
+                    {/* BOTÕES DE EXPORTAÇÃO */}
+                    <div className="hidden md:flex items-center gap-3">
+                      <Button 
+                        onClick={() => gerarExcelGeral(dataCampanha, amostrasDoDia)}
+                        disabled={generatingExcel === dataCampanha || generatingPdf === dataCampanha}
+                        className="bg-white border-2 border-[#80b02d] text-[#80b02d] hover:bg-[#80b02d] hover:text-white font-bold rounded-xl h-11 px-5 shadow-sm transition-colors flex items-center gap-2"
+                      >
+                        <Icons.DownloadExcel /> {generatingExcel === dataCampanha ? "Gerando..." : "Excel"}
+                      </Button>
+
+                      <Button 
+                        onClick={() => gerarPDFGeral(dataCampanha, amostrasDoDia)}
+                        disabled={generatingPdf === dataCampanha || generatingExcel === dataCampanha}
+                        className="bg-[#391e2a] hover:bg-[#2a161f] text-white font-bold rounded-xl h-11 px-5 shadow-sm transition-colors flex items-center gap-2"
+                      >
+                        <Icons.DownloadPDF /> {generatingPdf === dataCampanha ? "Gerando..." : "PDF"}
+                      </Button>
+                    </div>
                   </div>
 
                   {/* TABELA COMPILADA DO DIA */}
