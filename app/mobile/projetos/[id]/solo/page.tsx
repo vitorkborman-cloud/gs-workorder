@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import AppShell from "../../../../../components/AppShell";
+import proj4 from "proj4"; // NOVA IMPORTAÇÃO PARA CONVERSÃO UTM
 
 // ================= ÍCONES PREMIUM =================
 const Icons = {
@@ -30,6 +31,7 @@ type Layer = {
 
 type FormData = {
   nome_sondagem: string;
+  nomenclatura_poco: string; // NOVO CAMPO
   data: string;
   hora: string;
   nivel_agua: string;
@@ -39,74 +41,43 @@ type FormData = {
   pre_filtro: string;
   secao_filtrante_base: string;
   secao_filtrante_topo: string;
-  coord_x: string;
-  coord_y: string;
+  coord_x: string; // Vai armazenar UTM Este
+  coord_y: string; // Vai armazenar UTM Norte
+  utm_zona: string; // NOVO CAMPO para UTM
   profundidade_total: string;
 };
 
 const tiposSolo = [
-  "Areia",
-  "Areia de granulação variada argilosa",
-  "Areia de granulação variada pouco argilosa",
-  "Areia de granulação variada pouco siltosa",
-  "Areia de granulação variada silto argilosa",
-  "Areia de granulação variada siltosa",
-  "Areia de granulação variada muito argilosa",
-  "Areia fina",
-  "Areia fina argilosa",
-  "Areia fina e média argilosa",
-  "Areia fina e média pouco argilosa",
-  "Areia fina e média pouco siltosa",
-  "Areia fina e média silto argilosa",
-  "Areia fina e média siltosa",
-  "Areia fina e média muito argilosa",
-  "Areia fina pouco argilosa",
-  "Areia fina pouco siltosa",
-  "Areia fina silto argilosa",
-  "Areia fina siltosa",
-  "Areia fina muito argilosa",
-  "Areia grossa",
-  "Areia grossa argilosa",
-  "Areia grossa pouco argilosa",
-  "Areia grossa pouco siltosa",
-  "Areia grossa silto argilosa",
-  "Areia grossa siltosa",
-  "Areia grossa muito argilosa",
-  "Areia média",
-  "Argila",
-  "Argila orgânica",
-  "Argila plástica",
-  "Argila silto arenosa",
-  "Argila siltosa",
-  "Argila siltosa pouco arenosa",
-  "Argila siltosa muito arenosa",
-  "Aterro",
-  "Britas",
-  "Concreto",
-  "Rachão",
-  "Silte",
-  "Silte argilo arenoso",
-  "Silte argiloso",
-  "Silte areno argiloso",
-  "Silte arenoso",
-  "Silte muito arenoso"
+  "Areia", "Areia de granulação variada argilosa", "Areia de granulação variada pouco argilosa",
+  "Areia de granulação variada pouco siltosa", "Areia de granulação variada silto argilosa",
+  "Areia de granulação variada siltosa", "Areia de granulação variada muito argilosa",
+  "Areia fina", "Areia fina argilosa", "Areia fina e média argilosa", "Areia fina e média pouco argilosa",
+  "Areia fina e média pouco siltosa", "Areia fina e média silto argilosa", "Areia fina e média siltosa",
+  "Areia fina e média muito argilosa", "Areia fina pouco argilosa", "Areia fina pouco siltosa",
+  "Areia fina silto argilosa", "Areia fina siltosa", "Areia fina muito argilosa", "Areia grossa",
+  "Areia grossa argilosa", "Areia grossa pouco argilosa", "Areia grossa pouco siltosa",
+  "Areia grossa silto argilosa", "Areia grossa siltosa", "Areia grossa muito argilosa", "Areia média",
+  "Argila", "Argila orgânica", "Argila plástica", "Argila silto arenosa", "Argila siltosa",
+  "Argila siltosa pouco arenosa", "Argila siltosa muito arenosa", "Aterro", "Britas", "Concreto",
+  "Rachão", "Silte", "Silte argilo arenoso", "Silte argiloso", "Silte areno argiloso",
+  "Silte arenoso", "Silte muito arenoso"
 ];
 
 // ================= PAGE =================
 export default function SoloPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.id as string;
 
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(false);
 
-  const [layers, setLayers] = useState<Layer[]>([
-    { de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }
-  ]);
+  const [layers, setLayers] = useState<Layer[]>([{ de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
 
   const [form, setForm] = useState<FormData>({
     nome_sondagem: "",
+    nomenclatura_poco: "", // Inicia vazio
     data: "",
     hora: "",
     nivel_agua: "",
@@ -118,6 +89,7 @@ export default function SoloPage() {
     secao_filtrante_topo: "",
     coord_x: "",
     coord_y: "",
+    utm_zona: "", // Inicia vazio
     profundidade_total: "",
   });
 
@@ -135,6 +107,7 @@ export default function SoloPage() {
 
     setForm({
       nome_sondagem: data.nome_sondagem ?? "",
+      nomenclatura_poco: data.nomenclatura_poco ?? "", // Carrega do banco
       data: data.data ?? "",
       hora: data.hora ?? "",
       nivel_agua: data.nivel_agua ?? "",
@@ -146,25 +119,21 @@ export default function SoloPage() {
       secao_filtrante_topo: data.secao_filtrante_topo ?? "",
       coord_x: data.coord_x ?? "",
       coord_y: data.coord_y ?? "",
+      utm_zona: data.utm_zona ?? "", // Carrega do banco
       profundidade_total: data.profundidade_total ?? "",
     });
 
     setLayers(
       data.layers && data.layers.length > 0
         ? data.layers.map((l: any) => ({
-            de: l.de || "",
-            ate: l.ate || "",
-            tipo: l.tipo || "",
-            leitura_voc: l.leitura_voc || "",
-            coloracao: l.coloracao || ""
+            de: l.de || "", ate: l.ate || "", tipo: l.tipo || "",
+            leitura_voc: l.leitura_voc || "", coloracao: l.coloracao || ""
           }))
         : [{ de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]
     );
   }
 
-  useEffect(() => {
-    loadDraft();
-  }, []);
+  useEffect(() => { loadDraft(); }, []);
 
   function setField(key: keyof FormData, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -178,9 +147,10 @@ export default function SoloPage() {
     setLayers((prev) => [...prev, { de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
   }
 
+  // ================= LÓGICA DE GEOLOCALIZAÇÃO COM UTM =================
   function obterLocalizacaoAutomatica() {
     if (!navigator.geolocation) {
-      alert("Geolocalização não é suportada pelo seu dispositivo/navegador.");
+      alert("Geolocalização não suportada.");
       return;
     }
 
@@ -188,22 +158,44 @@ export default function SoloPage() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const lat = position.coords.latitude.toFixed(6);
-        const lng = position.coords.longitude.toFixed(6);
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
 
-        setForm((prev) => ({ ...prev, coord_x: lng, coord_y: lat }));
+        // Calcula o fuso UTM baseando-se na longitude
+        const zoneNum = Math.floor((lon + 180) / 6) + 1;
+        // Identifica o hemisfério (Norte ou Sul) baseando-se na latitude
+        const isSouth = lat < 0;
+        const hemisferio = isSouth ? 'S' : 'N';
+        
+        // Letra da banda de latitude (aproximada para apresentação)
+        const zoneLetter = isSouth ? 'S' : 'N'; 
+
+        // Define as projeções do proj4
+        // EPSG:4326 é a latitude/longitude padrão (WGS84)
+        const wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
+        
+        // Constrói a string de projeção UTM correta para a zona atual
+        // O '+south' é vital para calcular o Y (Northing) correto no Brasil
+        const utmStr = `+proj=utm +zone=${zoneNum} ${isSouth ? '+south' : ''} +datum=WGS84 +units=m +no_defs`;
+
+        // Executa a conversão
+        const [easting, northing] = proj4(wgs84, utmStr, [lon, lat]);
+
+        setForm((prev) => ({ 
+            ...prev, 
+            coord_x: easting.toFixed(2), 
+            coord_y: northing.toFixed(2),
+            utm_zona: `${zoneNum}${zoneLetter}` // Ex: 23S
+        }));
+
         setFetchingLocation(false);
       },
       (error) => {
         console.error(error);
-        alert("Erro ao obter localização. Verifique se o GPS está ligado e se você deu permissão ao site.");
+        alert("Erro ao obter localização. Verifique o GPS.");
         setFetchingLocation(false);
       },
-      { 
-        enableHighAccuracy: true,
-        timeout: 15000, 
-        maximumAge: 0 
-      }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }
 
@@ -221,7 +213,6 @@ export default function SoloPage() {
 
         if (data) setDraftId(data.id);
       }
-      await loadDraft();
       alert("Rascunho salvo com sucesso.");
     } catch (error) {
       alert("Erro ao salvar.");
@@ -236,23 +227,25 @@ export default function SoloPage() {
 
     setSaving(true);
     try {
-      await supabase
-        .from("soil_descriptions")
-        .insert({ project_id: projectId, ...form, layers, finalized: true });
-
       if (draftId) {
-        await supabase.from("soil_descriptions").delete().eq("id", draftId);
+        // Se já existe um rascunho, apenas atualizamos para finalizado
+        await supabase.from("soil_descriptions").update({ ...form, layers, finalized: true }).eq("id", draftId);
+      } else {
+        // Se não existir, insere um novo já finalizado
+        await supabase.from("soil_descriptions").insert({ project_id: projectId, ...form, layers, finalized: true });
       }
 
       setDraftId(null);
       setForm({
-        nome_sondagem: "", data: "", hora: "", nivel_agua: "", tipo_sondagem: "",
+        nome_sondagem: "", nomenclatura_poco: "", data: "", hora: "", nivel_agua: "", tipo_sondagem: "",
         diametro_sondagem: "", diametro_poco: "", pre_filtro: "",
-        secao_filtrante_base: "", secao_filtrante_topo: "", coord_x: "", coord_y: "", profundidade_total: "",
+        secao_filtrante_base: "", secao_filtrante_topo: "", coord_x: "", coord_y: "", utm_zona: "", profundidade_total: "",
       });
       setLayers([{ de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
       
       alert("Descrição de solo concluída com sucesso!");
+      // Opcional: Voltar para a página anterior após concluir
+      // router.back();
     } catch (error) {
       alert("Erro ao concluir.");
     } finally {
@@ -269,12 +262,8 @@ export default function SoloPage() {
         <div className="bg-[#391e2a] text-white px-5 py-5 shadow-md">
           <div className="flex justify-between items-center max-w-4xl mx-auto w-full">
             <div>
-              <h1 className="text-xl font-bold tracking-wide">
-                Perfil Descritivo
-              </h1>
-              <p className="text-xs text-[#80b02d] font-semibold mt-0.5 uppercase tracking-wider">
-                Registro Técnico de Sondagem
-              </p>
+              <h1 className="text-xl font-bold tracking-wide">Perfil Descritivo</h1>
+              <p className="text-xs text-[#80b02d] font-semibold mt-0.5 uppercase tracking-wider">Registro Técnico de Sondagem</p>
             </div>
           </div>
         </div>
@@ -285,7 +274,10 @@ export default function SoloPage() {
           {/* SONDAGEM */}
           <Section title="Dados da Sondagem" icon={<Icons.Clipboard />}>
             <div className="space-y-4">
-              <Input label="Nome / Identificação da Sondagem *" value={form.nome_sondagem} onChange={(v: string) => setField("nome_sondagem", v)} placeholder="Ex: SP-01" />
+              <div className="grid grid-cols-2 gap-4 items-end">
+                  <Input label="ID / Nomenclatura (Poço) *" value={form.nomenclatura_poco} onChange={(v: string) => setField("nomenclatura_poco", v)} placeholder="Ex: MW-01" />
+                  <Input label="ID Interno da Sondagem" value={form.nome_sondagem} onChange={(v: string) => setField("nome_sondagem", v)} placeholder="Ex: SP-01" />
+              </div>
               <div className="grid grid-cols-2 gap-4 items-end">
                 <Input label="Data" value={form.data} type="date" onChange={(v: string) => setField("data", v)} />
                 <Input label="Hora" value={form.hora} type="time" onChange={(v: string) => setField("hora", v)} />
@@ -313,12 +305,13 @@ export default function SoloPage() {
             </div>
           </Section>
 
-          {/* COORDENADAS */}
-          <Section title="Geolocalização" icon={<Icons.MapPin />}>
+          {/* COORDENADAS (AGORA UTM) */}
+          <Section title="Geolocalização (UTM)" icon={<Icons.MapPin />}>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 items-end">
-                <Input label="Coordenada X (UTM/Long)" value={form.coord_x} onChange={(v: string) => setField("coord_x", v)} placeholder="-46.000000" />
-                <Input label="Coordenada Y (UTM/Lat)" value={form.coord_y} onChange={(v: string) => setField("coord_y", v)} placeholder="-23.000000" />
+              <div className="grid grid-cols-3 gap-3 items-end">
+                <Input label="UTM Este (X)" value={form.coord_x} onChange={(v: string) => setField("coord_x", v)} placeholder="Ex: 333420" />
+                <Input label="UTM Norte (Y)" value={form.coord_y} onChange={(v: string) => setField("coord_y", v)} placeholder="Ex: 7393300" />
+                <Input label="Zona" value={form.utm_zona} onChange={(v: string) => setField("utm_zona", v)} placeholder="Ex: 23S" />
               </div>
               
               <button
@@ -327,13 +320,9 @@ export default function SoloPage() {
                 className="w-full bg-[#80b02d]/10 text-[#6a9425] hover:bg-[#80b02d]/20 py-3 rounded-xl border border-[#80b02d]/30 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition disabled:opacity-50"
               >
                 {fetchingLocation ? (
-                  <>
-                    <Icons.Loader /> Buscando satélites...
-                  </>
+                  <><Icons.Loader /> Convertendo GPS para UTM...</>
                 ) : (
-                  <>
-                    <Icons.Crosshair /> Capturar Minha Localização Atual
-                  </>
+                  <><Icons.Crosshair /> Capturar Minha Localização (UTM)</>
                 )}
               </button>
             </div>
@@ -344,24 +333,13 @@ export default function SoloPage() {
             <div className="space-y-5">
               {layers.map((layer, i) => (
                 <div key={i} className="relative bg-white border-2 border-gray-100 p-5 rounded-2xl shadow-sm space-y-4 transition-all hover:border-gray-200">
-                  
-                  {/* Número da Camada & Botão Excluir */}
                   <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                    <span className="bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-wider py-1 px-3 rounded-md">
-                      Camada {i + 1}
-                    </span>
+                    <span className="bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-wider py-1 px-3 rounded-md">Camada {i + 1}</span>
                     {layers.length > 1 && (
-                      <button
-                        onClick={() => removeLayer(i)}
-                        className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white w-7 h-7 rounded-full text-xs flex items-center justify-center transition-colors"
-                        title="Remover Camada"
-                      >
-                        <Icons.Trash />
-                      </button>
+                      <button onClick={() => removeLayer(i)} className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white w-7 h-7 rounded-full text-xs flex items-center justify-center transition-colors" title="Remover Camada"><Icons.Trash /></button>
                     )}
                   </div>
 
-                  {/* Formulário da Camada */}
                   <div className="grid grid-cols-2 gap-4 items-end">
                     <Input label="Prof. Inicial - De (m)" type="number" value={layer.de} onChange={(v: string) => { const copy = [...layers]; copy[i].de = v; setLayers(copy); }} placeholder="0.00" />
                     <Input label="Prof. Final - Até (m)" type="number" value={layer.ate} onChange={(v: string) => { const copy = [...layers]; copy[i].ate = v; setLayers(copy); }} placeholder="0.00" />
@@ -382,24 +360,14 @@ export default function SoloPage() {
 
         </div>
 
-        {/* ================= BARRA DE AÇÕES FIXA (Mobile First) ================= */}
+        {/* BARRA DE AÇÕES FIXA */}
         <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md p-4 border-t shadow-[0_-10px_40px_rgba(0,0,0,0.08)] flex gap-3 z-40">
           <div className="max-w-4xl mx-auto w-full flex gap-3">
-            <button
-              onClick={salvar}
-              disabled={saving}
-              className="flex-1 bg-white border-2 border-[#391e2a] text-[#391e2a] font-bold py-3.5 rounded-xl text-sm disabled:opacity-50 active:scale-95 transition flex items-center justify-center gap-2"
-            >
-              {saving ? <Icons.Loader /> : <Icons.Save />}
-              Salvar Rascunho
+            <button onClick={salvar} disabled={saving} className="flex-1 bg-white border-2 border-[#391e2a] text-[#391e2a] font-bold py-3.5 rounded-xl text-sm disabled:opacity-50 active:scale-95 transition flex items-center justify-center gap-2">
+              {saving ? <Icons.Loader /> : <Icons.Save />} Salvar Rascunho
             </button>
-            <button
-              onClick={concluir}
-              disabled={saving}
-              className="flex-1 bg-[#80b02d] text-white font-bold py-3.5 rounded-xl text-sm shadow-md hover:bg-[#729e28] disabled:opacity-80 active:scale-95 transition flex items-center justify-center gap-2"
-            >
-              {saving ? <Icons.Loader /> : <Icons.Check />}
-              Concluir Perfil
+            <button onClick={concluir} disabled={saving} className="flex-1 bg-[#80b02d] text-white font-bold py-3.5 rounded-xl text-sm shadow-md hover:bg-[#729e28] disabled:opacity-80 active:scale-95 transition flex items-center justify-center gap-2">
+              {saving ? <Icons.Loader /> : <Icons.Check />} Concluir Perfil
             </button>
           </div>
         </div>
@@ -409,24 +377,15 @@ export default function SoloPage() {
   );
 }
 
-// ================= COMPONENTES DE UI PREMIUM COM TIPAGEM ESTRITA =================
-
+// ================= COMPONENTES UI =================
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 space-y-5 overflow-hidden">
       <div className="flex items-center gap-3 border-b border-gray-100 pb-4 -mx-1">
-        {icon && (
-          <div className="bg-[#391e2a]/5 text-[#391e2a] p-2.5 rounded-xl">
-            {icon}
-          </div>
-        )}
-        <h2 className="text-xs font-extrabold text-[#391e2a] uppercase tracking-wider">
-          {title}
-        </h2>
+        {icon && <div className="bg-[#391e2a]/5 text-[#391e2a] p-2.5 rounded-xl">{icon}</div>}
+        <h2 className="text-xs font-extrabold text-[#391e2a] uppercase tracking-wider">{title}</h2>
       </div>
-      <div className="space-y-4">
-        {children}
-      </div>
+      <div className="space-y-4">{children}</div>
     </div>
   );
 }
@@ -434,16 +393,8 @@ function Section({ title, icon, children }: { title: string; icon?: React.ReactN
 function Input({ label, value, onChange, type = "text", placeholder = "" }: { label: string; value: string; onChange: (val: string) => void; type?: string; placeholder?: string }) {
   return (
     <div className="flex flex-col justify-end gap-1.5 w-full">
-      <label className="text-[11px] font-bold text-gray-500 ml-1 tracking-tight">
-        {label}
-      </label>
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full h-[46px] border border-gray-200 rounded-xl px-4 text-sm bg-white focus:ring-2 focus:ring-[#80b02d]/30 focus:border-[#80b02d] transition-all placeholder:text-gray-300 shadow-inner-sm"
-      />
+      <label className="text-[11px] font-bold text-gray-500 ml-1 tracking-tight">{label}</label>
+      <input type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="w-full h-[46px] border border-gray-200 rounded-xl px-4 text-sm bg-white focus:ring-2 focus:ring-[#80b02d]/30 focus:border-[#80b02d] transition-all placeholder:text-gray-300 shadow-inner-sm" />
     </div>
   );
 }
@@ -451,19 +402,11 @@ function Input({ label, value, onChange, type = "text", placeholder = "" }: { la
 function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (val: string) => void }) {
   return (
     <div className="flex flex-col justify-end gap-1.5 w-full">
-      <label className="text-[11px] font-bold text-gray-500 ml-1 tracking-tight">
-        {label}
-      </label>
+      <label className="text-[11px] font-bold text-gray-500 ml-1 tracking-tight">{label}</label>
       <div className="relative flex items-center">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full h-[46px] border border-gray-200 rounded-xl px-4 text-sm bg-white focus:ring-2 focus:ring-[#80b02d]/30 focus:border-[#80b02d] transition-all appearance-none shadow-inner-sm"
-        >
+        <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full h-[46px] border border-gray-200 rounded-xl px-4 text-sm bg-white focus:ring-2 focus:ring-[#80b02d]/30 focus:border-[#80b02d] transition-all appearance-none shadow-inner-sm">
           <option value="" className="text-gray-300">Selecione uma opção...</option>
-          {options.map((o: string) => (
-            <option key={o} value={o}>{o}</option>
-          ))}
+          {options.map((o: string) => <option key={o} value={o}>{o}</option>)}
         </select>
         <div className="absolute right-4 pointer-events-none text-gray-400">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
@@ -475,12 +418,8 @@ function Select({ label, value, options, onChange }: { label: string; value: str
 
 function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full mt-2 bg-white hover:bg-gray-50 text-[#391e2a] py-3.5 rounded-xl border-2 border-gray-200 border-dashed text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-sm"
-    >
-      <Icons.Plus />
-      {label}
+    <button onClick={onClick} className="w-full mt-2 bg-white hover:bg-gray-50 text-[#391e2a] py-3.5 rounded-xl border-2 border-gray-200 border-dashed text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-sm">
+      <Icons.Plus />{label}
     </button>
   );
 }
