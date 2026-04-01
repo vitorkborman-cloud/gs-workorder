@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import AppShell from "../../../../../components/AppShell";
-import proj4 from "proj4";
+import proj4 from "proj4"; 
 
 // ================= ÍCONES PREMIUM =================
 const Icons = {
@@ -41,10 +41,10 @@ type FormData = {
   pre_filtro: string;
   secao_filtrante_base: string;
   secao_filtrante_topo: string;
-  coord_x: string;
-  coord_y: string;
-  utm_zona: string;
-  cota: string; // ✅ NOVO CAMPO: Cota (Altitude)
+  coord_x: string; 
+  coord_y: string; 
+  utm_zona: string; 
+  cota: string;
   profundidade_total: string;
 };
 
@@ -91,7 +91,7 @@ export default function SoloPage() {
     coord_x: "",
     coord_y: "",
     utm_zona: "",
-    cota: "", // ✅ Inicia vazio
+    cota: "",
     profundidade_total: "",
   });
 
@@ -109,7 +109,7 @@ export default function SoloPage() {
 
     setForm({
       nome_sondagem: data.nome_sondagem ?? "",
-      nomenclatura_poco: data.nomenclatura_poco ?? "",
+      nomenclatura_poco: data.nomenclatura_poco ?? "", 
       data: data.data ?? "",
       hora: data.hora ?? "",
       nivel_agua: data.nivel_agua ?? "",
@@ -121,8 +121,8 @@ export default function SoloPage() {
       secao_filtrante_topo: data.secao_filtrante_topo ?? "",
       coord_x: data.coord_x ?? "",
       coord_y: data.coord_y ?? "",
-      utm_zona: data.utm_zona ?? "",
-      cota: data.cota ?? "", // ✅ Carrega do banco
+      utm_zona: data.utm_zona ?? "", 
+      cota: data.cota ?? "",
       profundidade_total: data.profundidade_total ?? "",
     });
 
@@ -150,21 +150,53 @@ export default function SoloPage() {
     setLayers((prev) => [...prev, { de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
   }
 
-  // ================= LÓGICA DE GEOLOCALIZAÇÃO COM UTM E COTA =================
+  // ================= LÓGICA DE GEOLOCALIZAÇÃO REFINADA (UTM E COTA) =================
   function obterLocalizacaoAutomatica() {
     if (!navigator.geolocation) {
-      alert("Geolocalização não suportada.");
+      alert("Geolocalização não suportada no seu dispositivo/navegador.");
       return;
     }
 
     setFetchingLocation(true);
+    let watchId: number;
+    let bestPosition: GeolocationPosition | null = null;
 
-    navigator.geolocation.getCurrentPosition(
+    // 1. Liga o "radar" para assistir as mudanças de posição em tempo real
+    watchId = navigator.geolocation.watchPosition(
       (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const altitude = position.coords.altitude; // ✅ Pega a altitude do GPS
+        // Se ainda não temos uma posição, ou se a nova posição for MAIS PRECISA que a anterior
+        // (no GPS, quanto menor o valor de 'accuracy', melhor é a precisão em metros)
+        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+          bestPosition = position;
+        }
+      },
+      (error) => {
+        console.error("Erro no GPS:", error);
+      },
+      { 
+        enableHighAccuracy: true, // Força o uso do chip GPS
+        maximumAge: 0,            // Não aceita cache antigo
+        timeout: 10000 
+      }
+    );
 
+    // 2. Deixa o radar rodando por 8 segundos para refinar o sinal com os satélites
+    setTimeout(() => {
+      // Desliga o radar para economizar bateria
+      navigator.geolocation.clearWatch(watchId); 
+
+      if (bestPosition) {
+        const lat = bestPosition.coords.latitude;
+        const lon = bestPosition.coords.longitude;
+        const altitude = bestPosition.coords.altitude;
+        const precisao = bestPosition.coords.accuracy;
+
+        // Avisa se a precisão estiver muito ruim (acima de 20 metros)
+        if (precisao > 20) {
+          alert(`Aviso: O sinal do GPS está fraco (Margem de erro: ${precisao.toFixed(0)}m). Tente ir para um local mais aberto para melhor precisão.`);
+        }
+
+        // Calcula a conversão para UTM
         const zoneNum = Math.floor((lon + 180) / 6) + 1;
         const isSouth = lat < 0;
         const zoneLetter = isSouth ? 'S' : 'N'; 
@@ -178,19 +210,16 @@ export default function SoloPage() {
             ...prev, 
             coord_x: easting.toFixed(2), 
             coord_y: northing.toFixed(2),
-            utm_zona: `${zoneNum}${zoneLetter}`,
-            cota: altitude ? altitude.toFixed(2) : "" // ✅ Preenche a cota se disponível
+            utm_zona: `${zoneNum}${zoneLetter}`, // Ex: 23S
+            cota: altitude ? altitude.toFixed(2) : "" 
         }));
 
-        setFetchingLocation(false);
-      },
-      (error) => {
-        console.error(error);
-        alert("Erro ao obter localização. Verifique o GPS.");
-        setFetchingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+      } else {
+        alert("Não foi possível capturar o sinal do GPS. Verifique se a localização está ativada.");
+      }
+
+      setFetchingLocation(false);
+    }, 8000); // 8000 milissegundos = 8 segundos de refinamento
   }
 
   async function salvar() {
@@ -222,8 +251,10 @@ export default function SoloPage() {
     setSaving(true);
     try {
       if (draftId) {
+        // Se já existe um rascunho, apenas atualizamos para finalizado
         await supabase.from("soil_descriptions").update({ ...form, layers, finalized: true }).eq("id", draftId);
       } else {
+        // Se não existir, insere um novo já finalizado
         await supabase.from("soil_descriptions").insert({ project_id: projectId, ...form, layers, finalized: true });
       }
 
@@ -311,7 +342,7 @@ export default function SoloPage() {
                 className="w-full bg-[#80b02d]/10 text-[#6a9425] hover:bg-[#80b02d]/20 py-3 rounded-xl border border-[#80b02d]/30 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition disabled:opacity-50"
               >
                 {fetchingLocation ? (
-                  <><Icons.Loader /> Lendo sensores do GPS...</>
+                  <><Icons.Loader /> Triangulando satélites (Aguarde 8s)...</>
                 ) : (
                   <><Icons.Crosshair /> Capturar Minha Localização (UTM + Cota)</>
                 )}
