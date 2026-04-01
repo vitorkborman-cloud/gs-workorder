@@ -482,7 +482,7 @@ export default function MobileWorkOrderPage() {
                     value={item.equipamento}
                     onChange={(e) => handleSystemDataChange(index, "equipamento", e.target.value)}
                     onBlur={syncSystemData}
-                    placeholder="Ex: Bomba dosadora"
+                    placeholder="Ex: Hidrômetro FM-01"
                     className="w-full rounded-lg border border-gray-200 p-2.5 text-sm bg-white mt-1 outline-none focus:border-[var(--green)]"
                   />
                 </div>
@@ -493,7 +493,7 @@ export default function MobileWorkOrderPage() {
                     value={item.medicao}
                     onChange={(e) => handleSystemDataChange(index, "medicao", e.target.value)}
                     onBlur={syncSystemData}
-                    placeholder="Ex: 15 L/h"
+                    placeholder="Ex: 1539,13"
                     className="w-full rounded-lg border border-gray-200 p-2.5 text-sm bg-white mt-1 outline-none focus:border-[var(--green)]"
                   />
                 </div>
