@@ -171,7 +171,7 @@ export async function POST(request: Request) {
     let identificadorArquivo = 'Sondagem';
 
     if (nom && sond) {
-        identificadorVisual = `${nom}/${sond}`;
+        identificadorVisual = `${nom} / ${sond}`;
         identificadorArquivo = `${nom}_${sond}`;
     } else if (nom) {
         identificadorVisual = nom;
@@ -220,7 +220,13 @@ export async function POST(request: Request) {
               <tr>
                   <td style="width: 25%;"><span class="destaque" style="text-transform: none;">Poço/Sondagem</span><br/><span class="valor">${identificadorVisual}</span></td>
                   <td style="width: 25%;"><span class="destaque">MÉTODO:</span><br/><span class="valor">${data.tipo_sondagem || '-'}</span></td>
-                  <td style="width: 50%;"><span class="destaque">COORDENADAS:</span><br/><span class="valor">X: ${data.coord_x || '-'} / Y: ${data.coord_y || '-'}</span></td>
+                  <td style="width: 50%;">
+                      <span class="destaque">COORDENADAS (UTM):</span><br/>
+                      <span class="valor">
+                          X: ${data.coord_x || '-'} &nbsp;|&nbsp; Y: ${data.coord_y || '-'}<br/>
+                          Zona: ${data.utm_zona || '-'} &nbsp;|&nbsp; Cota: ${data.cota ? data.cota + ' m' : '-'}
+                      </span>
+                  </td>
               </tr>
               <tr>
                   <td><span class="destaque">DATA:</span><br/><span class="valor">${data.data || '-'}</span></td>

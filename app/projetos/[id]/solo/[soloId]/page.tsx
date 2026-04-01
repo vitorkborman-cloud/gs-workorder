@@ -5,8 +5,6 @@ import { useParams } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import AdminShell from "../../../../../components/layout/AdminShell";
 import { Button } from "../../../../../components/ui/button";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 type Layer = {
   de: string;
@@ -139,14 +137,13 @@ export default function SoloDetailPage() {
   if (!data) return;
 
   try {
-    // Alerta opcional para avisar que está gerando (pode trocar por um estado de loading)
     console.log("Solicitando PDF para a API...");
 
     // 1. Chama a rota do nosso servidor Next.js
     const response = await fetch('/api/gerar-pdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data, layers }) // Enviamos os dados e as camadas
+      body: JSON.stringify({ data, layers })
     });
 
     if (!response.ok) throw new Error("Falha ao gerar o arquivo no servidor");
@@ -156,7 +153,11 @@ export default function SoloDetailPage() {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Perfil_${data.nome_sondagem}.pdf`;
+    
+    // Fallback caso não tenha a nomenclatura preenchida
+    const nomeIdentificador = data.nomenclatura_poco || data.nome_sondagem || "Sondagem";
+    link.download = `Perfil_${nomeIdentificador}.pdf`;
+    
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -181,7 +182,7 @@ export default function SoloDetailPage() {
           <div className="flex justify-between items-center max-w-6xl mx-auto">
             <div>
               <h1 className="text-3xl font-bold">{isEditing ? "Modo Edição" : "Visualização do Perfil"}</h1>
-              <p className="opacity-80 mt-1">Sondagem: {data.nome_sondagem}</p>
+              <p className="opacity-80 mt-1">Poço/Sondagem: {data.nomenclatura_poco ? `${data.nomenclatura_poco} / ${data.nome_sondagem}` : data.nome_sondagem}</p>
             </div>
             
             <div className="flex gap-3">
@@ -246,8 +247,14 @@ export default function SoloDetailPage() {
 
                 <Section title="Geolocalização">
                   <div className="space-y-4">
-                    <EditInput label="Coord. X" value={editForm.coord_x} onChange={(v) => handleFieldChange("coord_x", v)} />
-                    <EditInput label="Coord. Y" value={editForm.coord_y} onChange={(v) => handleFieldChange("coord_y", v)} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <EditInput label="UTM Este (X)" value={editForm.coord_x} onChange={(v) => handleFieldChange("coord_x", v)} />
+                      <EditInput label="UTM Norte (Y)" value={editForm.coord_y} onChange={(v) => handleFieldChange("coord_y", v)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <EditInput label="Zona UTM" value={editForm.utm_zona} onChange={(v) => handleFieldChange("utm_zona", v)} />
+                      <EditInput label="Cota / Alt. (m)" type="number" value={editForm.cota} onChange={(v) => handleFieldChange("cota", v)} />
+                    </div>
                   </div>
                 </Section>
               </div>
@@ -316,8 +323,10 @@ export default function SoloDetailPage() {
                 </Section>
                 <Section title="Geolocalização">
                   <Grid>
-                    <Info label="Coord. X" value={data.coord_x} />
-                    <Info label="Coord. Y" value={data.coord_y} />
+                    <Info label="Este (X)" value={data.coord_x} />
+                    <Info label="Norte (Y)" value={data.coord_y} />
+                    <Info label="Zona UTM" value={data.utm_zona} />
+                    <Info label="Cota / Alt." value={data.cota ? `${data.cota} m` : "-"} />
                   </Grid>
                 </Section>
               </div>
@@ -383,7 +392,6 @@ function Info({ label, value }: { label: string; value: any }) {
   );
 }
 
-// Mini input interno para o modo de edição (Desktop friendly)
 function EditInput({ label, value, onChange, type = "text" }: { label: string, value: string, onChange: (v: string) => void, type?: string }) {
   return (
     <div className="flex flex-col">
