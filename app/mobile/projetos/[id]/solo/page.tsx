@@ -275,8 +275,8 @@ export default function SoloPage() {
           <Section title="Dados da Sondagem" icon={<Icons.Clipboard />}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 items-end">
-                  <Input label="ID / Nomenclatura (Poço) *" value={form.nomenclatura_poco} onChange={(v: string) => setField("nomenclatura_poco", v)} placeholder="Ex: MW-01" />
-                  <Input label="ID Interno da Sondagem" value={form.nome_sondagem} onChange={(v: string) => setField("nome_sondagem", v)} placeholder="Ex: SP-01" />
+                  <Input label="ID / Nomenclatura (Poço) *" value={form.nomenclatura_poco} onChange={(v: string) => setField("nomenclatura_poco", v)} placeholder="Ex: GS-W01" />
+                  <Input label="ID Interno da Sondagem" value={form.nome_sondagem} onChange={(v: string) => setField("nome_sondagem", v)} placeholder="Ex: ST-01" />
               </div>
               <div className="grid grid-cols-2 gap-4 items-end">
                 <Input label="Data" value={form.data} type="date" onChange={(v: string) => setField("data", v)} />
@@ -286,7 +286,7 @@ export default function SoloPage() {
                 <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v: string) => setField("tipo_sondagem", v)} placeholder="Ex: Trado manual" />
                 <Input label="Profundidade Total (m)" value={form.profundidade_total} type="number" onChange={(v: string) => setField("profundidade_total", v)} placeholder="0.00" />
               </div>
-              <Input label="Nível d'água (m) - Opcional" value={form.nivel_agua} type="number" onChange={(v: string) => setField("nivel_agua", v)} placeholder="0.00" />
+              <Input label="Nível d'água (m)" value={form.nivel_agua} type="number" onChange={(v: string) => setField("nivel_agua", v)} placeholder="0.00" />
             </div>
           </Section>
 
@@ -299,8 +299,8 @@ export default function SoloPage() {
               </div>
               <Input label="Nível do Pré-filtro (m)" value={form.pre_filtro} type="number" onChange={(v: string) => setField("pre_filtro", v)} placeholder="0.00" />
               <div className="grid grid-cols-2 gap-4 items-end">
-                <Input label="Seção Filtrante - Topo (m)" value={form.secao_filtrante_topo} type="number" onChange={(v: string) => setField("secao_filtrante_topo", v)} placeholder="0.00" />
-                <Input label="Seção Filtrante - Base (m)" value={form.secao_filtrante_base} type="number" onChange={(v: string) => setField("secao_filtrante_base", v)} placeholder="0.00" />
+                <Input label="Seção Filtrante - Início (m)" value={form.secao_filtrante_topo} type="number" onChange={(v: string) => setField("secao_filtrante_topo", v)} placeholder="0.00" />
+                <Input label="Seção Filtrante - Fim (m)" value={form.secao_filtrante_base} type="number" onChange={(v: string) => setField("secao_filtrante_base", v)} placeholder="0.00" />
               </div>
             </div>
           </Section>
