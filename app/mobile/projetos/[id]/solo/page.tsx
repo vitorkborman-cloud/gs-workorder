@@ -348,7 +348,7 @@ export default function SoloPage() {
                   <Select label="Classificação do Solo" value={layer.tipo} options={tiposSolo} onChange={(v: string) => { const copy = [...layers]; copy[i].tipo = v; setLayers(copy); }} />
                   
                   <div className="grid grid-cols-2 gap-4 items-end bg-gray-50/50 p-3 rounded-xl border border-gray-100">
-                    <Input label="Coloração Visual" value={layer.coloracao} onChange={(v: string) => { const copy = [...layers]; copy[i].coloracao = v; setLayers(copy); }} placeholder="Ex: Marrom escuro" />
+                    <Input label="Observações" value={layer.coloracao} onChange={(v: string) => { const copy = [...layers]; copy[i].coloracao = v; setLayers(copy); }} placeholder="Avermelhado/Úmido/Odor forte" />
                     <Input label="Leitura VOC (ppm)" type="number" value={layer.leitura_voc} onChange={(v: string) => { const copy = [...layers]; copy[i].leitura_voc = v; setLayers(copy); }} placeholder="0.0" />
                   </div>
                 </div>

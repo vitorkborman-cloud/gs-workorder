@@ -260,7 +260,7 @@ export default function SoloDetailPage() {
                         <th className="p-3 font-bold text-[#391e2a] text-xs">De (m)</th>
                         <th className="p-3 font-bold text-[#391e2a] text-xs">Até (m)</th>
                         <th className="p-3 font-bold text-[#391e2a] text-xs w-[30%]">Tipo de Solo</th>
-                        <th className="p-3 font-bold text-[#391e2a] text-xs">Coloração</th>
+                        <th className="p-3 font-bold text-[#391e2a] text-xs">Observações</th>
                         <th className="p-3 font-bold text-[#391e2a] text-xs">VOC (ppm)</th>
                         <th className="p-3 font-bold text-[#391e2a] text-xs text-center">Ações</th>
                       </tr>
@@ -330,7 +330,7 @@ export default function SoloDetailPage() {
                         <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">De (m)</th>
                         <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">Até (m)</th>
                         <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">Tipo de Solo</th>
-                        <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">Coloração</th>
+                        <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">Observações</th>
                         <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">VOC (ppm)</th>
                       </tr>
                     </thead>

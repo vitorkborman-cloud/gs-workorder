@@ -257,7 +257,7 @@ export async function POST(request: Request) {
                               <div style="width: 28px; height: 28px; border: 0.5px solid #333; border-radius: 4px; ${estilo}"></div>
                               <div class="desc-text-container" style="margin-left: 12px;">
                                   <div><b style="color: #391e2a; font-size: 13px;">${l.tipo ? l.tipo.toUpperCase() : 'N/A'}</b></div>
-                                  ${l.coloracao ? `<div style="margin-top: 2px; color: #555;">Coloração: ${l.coloracao}</div>` : ''}
+                                  ${l.coloracao ? `<div style="margin-top: 2px; color: #555;">Observações: ${l.coloracao}</div>` : ''}
                               </div>
                           </div>
                       </div>`;
