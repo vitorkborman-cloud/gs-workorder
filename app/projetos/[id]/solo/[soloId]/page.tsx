@@ -216,6 +216,7 @@ export default function SoloDetailPage() {
                 
                 <Section title="Dados da Sondagem">
                   <div className="space-y-4">
+                    <EditInput label="Nomenclatura do poço" value={editForm.nomenclatura_poco} onChange={(v) => handleFieldChange("nomenclatura_poco", v)} />
                     <EditInput label="Sondagem" value={editForm.nome_sondagem} onChange={(v) => handleFieldChange("nome_sondagem", v)} />
                     <EditInput label="Tipo" value={editForm.tipo_sondagem} onChange={(v) => handleFieldChange("tipo_sondagem", v)} />
                     <div className="grid grid-cols-2 gap-3">
@@ -296,6 +297,7 @@ export default function SoloDetailPage() {
               <div className="grid md:grid-cols-3 gap-6">
                 <Section title="Dados da Sondagem">
                   <Grid>
+                    <Info label="Nomenclatura do poço" value={data.nomenclatura_poco} />
                     <Info label="Sondagem" value={data.nome_sondagem} />
                     <Info label="Tipo" value={data.tipo_sondagem} />
                     <Info label="Data" value={data.data} />

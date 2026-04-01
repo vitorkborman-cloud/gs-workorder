@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
 import fs from 'fs';
 import path from 'path';
 
-// Interface para o TypeScript não reclamar do erro no .map
+export const maxDuration = 60; 
+export const dynamic = 'force-dynamic';
+
 interface Layer {
   de: string | number;
   ate: string | number;
@@ -13,23 +16,40 @@ interface Layer {
 }
 
 export async function POST(request: Request) {
+  let browser: any = null;
+
   try {
     const body = await request.json();
     const { data, layers }: { data: any, layers: Layer[] } = body;
 
-    // --- CARREGAMENTO DO LOGO ---
+    const isLocal = process.env.NODE_ENV === 'development';
+    const chrome: any = chromium;
+
+    browser = await puppeteer.launch({
+      args: isLocal 
+        ? ['--no-sandbox', '--disable-setuid-sandbox'] 
+        : [...chrome.args, '--hide-scrollbars', '--disable-web-security'],
+      defaultViewport: isLocal ? { width: 1280, height: 720 } : chrome.defaultViewport,
+      executablePath: isLocal
+        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' 
+        : await chrome.executablePath(),
+      headless: isLocal ? true : chrome.headless,
+    });
+
+    const page = await browser.newPage();
+
     let logoBase64 = "";
     try {
       const logoPath = path.join(process.cwd(), 'public', 'logo.png');
-      const logoBuffer = fs.readFileSync(logoPath);
-      logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+      if (fs.existsSync(logoPath)) {
+        const logoBuffer = fs.readFileSync(logoPath);
+        logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+      }
     } catch (e) {
-      console.error("Erro ao carregar logo:", e);
+      console.warn("Logo não encontrado, gerando sem imagem.");
     }
 
-    // ESCALA: 0.75x (60 * 0.75 = 45)
     const ESCALA = 45; 
-    
     const preFiltroTopo = parseFloat(data.pre_filtro);
     const filtroTopo = parseFloat(data.secao_filtrante_topo);
     const filtroBase = parseFloat(data.secao_filtrante_base);
@@ -143,8 +163,23 @@ export async function POST(request: Request) {
         `;
     }
 
-    const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
-    const page = await browser.newPage();
+    // --- LÓGICA DE COMBINAÇÃO DOS IDENTIFICADORES ---
+    const nom = data.nomenclatura_poco?.trim();
+    const sond = data.nome_sondagem?.trim();
+    
+    let identificadorVisual = '-';
+    let identificadorArquivo = 'Sondagem';
+
+    if (nom && sond) {
+        identificadorVisual = `${nom}/${sond}`;
+        identificadorArquivo = `${nom}_${sond}`;
+    } else if (nom) {
+        identificadorVisual = nom;
+        identificadorArquivo = nom;
+    } else if (sond) {
+        identificadorVisual = sond;
+        identificadorArquivo = sond;
+    }
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -183,7 +218,7 @@ export async function POST(request: Request) {
                   <td colspan="3" class="title-cell"><h1>Perfil Técnico e Descritivo de Sondagem</h1></td>
               </tr>
               <tr>
-                  <td style="width: 25%;"><span class="destaque">ID SONDAGEM:</span><br/><span class="valor">${data.nome_sondagem || '-'}</span></td>
+                  <td style="width: 25%;"><span class="destaque" style="text-transform: none;">Poço/Sondagem</span><br/><span class="valor">${identificadorVisual}</span></td>
                   <td style="width: 25%;"><span class="destaque">MÉTODO:</span><br/><span class="valor">${data.tipo_sondagem || '-'}</span></td>
                   <td style="width: 50%;"><span class="destaque">COORDENADAS:</span><br/><span class="valor">X: ${data.coord_x || '-'} / Y: ${data.coord_y || '-'}</span></td>
               </tr>
@@ -239,12 +274,22 @@ export async function POST(request: Request) {
 
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
     const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '30px', right: '30px', bottom: '30px', left: '30px' } });
-    await browser.close();
+    
+    // Arquivo com underline (_) para garantir compatibilidade
+    const nomeArquivo = `PERFIL TECNICO E DESCRITIVO DE SONDAGEM - ${identificadorArquivo}.pdf`;
 
-    const pdfUint8Array = new Uint8Array(pdfBuffer);
-    return new Response(pdfUint8Array, { status: 200, headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="Perfil_${data.nome_sondagem}.pdf"` } });
+    return new Response(new Uint8Array(pdfBuffer), { 
+      status: 200, 
+      headers: { 
+        'Content-Type': 'application/pdf', 
+        'Content-Disposition': `attachment; filename="${nomeArquivo}"` 
+      } 
+    });
+
   } catch (error: any) {
-    console.error("Erro ao gerar PDF:", error);
+    console.error("Erro na API de PDF:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  } finally {
+    if (browser) await browser.close();
   }
 }
