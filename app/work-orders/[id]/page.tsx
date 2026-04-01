@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { isMobileDevice } from "@/lib/isMobile";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 // ================= HELPERS (Logo Branco) =================
 async function generateWhiteLogoBase64(src: string): Promise<string> {
@@ -40,12 +42,18 @@ type Activity = {
   images: string[] | null;
 };
 
+type SystemData = {
+  equipamento: string;
+  medicao: string;
+};
+
 // ================= ÍCONES =================
 const Icons = {
   Check: () => <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>,
   X: () => <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>,
   Plus: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>,
-  Download: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+  DownloadPDF: () => <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11v6m0 0l-2-2m2 2l2-2" /></svg>,
+  DownloadExcel: () => <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
   Lock: () => <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
 };
 
@@ -57,7 +65,9 @@ export default function WorkOrderPage() {
   const [finalized, setFinalized] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [workOrder, setWorkOrder] = useState<any>(null);
+  
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingExcel, setGeneratingExcel] = useState(false);
 
   useEffect(() => {
     setMobile(isMobileDevice());
@@ -119,6 +129,132 @@ export default function WorkOrderPage() {
 
     await supabase.from("work_orders").update({ finalized: true }).eq("id", workOrderId);
     load();
+  }
+
+  // ================= GERADOR DE EXCEL (BONITO E SEM FOTOS) =================
+  async function gerarExcel() {
+    if (!workOrder) return;
+    setGeneratingExcel(true);
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Work Order", {
+        views: [{ showGridLines: false }]
+      });
+
+      // Define as larguras das colunas
+      sheet.columns = [
+        { width: 45 }, // A: Descrição / Equipamento
+        { width: 20 }, // B: Status / Medição
+        { width: 60 }, // C: Observações
+      ];
+
+      // --- 1. TÍTULO E CABEÇALHO ---
+      const titleRow = sheet.addRow(["WORK ORDER - " + workOrder.title.toUpperCase()]);
+      sheet.mergeCells("A1:C1");
+      titleRow.height = 35;
+      titleRow.font = { name: 'Arial', size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+      titleRow.alignment = { vertical: "middle", horizontal: "center" };
+      titleRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } }; // Roxo da marca
+
+      const projName = workOrder.projects?.name ?? "N/A";
+      const dateStr = new Date(workOrder.created_at).toLocaleDateString();
+      const subRow = sheet.addRow([`PROJETO: ${projName}   |   DATA: ${dateStr}`]);
+      sheet.mergeCells("A2:C2");
+      subRow.height = 20;
+      subRow.font = { name: 'Arial', size: 10, bold: true, color: { argb: "FF333333" } };
+      subRow.alignment = { vertical: "middle", horizontal: "center" };
+      subRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+
+      sheet.addRow([]);
+
+      // --- 2. CHECKLIST DE ATIVIDADES ---
+      const actTitle = sheet.addRow(["CHECKLIST DE ATIVIDADES"]);
+      sheet.mergeCells(`A${actTitle.number}:C${actTitle.number}`);
+      actTitle.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      actTitle.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF80B02D" } }; // Verde da marca
+
+      const actHeader = sheet.addRow(["Descrição da Atividade", "Status", "Observações de Campo"]);
+      actHeader.font = { bold: true };
+      actHeader.eachCell(c => {
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+        c.border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
+        c.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+
+      activities.forEach(act => {
+        const statusStr = act.status === "concluído" ? "Concluído" : act.status === "não concluído" ? "Não Concluído" : "Pendente";
+        const row = sheet.addRow([act.description, statusStr, act.note || "-"]);
+        
+        row.eachCell((c, colNumber) => {
+          c.border = { top: {style:'thin', color: {argb:'FFEEEEEE'}}, bottom:{style:'thin', color: {argb:'FFEEEEEE'}}, left:{style:'thin', color: {argb:'FFEEEEEE'}}, right:{style:'thin', color: {argb:'FFEEEEEE'}} };
+          c.alignment = { vertical: 'middle', wrapText: true };
+          if (colNumber === 2) c.alignment = { vertical: 'middle', horizontal: 'center' }; // Centraliza o status
+        });
+
+        const statusCell = row.getCell(2);
+        if (statusStr === "Não Concluído" || statusStr === "Pendente") {
+          statusCell.font = { color: { argb: "FFDC2626" }, bold: true }; // Vermelho
+        } else {
+          statusCell.font = { color: { argb: "FF16A34A" }, bold: true }; // Verde
+        }
+      });
+
+      sheet.addRow([]);
+
+      // --- 3. DADOS DO SISTEMA ---
+      const sysData: SystemData[] = workOrder.system_data || [];
+      if (sysData.length > 0) {
+        const sysTitle = sheet.addRow(["DADOS DO SISTEMA (Equipamentos e Medições)"]);
+        sheet.mergeCells(`A${sysTitle.number}:C${sysTitle.number}`);
+        sysTitle.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        sysTitle.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF80B02D" } };
+
+        const sysHeader = sheet.addRow(["Equipamento", "Medição Registrada", ""]);
+        sheet.mergeCells(`B${sysHeader.number}:C${sysHeader.number}`);
+        sysHeader.font = { bold: true };
+        sysHeader.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+        sysHeader.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+        sysHeader.getCell(1).border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
+        sysHeader.getCell(2).border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
+        sysHeader.alignment = { vertical: 'middle', horizontal: 'center' };
+
+        sysData.forEach((item) => {
+          const row = sheet.addRow([item.equipamento || "-", item.medicao || "-", ""]);
+          sheet.mergeCells(`B${row.number}:C${row.number}`);
+          row.getCell(1).border = { top: {style:'thin', color: {argb:'FFEEEEEE'}}, bottom:{style:'thin', color: {argb:'FFEEEEEE'}}, left:{style:'thin', color: {argb:'FFEEEEEE'}}, right:{style:'thin', color: {argb:'FFEEEEEE'}} };
+          row.getCell(2).border = { top: {style:'thin', color: {argb:'FFEEEEEE'}}, bottom:{style:'thin', color: {argb:'FFEEEEEE'}}, left:{style:'thin', color: {argb:'FFEEEEEE'}}, right:{style:'thin', color: {argb:'FFEEEEEE'}} };
+          row.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+
+        sheet.addRow([]);
+      }
+
+      // --- 4. INFORMAÇÕES ADICIONAIS ---
+      if (workOrder.additional_info) {
+        const addTitle = sheet.addRow(["INFORMAÇÕES GERAIS ADICIONAIS"]);
+        sheet.mergeCells(`A${addTitle.number}:C${addTitle.number}`);
+        addTitle.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        addTitle.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+
+        const addRow = sheet.addRow([workOrder.additional_info]);
+        sheet.mergeCells(`A${addRow.number}:C${addRow.number}`);
+        addRow.height = 80;
+        addRow.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+        addRow.getCell(1).border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
+        addRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      saveAs(blob, `WO_${workOrder.title.replace(/\s+/g, '_')}.xlsx`);
+
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao exportar arquivo Excel.");
+    } finally {
+      setGeneratingExcel(false);
+    }
   }
 
   // ================= GERADOR DE PDF OTIMIZADO =================
@@ -200,7 +336,7 @@ export default function WorkOrderPage() {
       pdf.setFontSize(12);
       pdf.setFont("helvetica", "normal");
       pdf.text(`PROJETO: ${workOrder.projects?.name ?? "Não atribuído"}`, pageWidth / 2, 150, { align: "center" });
-      pdf.text(`DATA: ${new Date().toLocaleDateString()}`, pageWidth / 2, 160, { align: "center" });
+      pdf.text(`DATA: ${new Date(workOrder.created_at).toLocaleDateString()}`, pageWidth / 2, 160, { align: "center" });
 
       pdf.setFontSize(10);
       pdf.setTextColor(150, 150, 150);
@@ -232,6 +368,29 @@ export default function WorkOrderPage() {
         }
       });
       currentY = (pdf as any).lastAutoTable.finalY + 15;
+
+      /* ================= 2.5. DADOS DO SISTEMA ================= */
+      const sysData: SystemData[] = workOrder.system_data || [];
+      if (sysData.length > 0) {
+        checkPageBreak(40);
+        
+        pdf.setFontSize(11);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(...brandPurple);
+        pdf.text("DADOS DO SISTEMA", margin, currentY);
+        currentY += 6;
+
+        autoTable(pdf, {
+          startY: currentY,
+          margin: { left: margin, right: margin },
+          head: [["Equipamento", "Medição"]],
+          body: sysData.map(s => [s.equipamento || "-", s.medicao || "-"]),
+          theme: 'striped',
+          headStyles: { fillColor: brandGreen, textColor: 255, fontStyle: "bold" },
+          styles: { fontSize: 9, cellPadding: 4 }
+        });
+        currentY = (pdf as any).lastAutoTable.finalY + 15;
+      }
 
       /* ================= 3. REGISTROS FOTOGRÁFICOS ================= */
       const activitiesWithPhotos = activities.filter(a => a.images && a.images.length > 0);
@@ -279,14 +438,14 @@ export default function WorkOrderPage() {
       }
 
       /* ================= 4. INFORMAÇÕES EXTRAS E ASSINATURA ================= */
-      if (workOrder.additional_info || workOrder.signature_url) {
+      if (workOrder.additional_info || workOrder.signature_url || (workOrder.additional_images && workOrder.additional_images.length > 0)) {
         checkPageBreak(80);
         
         if (workOrder.additional_info) {
           pdf.setFont("helvetica", "bold");
           pdf.setFontSize(12);
           pdf.setTextColor(...brandPurple);
-          pdf.text("Notas Adicionais", margin, currentY);
+          pdf.text("Notas Adicionais Gerais", margin, currentY);
           currentY += 8;
 
           pdf.setFont("helvetica", "normal");
@@ -294,7 +453,42 @@ export default function WorkOrderPage() {
           pdf.setTextColor(60);
           const splitText = pdf.splitTextToSize(workOrder.additional_info, pageWidth - margin * 2);
           pdf.text(splitText, margin, currentY);
-          currentY += (splitText.length * 5) + 20;
+          currentY += (splitText.length * 5) + 15;
+        }
+
+        if (workOrder.additional_images && workOrder.additional_images.length > 0) {
+          checkPageBreak(80);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(11);
+          pdf.setTextColor(...brandPurple);
+          pdf.text("Imagens Adicionais", margin, currentY);
+          currentY += 6;
+
+          for (const imgUrl of workOrder.additional_images) {
+            try {
+              const imgBase64 = await urlToBase64(imgUrl);
+              const img = new Image();
+              img.src = imgBase64;
+              await new Promise(resolve => (img.onload = resolve));
+
+              const maxWidth = 100;
+              const maxHeight = 80;
+              let w = img.width;
+              let h = img.height;
+              const ratio = w / h;
+
+              if (w > maxWidth) { w = maxWidth; h = w / ratio; }
+              if (h > maxHeight) { h = maxHeight; w = h * ratio; }
+
+              checkPageBreak(h + 10);
+              pdf.addImage(imgBase64, "JPEG", margin, currentY, w, h);
+              pdf.setDrawColor(200);
+              pdf.rect(margin, currentY, w, h);
+              currentY += h + 15;
+            } catch (e) {
+              console.error("Erro ao inserir imagem adicional:", e);
+            }
+          }
         }
 
         if (workOrder.signature_url) {
@@ -362,9 +556,23 @@ export default function WorkOrderPage() {
                 </Button>
               )}
               {finalized && (
-                <Button onClick={gerarPDF} disabled={generatingPdf} className="bg-[#80b02d] hover:bg-[#6c9526] text-white font-bold px-6 shadow-lg w-full md:w-auto">
-                  {generatingPdf ? "Processando..." : <><Icons.Download /> Baixar Relatório</>}
-                </Button>
+                <>
+                  <Button 
+                    onClick={gerarExcel} 
+                    disabled={generatingExcel || generatingPdf} 
+                    className="bg-white text-[#391e2a] hover:bg-gray-100 font-bold px-5 shadow-sm w-full md:w-auto transition-all"
+                  >
+                    {generatingExcel ? "Processando..." : <><Icons.DownloadExcel /> Excel</>}
+                  </Button>
+
+                  <Button 
+                    onClick={gerarPDF} 
+                    disabled={generatingPdf || generatingExcel} 
+                    className="bg-[#80b02d] hover:bg-[#6c9526] text-white font-bold px-5 shadow-lg w-full md:w-auto transition-all"
+                  >
+                    {generatingPdf ? "Processando..." : <><Icons.DownloadPDF /> PDF</>}
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -458,7 +666,7 @@ export default function WorkOrderPage() {
               <Icons.Lock /> Trancar e Finalizar Work Order
             </Button>
             <p className="text-center text-xs text-gray-400 mt-3 font-medium">
-              Após finalizar, o PDF será liberado para download e as atividades não poderão ser alteradas.
+              Após finalizar, o PDF e o Excel serão liberados para download e as atividades não poderão ser alteradas.
             </p>
           </div>
         )}
