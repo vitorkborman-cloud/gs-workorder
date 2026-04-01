@@ -14,6 +14,11 @@ type Activity = {
   images: string[] | null;
 };
 
+type SystemData = {
+  equipamento: string;
+  medicao: string;
+};
+
 export default function MobileWorkOrderPage() {
   const params = useParams();
   const workOrderId = params.woId as string;
@@ -24,9 +29,10 @@ export default function MobileWorkOrderPage() {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [openSign, setOpenSign] = useState(false);
 
-  // ✅ NOVOS STATES
+  // ✅ STATES DA WORK ORDER
   const [additionalInfo, setAdditionalInfo] = useState<string>("");
   const [additionalImages, setAdditionalImages] = useState<string[]>([]);
+  const [systemData, setSystemData] = useState<SystemData[]>([]); // NOVO STATE
 
   const sigRef = useRef<SignatureCanvas | null>(null);
 
@@ -35,7 +41,7 @@ export default function MobileWorkOrderPage() {
   async function load() {
     const { data: wo } = await supabase
       .from("work_orders")
-      .select("finalized, signature_url, additional_info, additional_images")
+      .select("finalized, signature_url, additional_info, additional_images, system_data") // Adicionado system_data
       .eq("id", workOrderId)
       .single();
 
@@ -43,6 +49,7 @@ export default function MobileWorkOrderPage() {
     setSignatureUrl(wo?.signature_url ?? null);
     setAdditionalInfo(wo?.additional_info ?? "");
     setAdditionalImages(wo?.additional_images ?? []);
+    setSystemData(wo?.system_data ?? []);
 
     const { data } = await supabase
       .from("activities")
@@ -179,6 +186,34 @@ export default function MobileWorkOrderPage() {
     );
 
     await supabase.from("activities").update({ images: newImages }).eq("id", id);
+  }
+
+  /* ================= DADOS DO SISTEMA (NOVO) ================= */
+
+  async function addSystemData() {
+    if (finalized) return;
+    const newItems = [...systemData, { equipamento: "", medicao: "" }];
+    setSystemData(newItems);
+    await supabase.from("work_orders").update({ system_data: newItems }).eq("id", workOrderId);
+  }
+
+  function handleSystemDataChange(index: number, field: "equipamento" | "medicao", value: string) {
+    if (finalized) return;
+    const newItems = [...systemData];
+    newItems[index][field] = value;
+    setSystemData(newItems);
+  }
+
+  async function syncSystemData() {
+    if (finalized) return;
+    await supabase.from("work_orders").update({ system_data: systemData }).eq("id", workOrderId);
+  }
+
+  async function removeSystemData(index: number) {
+    if (finalized) return;
+    const newItems = systemData.filter((_, i) => i !== index);
+    setSystemData(newItems);
+    await supabase.from("work_orders").update({ system_data: newItems }).eq("id", workOrderId);
   }
 
   /* ================= IMAGENS ADICIONAIS ================= */
@@ -333,7 +368,7 @@ export default function MobileWorkOrderPage() {
           defaultValue={act.note ?? ""}
           onBlur={(e) => updateNote(act.id, e.target.value)}
           placeholder="Observações..."
-          className="w-full rounded-xl border p-3 text-sm"
+          className="w-full rounded-xl border p-3 text-sm bg-white"
         />
 
         {!finalized && (
@@ -394,7 +429,7 @@ export default function MobileWorkOrderPage() {
         <div className="px-4 mt-4">
           <button
             onClick={() => setOpenSign(true)}
-            className="w-full py-4 rounded-2xl font-bold text-white bg-[var(--purple)]"
+            className="w-full py-4 rounded-2xl font-bold text-white bg-[var(--purple)] shadow-md"
           >
             {signatureUrl ? "Refazer assinatura" : "Assinatura do responsável"}
           </button>
@@ -404,24 +439,86 @@ export default function MobileWorkOrderPage() {
       {signatureUrl && (
         <div className="px-4 mt-4">
           <div className="bg-white rounded-2xl p-3 border">
-            <p className="text-xs mb-2 text-gray-500">Assinatura registrada</p>
+            <p className="text-xs mb-2 text-gray-500 font-semibold uppercase tracking-wider">Assinatura registrada</p>
             <img src={signatureUrl} className="w-full h-32 object-contain" />
           </div>
         </div>
       )}
 
-      <div className="space-y-4 pb-28 mt-4">
+      <div className="space-y-4 mt-4 px-4">
         {activities.map(act => (
           <SwipeCard key={act.id} act={act} />
         ))}
       </div>
 
+      {/* ================= DADOS DO SISTEMA (NOVO BLOCO) ================= */}
+
+      <div className="px-4 mt-6">
+        <div className="bg-white rounded-2xl p-4 border space-y-4 shadow-sm">
+          <div className="flex justify-between items-center">
+            <p className="font-bold text-sm text-[#391e2a] uppercase tracking-wider">
+              Dados do Sistema
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {systemData.map((item, index) => (
+              <div key={index} className="relative bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-3">
+                
+                {/* Botão de remover se houver mais de um e não estiver finalizado */}
+                {!finalized && (
+                  <button 
+                    onClick={() => removeSystemData(index)}
+                    className="absolute -top-2 -right-2 bg-red-100 text-red-600 border border-red-200 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
+                  >
+                    X
+                  </button>
+                )}
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Equipamento</label>
+                  <input
+                    disabled={finalized}
+                    value={item.equipamento}
+                    onChange={(e) => handleSystemDataChange(index, "equipamento", e.target.value)}
+                    onBlur={syncSystemData}
+                    placeholder="Ex: Bomba dosadora"
+                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm bg-white mt-1 outline-none focus:border-[var(--green)]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Medição</label>
+                  <input
+                    disabled={finalized}
+                    value={item.medicao}
+                    onChange={(e) => handleSystemDataChange(index, "medicao", e.target.value)}
+                    onBlur={syncSystemData}
+                    placeholder="Ex: 15 L/h"
+                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm bg-white mt-1 outline-none focus:border-[var(--green)]"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {!finalized && (
+            <button
+              onClick={addSystemData}
+              className="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 text-gray-500 font-bold text-sm hover:bg-gray-50 transition flex justify-center items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+              Adicionar Equipamento
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* ================= INFORMAÇÕES ADICIONAIS ================= */}
 
-      <div className="px-4 mt-6 space-y-3">
-        <div className="bg-white rounded-2xl p-4 border space-y-3">
+      <div className="px-4 mt-6 space-y-3 pb-28">
+        <div className="bg-white rounded-2xl p-4 border space-y-3 shadow-sm">
 
-          <p className="font-semibold text-sm">
+          <p className="font-bold text-sm text-[#391e2a] uppercase tracking-wider">
             Informações adicionais
           </p>
 
@@ -430,7 +527,7 @@ export default function MobileWorkOrderPage() {
             disabled={finalized}
             onChange={(e) => updateAdditionalInfo(e.target.value)}
             placeholder="Observações não planejadas identificadas em campo..."
-            className="w-full rounded-xl border p-3 text-sm"
+            className="w-full rounded-xl border border-gray-200 p-3 text-sm bg-gray-50 outline-none focus:border-[var(--green)]"
           />
 
           {!finalized && (
@@ -451,9 +548,9 @@ export default function MobileWorkOrderPage() {
 
               <label
                 htmlFor="additional-file"
-                className="w-full block text-center py-3 rounded-2xl bg-[var(--purple)] text-white font-bold shadow-md"
+                className="w-full block text-center py-3 rounded-xl bg-[var(--purple)] text-white font-bold shadow-md"
               >
-                📎 Anexar imagem
+                📎 Anexar imagem extra
               </label>
             </>
           )}
@@ -463,7 +560,7 @@ export default function MobileWorkOrderPage() {
               <div key={i} className="relative">
                 <img
                   src={img}
-                  className="w-20 h-20 object-cover rounded-lg border"
+                  className="w-20 h-20 object-cover rounded-lg border shadow-sm"
                 />
                 {!finalized && (
                   <button
@@ -481,40 +578,41 @@ export default function MobileWorkOrderPage() {
       </div>
 
       {!finalized && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-6 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40">
           <button
             onClick={finalize}
-            className="w-full py-4 rounded-2xl font-bold text-white bg-[var(--green)]"
+            className="w-full py-4 rounded-xl font-bold text-white bg-[var(--green)] shadow-md text-lg"
           >
             Finalizar Work Order
           </button>
         </div>
       )}
 
+      {/* MODAL DE ASSINATURA */}
       {openSign && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-4 space-y-3">
-            <p className="font-bold text-center">Assine abaixo</p>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <p className="font-extrabold text-center text-lg text-[#391e2a]">Assine abaixo</p>
 
             <SignatureCanvas
               ref={sigRef}
-              penColor="black"
+              penColor="#391e2a"
               canvasProps={{
-                className: "w-full h-48 bg-white border rounded-xl",
+                className: "w-full h-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl",
               }}
             />
 
-            <div className="flex gap-2">
+            <div className="flex gap-3 mt-4">
               <button
                 onClick={() => sigRef.current?.clear()}
-                className="flex-1 py-3 rounded-xl bg-gray-200 font-bold"
+                className="flex-1 py-3.5 rounded-xl bg-gray-100 text-gray-600 font-bold"
               >
                 Limpar
               </button>
 
               <button
                 onClick={salvarAssinatura}
-                className="flex-1 py-3 rounded-xl bg-[var(--green)] text-white font-bold"
+                className="flex-1 py-3.5 rounded-xl bg-[var(--green)] text-white font-bold shadow-md"
               >
                 Salvar
               </button>
@@ -522,7 +620,7 @@ export default function MobileWorkOrderPage() {
 
             <button
               onClick={() => setOpenSign(false)}
-              className="w-full text-sm text-gray-500"
+              className="w-full py-2 text-sm font-semibold text-gray-400 mt-2"
             >
               Cancelar
             </button>
