@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import AppShell from "../../../../../components/AppShell";
-import proj4 from "proj4"; // NOVA IMPORTAÇÃO PARA CONVERSÃO UTM
+import proj4 from "proj4";
 
 // ================= ÍCONES PREMIUM =================
 const Icons = {
@@ -31,7 +31,7 @@ type Layer = {
 
 type FormData = {
   nome_sondagem: string;
-  nomenclatura_poco: string; // NOVO CAMPO
+  nomenclatura_poco: string;
   data: string;
   hora: string;
   nivel_agua: string;
@@ -41,9 +41,10 @@ type FormData = {
   pre_filtro: string;
   secao_filtrante_base: string;
   secao_filtrante_topo: string;
-  coord_x: string; // Vai armazenar UTM Este
-  coord_y: string; // Vai armazenar UTM Norte
-  utm_zona: string; // NOVO CAMPO para UTM
+  coord_x: string;
+  coord_y: string;
+  utm_zona: string;
+  cota: string; // ✅ NOVO CAMPO: Cota (Altitude)
   profundidade_total: string;
 };
 
@@ -77,7 +78,7 @@ export default function SoloPage() {
 
   const [form, setForm] = useState<FormData>({
     nome_sondagem: "",
-    nomenclatura_poco: "", // Inicia vazio
+    nomenclatura_poco: "",
     data: "",
     hora: "",
     nivel_agua: "",
@@ -89,7 +90,8 @@ export default function SoloPage() {
     secao_filtrante_topo: "",
     coord_x: "",
     coord_y: "",
-    utm_zona: "", // Inicia vazio
+    utm_zona: "",
+    cota: "", // ✅ Inicia vazio
     profundidade_total: "",
   });
 
@@ -107,7 +109,7 @@ export default function SoloPage() {
 
     setForm({
       nome_sondagem: data.nome_sondagem ?? "",
-      nomenclatura_poco: data.nomenclatura_poco ?? "", // Carrega do banco
+      nomenclatura_poco: data.nomenclatura_poco ?? "",
       data: data.data ?? "",
       hora: data.hora ?? "",
       nivel_agua: data.nivel_agua ?? "",
@@ -119,7 +121,8 @@ export default function SoloPage() {
       secao_filtrante_topo: data.secao_filtrante_topo ?? "",
       coord_x: data.coord_x ?? "",
       coord_y: data.coord_y ?? "",
-      utm_zona: data.utm_zona ?? "", // Carrega do banco
+      utm_zona: data.utm_zona ?? "",
+      cota: data.cota ?? "", // ✅ Carrega do banco
       profundidade_total: data.profundidade_total ?? "",
     });
 
@@ -147,7 +150,7 @@ export default function SoloPage() {
     setLayers((prev) => [...prev, { de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
   }
 
-  // ================= LÓGICA DE GEOLOCALIZAÇÃO COM UTM =================
+  // ================= LÓGICA DE GEOLOCALIZAÇÃO COM UTM E COTA =================
   function obterLocalizacaoAutomatica() {
     if (!navigator.geolocation) {
       alert("Geolocalização não suportada.");
@@ -160,32 +163,23 @@ export default function SoloPage() {
       (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
+        const altitude = position.coords.altitude; // ✅ Pega a altitude do GPS
 
-        // Calcula o fuso UTM baseando-se na longitude
         const zoneNum = Math.floor((lon + 180) / 6) + 1;
-        // Identifica o hemisfério (Norte ou Sul) baseando-se na latitude
         const isSouth = lat < 0;
-        const hemisferio = isSouth ? 'S' : 'N';
-        
-        // Letra da banda de latitude (aproximada para apresentação)
         const zoneLetter = isSouth ? 'S' : 'N'; 
 
-        // Define as projeções do proj4
-        // EPSG:4326 é a latitude/longitude padrão (WGS84)
         const wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-        
-        // Constrói a string de projeção UTM correta para a zona atual
-        // O '+south' é vital para calcular o Y (Northing) correto no Brasil
         const utmStr = `+proj=utm +zone=${zoneNum} ${isSouth ? '+south' : ''} +datum=WGS84 +units=m +no_defs`;
 
-        // Executa a conversão
         const [easting, northing] = proj4(wgs84, utmStr, [lon, lat]);
 
         setForm((prev) => ({ 
             ...prev, 
             coord_x: easting.toFixed(2), 
             coord_y: northing.toFixed(2),
-            utm_zona: `${zoneNum}${zoneLetter}` // Ex: 23S
+            utm_zona: `${zoneNum}${zoneLetter}`,
+            cota: altitude ? altitude.toFixed(2) : "" // ✅ Preenche a cota se disponível
         }));
 
         setFetchingLocation(false);
@@ -228,10 +222,8 @@ export default function SoloPage() {
     setSaving(true);
     try {
       if (draftId) {
-        // Se já existe um rascunho, apenas atualizamos para finalizado
         await supabase.from("soil_descriptions").update({ ...form, layers, finalized: true }).eq("id", draftId);
       } else {
-        // Se não existir, insere um novo já finalizado
         await supabase.from("soil_descriptions").insert({ project_id: projectId, ...form, layers, finalized: true });
       }
 
@@ -239,13 +231,11 @@ export default function SoloPage() {
       setForm({
         nome_sondagem: "", nomenclatura_poco: "", data: "", hora: "", nivel_agua: "", tipo_sondagem: "",
         diametro_sondagem: "", diametro_poco: "", pre_filtro: "",
-        secao_filtrante_base: "", secao_filtrante_topo: "", coord_x: "", coord_y: "", utm_zona: "", profundidade_total: "",
+        secao_filtrante_base: "", secao_filtrante_topo: "", coord_x: "", coord_y: "", utm_zona: "", cota: "", profundidade_total: "",
       });
       setLayers([{ de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
       
       alert("Descrição de solo concluída com sucesso!");
-      // Opcional: Voltar para a página anterior após concluir
-      // router.back();
     } catch (error) {
       alert("Erro ao concluir.");
     } finally {
@@ -305,13 +295,14 @@ export default function SoloPage() {
             </div>
           </Section>
 
-          {/* COORDENADAS (AGORA UTM) */}
+          {/* COORDENADAS (AGORA COM COTA) */}
           <Section title="Geolocalização (UTM)" icon={<Icons.MapPin />}>
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3 items-end">
+              <div className="grid grid-cols-2 gap-3 items-end">
                 <Input label="UTM Este (X)" value={form.coord_x} onChange={(v: string) => setField("coord_x", v)} placeholder="Ex: 333420" />
                 <Input label="UTM Norte (Y)" value={form.coord_y} onChange={(v: string) => setField("coord_y", v)} placeholder="Ex: 7393300" />
                 <Input label="Zona" value={form.utm_zona} onChange={(v: string) => setField("utm_zona", v)} placeholder="Ex: 23S" />
+                <Input label="Cota / Alt. (m)" value={form.cota} type="number" onChange={(v: string) => setField("cota", v)} placeholder="Ex: 750.50" />
               </div>
               
               <button
@@ -320,9 +311,9 @@ export default function SoloPage() {
                 className="w-full bg-[#80b02d]/10 text-[#6a9425] hover:bg-[#80b02d]/20 py-3 rounded-xl border border-[#80b02d]/30 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition disabled:opacity-50"
               >
                 {fetchingLocation ? (
-                  <><Icons.Loader /> Convertendo GPS para UTM...</>
+                  <><Icons.Loader /> Lendo sensores do GPS...</>
                 ) : (
-                  <><Icons.Crosshair /> Capturar Minha Localização (UTM)</>
+                  <><Icons.Crosshair /> Capturar Minha Localização (UTM + Cota)</>
                 )}
               </button>
             </div>
@@ -348,7 +339,7 @@ export default function SoloPage() {
                   <Select label="Classificação do Solo" value={layer.tipo} options={tiposSolo} onChange={(v: string) => { const copy = [...layers]; copy[i].tipo = v; setLayers(copy); }} />
                   
                   <div className="grid grid-cols-2 gap-4 items-end bg-gray-50/50 p-3 rounded-xl border border-gray-100">
-                    <Input label="Observações" value={layer.coloracao} onChange={(v: string) => { const copy = [...layers]; copy[i].coloracao = v; setLayers(copy); }} placeholder="Avermelhado/Úmido/Odor forte" />
+                    <Input label="Observações" value={layer.coloracao} onChange={(v: string) => { const copy = [...layers]; copy[i].coloracao = v; setLayers(copy); }} placeholder="Avermelhado/Úmido/Odor" />
                     <Input label="Leitura VOC (ppm)" type="number" value={layer.leitura_voc} onChange={(v: string) => { const copy = [...layers]; copy[i].leitura_voc = v; setLayers(copy); }} placeholder="0.0" />
                   </div>
                 </div>
