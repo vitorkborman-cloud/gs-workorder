@@ -178,31 +178,31 @@ export default function SoloFormPage() {
           <Section title="Dados da Sondagem" icon={<Icons.Clipboard />}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 items-end">
-                <Input label="ID / Nomenclatura (Poço) *" value={form.nomenclatura_poco} onChange={(v) => setField("nomenclatura_poco", v)} placeholder="Ex: GS-W01" disabled={finalized} />
-                <Input label="ID Interno da Sondagem" value={form.nome_sondagem} onChange={(v) => setField("nome_sondagem", v)} placeholder="Ex: ST-01" disabled={finalized} />
+                <Input label="ID / Nomenclatura (Poço) *" value={form.nomenclatura_poco} onChange={(v: string) => setField("nomenclatura_poco", v)} placeholder="Ex: GS-W01" disabled={finalized} />
+                <Input label="ID Interno da Sondagem" value={form.nome_sondagem} onChange={(v: string) => setField("nome_sondagem", v)} placeholder="Ex: ST-01" disabled={finalized} />
               </div>
               <div className="grid grid-cols-2 gap-4 items-end">
-                <Input label="Data" value={form.data} type="date" onChange={(v) => setField("data", v)} disabled={finalized} />
-                <Input label="Hora" value={form.hora} type="time" onChange={(v) => setField("hora", v)} disabled={finalized} />
+                <Input label="Data" value={form.data} type="date" onChange={(v: string) => setField("data", v)} disabled={finalized} />
+                <Input label="Hora" value={form.hora} type="time" onChange={(v: string) => setField("hora", v)} disabled={finalized} />
               </div>
               <div className="grid grid-cols-2 gap-4 items-end">
-                <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v) => setField("tipo_sondagem", v)} placeholder="Ex: Trado manual" disabled={finalized} />
-                <Input label="Profundidade Total (m)" value={form.profundidade_total} type="number" onChange={(v) => setField("profundidade_total", v)} placeholder="0.00" disabled={finalized} />
+                <Input label="Tipo de Sondagem" value={form.tipo_sondagem} onChange={(v: string) => setField("tipo_sondagem", v)} placeholder="Ex: Trado manual" disabled={finalized} />
+                <Input label="Profundidade Total (m)" value={form.profundidade_total} type="number" onChange={(v: string) => setField("profundidade_total", v)} placeholder="0.00" disabled={finalized} />
               </div>
-              <Input label="Nível d'água (m)" value={form.nivel_agua} type="number" onChange={(v) => setField("nivel_agua", v)} placeholder="0.00" disabled={finalized} />
+              <Input label="Nível d'água (m)" value={form.nivel_agua} type="number" onChange={(v: string) => setField("nivel_agua", v)} placeholder="0.00" disabled={finalized} />
             </div>
           </Section>
 
           <Section title="Dados de Instalação" icon={<Icons.Ruler />}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 items-end">
-                <Input label="Diâmetro Sondagem (in)" value={form.diametro_sondagem} onChange={(v) => setField("diametro_sondagem", v)} placeholder="Ex: 4" disabled={finalized} />
-                <Input label="Diâmetro Poço (in)" value={form.diametro_poco} onChange={(v) => setField("diametro_poco", v)} placeholder="Ex: 2" disabled={finalized} />
+                <Input label="Diâmetro Sondagem (in)" value={form.diametro_sondagem} onChange={(v: string) => setField("diametro_sondagem", v)} placeholder="Ex: 4" disabled={finalized} />
+                <Input label="Diâmetro Poço (in)" value={form.diametro_poco} onChange={(v: string) => setField("diametro_poco", v)} placeholder="Ex: 2" disabled={finalized} />
               </div>
-              <Input label="Nível do Pré-filtro (m)" value={form.pre_filtro} type="number" onChange={(v) => setField("pre_filtro", v)} placeholder="0.00" disabled={finalized} />
+              <Input label="Nível do Pré-filtro (m)" value={form.pre_filtro} type="number" onChange={(v: string) => setField("pre_filtro", v)} placeholder="0.00" disabled={finalized} />
               <div className="grid grid-cols-2 gap-4 items-end">
-                <Input label="Seção Filtrante - Início (m)" value={form.secao_filtrante_topo} type="number" onChange={(v) => setField("secao_filtrante_topo", v)} placeholder="0.00" disabled={finalized} />
-                <Input label="Seção Filtrante - Fim (m)" value={form.secao_filtrante_base} type="number" onChange={(v) => setField("secao_filtrante_base", v)} placeholder="0.00" disabled={finalized} />
+                <Input label="Seção Filtrante - Início (m)" value={form.secao_filtrante_topo} type="number" onChange={(v: string) => setField("secao_filtrante_topo", v)} placeholder="0.00" disabled={finalized} />
+                <Input label="Seção Filtrante - Fim (m)" value={form.secao_filtrante_base} type="number" onChange={(v: string) => setField("secao_filtrante_base", v)} placeholder="0.00" disabled={finalized} />
               </div>
             </div>
           </Section>
@@ -210,10 +210,10 @@ export default function SoloFormPage() {
           <Section title="Geolocalização (UTM)" icon={<Icons.MapPin />}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 items-end">
-                <Input label="UTM Este (X)" value={form.coord_x} onChange={(v) => setField("coord_x", v)} placeholder="Ex: 333420" disabled={finalized} />
-                <Input label="UTM Norte (Y)" value={form.coord_y} onChange={(v) => setField("coord_y", v)} placeholder="Ex: 7393300" disabled={finalized} />
-                <Input label="Zona" value={form.utm_zona} onChange={(v) => setField("utm_zona", v)} placeholder="Ex: 23S" disabled={finalized} />
-                <Input label="Cota / Alt. (m)" value={form.cota} type="number" onChange={(v) => setField("cota", v)} placeholder="Ex: 750.50" disabled={finalized} />
+                <Input label="UTM Este (X)" value={form.coord_x} onChange={(v: string) => setField("coord_x", v)} placeholder="Ex: 333420" disabled={finalized} />
+                <Input label="UTM Norte (Y)" value={form.coord_y} onChange={(v: string) => setField("coord_y", v)} placeholder="Ex: 7393300" disabled={finalized} />
+                <Input label="Zona" value={form.utm_zona} onChange={(v: string) => setField("utm_zona", v)} placeholder="Ex: 23S" disabled={finalized} />
+                <Input label="Cota / Alt. (m)" value={form.cota} type="number" onChange={(v: string) => setField("cota", v)} placeholder="Ex: 750.50" disabled={finalized} />
               </div>
               {!finalized && (
                 <button
@@ -240,13 +240,13 @@ export default function SoloFormPage() {
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-4 items-end">
-                    <Input label="De (m)" type="number" value={layer.de} onChange={(v) => { const c = [...layers]; c[i].de = v; setLayers(c); }} placeholder="0.00" disabled={finalized} />
-                    <Input label="Até (m)" type="number" value={layer.ate} onChange={(v) => { const c = [...layers]; c[i].ate = v; setLayers(c); }} placeholder="0.00" disabled={finalized} />
+                    <Input label="De (m)" type="number" value={layer.de} onChange={(v: string) => { const c = [...layers]; c[i].de = v; setLayers(c); }} placeholder="0.00" disabled={finalized} />
+                    <Input label="Até (m)" type="number" value={layer.ate} onChange={(v: string) => { const c = [...layers]; c[i].ate = v; setLayers(c); }} placeholder="0.00" disabled={finalized} />
                   </div>
-                  <Select label="Classificação do Solo" value={layer.tipo} options={tiposSolo} onChange={(v) => { const c = [...layers]; c[i].tipo = v; setLayers(c); }} disabled={finalized} />
+                  <Select label="Classificação do Solo" value={layer.tipo} options={tiposSolo} onChange={(v: string) => { const c = [...layers]; c[i].tipo = v; setLayers(c); }} disabled={finalized} />
                   <div className="grid grid-cols-2 gap-4 items-end bg-gray-50/50 p-3 rounded-xl border border-gray-100">
-                    <Input label="Observações" value={layer.coloracao} onChange={(v) => { const c = [...layers]; c[i].coloracao = v; setLayers(c); }} placeholder="Avermelhado/Úmido/Odor" disabled={finalized} />
-                    <Input label="Leitura VOC (ppm)" type="number" value={layer.leitura_voc} onChange={(v) => { const c = [...layers]; c[i].leitura_voc = v; setLayers(c); }} placeholder="0.0" disabled={finalized} />
+                    <Input label="Observações" value={layer.coloracao} onChange={(v: string) => { const c = [...layers]; c[i].coloracao = v; setLayers(c); }} placeholder="Avermelhado/Úmido/Odor" disabled={finalized} />
+                    <Input label="Leitura VOC (ppm)" type="number" value={layer.leitura_voc} onChange={(v: string) => { const c = [...layers]; c[i].leitura_voc = v; setLayers(c); }} placeholder="0.0" disabled={finalized} />
                   </div>
                 </div>
               ))}
