@@ -61,21 +61,28 @@ export default function DashboardPage() {
   }, []);
 
   async function load() {
-    const [{ data: p }, { data: wos }] = await Promise.all([
-      supabase.from("projects").select("*"),
-      supabase.from("work_orders").select("id"),
-    ]);
+    // 1. Projetos
+    const { data: p } = await supabase.from("projects").select("id, name");
 
-    const sortedProjects = p?.sort((a, b) =>
+    const sortedProjects = (p || []).sort((a, b) =>
       a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
-    ) || [];
-
+    );
     setProjects(sortedProjects);
     setTotalProjects(sortedProjects.length);
 
-    const woIds = wos?.map((w) => w.id) || [];
+    const projectIds = sortedProjects.map((x) => x.id);
+    if (projectIds.length === 0) return;
+
+    // 2. Work orders filtrados pelos projetos (respeita RLS)
+    const { data: wos } = await supabase
+      .from("work_orders")
+      .select("id")
+      .in("project_id", projectIds);
+
+    const woIds = (wos || []).map((w) => w.id);
     if (woIds.length === 0) return;
 
+    // 3. Atividades filtradas pelos work orders (respeita RLS)
     const { data: a } = await supabase
       .from("activities")
       .select("created_at, updated_at, status")
