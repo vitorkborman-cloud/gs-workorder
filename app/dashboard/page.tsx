@@ -280,7 +280,7 @@ export default function DashboardPage() {
                   <Tooltip
                     contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
                     itemStyle={{ color: '#391e2a' }}
-                    formatter={(value: number, name: string) => [value, name]}
+                    formatter={(value: any, name: any) => [value, name]}
                   />
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
 
