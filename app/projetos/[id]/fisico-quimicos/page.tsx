@@ -106,38 +106,48 @@ export default function FisicoQuimicosDesktopPage() {
       try { whiteLogoBase64 = await generateWhiteLogoBase64("/logo.png"); } catch (e) {}
 
       const doc = new jsPDF("p", "mm", "a4");
-      const marginX = 15;
-      const pageWidth = doc.internal.pageSize.getWidth();
+      const marginX   = 15;
+      const pageWidth  = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       let currentY = 0;
 
       const brandPurple: [number, number, number] = [57, 30, 42];
-      const brandGreen: [number, number, number] = [128, 176, 45];
+      const brandGreen:  [number, number, number] = [128, 176, 45];
+      const brandBlue:   [number, number, number] = [47, 126, 161];
 
-      const drawPageHeader = () => {
+      const drawPageHeader = (subtitle = "FÍSICO-QUÍMICOS — LEITURAS DETALHADAS") => {
         doc.setFillColor(...brandPurple);
-        doc.rect(0, 0, pageWidth, 35, "F");
+        doc.rect(0, 0, pageWidth, 30, "F");
+        doc.setFillColor(...brandGreen);
+        doc.rect(0, 30, pageWidth, 1.5, "F");
 
         if (whiteLogoBase64) {
-          try { doc.addImage(whiteLogoBase64, "PNG", marginX, 12.5, 35, 10); } catch (e) {}
+          try { doc.addImage(whiteLogoBase64, "PNG", marginX, 8, 32, 10); } catch (e) {}
         }
 
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(14);
+        doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.text("RELATÓRIO GERAL: FÍSICO-QUÍMICOS", pageWidth - marginX, 16, { align: "right" });
-        
-        doc.setFontSize(9);
+        doc.text(subtitle, pageWidth - marginX, 14, { align: "right" });
+        doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
-        doc.text(`PROJETO: ${projectName}`, pageWidth - marginX, 23, { align: "right" });
-        doc.text(`DATA DA CAMPANHA: ${formatDateBr(dataCampanha)}`, pageWidth - marginX, 28, { align: "right" });
-
-        currentY = 45;
+        doc.text(`Projeto: ${projectName}   |   Campanha: ${formatDateBr(dataCampanha)}`, pageWidth - marginX, 21, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+        currentY = 42;
       };
 
-      drawPageHeader();
+      const drawPageFooter = (pageNum: number, totalPages: number) => {
+        doc.setFillColor(245, 245, 245);
+        doc.rect(0, pageHeight - 12, pageWidth, 12, "F");
+        doc.setFontSize(7);
+        doc.setTextColor(150);
+        doc.text("GreenSoil do Brasil LTDA   |   Documento gerado eletronicamente", marginX, pageHeight - 5);
+        doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth - marginX, pageHeight - 5, { align: "right" });
+        doc.text(new Date().toLocaleString("pt-BR"), pageWidth / 2, pageHeight - 5, { align: "center" });
+      };
 
       const checkPageBreak = (needed: number) => {
-        if (currentY + needed > 275) {
+        if (currentY + needed > pageHeight - 20) {
           doc.addPage();
           drawPageHeader();
           return true;
@@ -145,159 +155,274 @@ export default function FisicoQuimicosDesktopPage() {
         return false;
       };
 
-      for (let i = 0; i < amostras.length; i++) {
-        const amostra = amostras[i];
-        
-        checkPageBreak(50); 
+      // ── Capa ──
+      doc.setFillColor(...brandPurple);
+      doc.rect(0, 0, pageWidth, pageHeight, "F");
+      doc.setFillColor(...brandGreen);
+      doc.rect(0, pageHeight - 40, pageWidth, 40, "F");
 
+      if (whiteLogoBase64) {
+        try { doc.addImage(whiteLogoBase64, "PNG", pageWidth / 2 - 35, 55, 70, 22); } catch (e) {}
+      }
+
+      doc.setTextColor(...brandGreen);
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text("RELATÓRIO FÍSICO-QUÍMICOS", pageWidth / 2, 108, { align: "center" });
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.text(`Campanha de ${formatDateBr(dataCampanha)}`, pageWidth / 2, 120, { align: "center" });
+
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.4);
+      doc.line(pageWidth / 2 - 45, 128, pageWidth / 2 + 45, 128);
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Projeto: ${projectName}`, pageWidth / 2, 138, { align: "center" });
+      doc.text(`${amostras.length} poços amostrados`, pageWidth / 2, 148, { align: "center" });
+
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.text("GreenSoil do Brasil LTDA   |   CNPJ: 29.088.151/0001-25", pageWidth / 2, pageHeight - 18, { align: "center" });
+
+      // ── Página de resumo ──
+      doc.addPage();
+      drawPageHeader("FÍSICO-QUÍMICOS — RESUMO DA CAMPANHA");
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...brandPurple);
+      doc.text("Resumo dos Poços Amostrados", marginX, currentY);
+      currentY += 6;
+
+      autoTable(doc, {
+        startY: currentY,
+        margin: { left: marginX, right: marginX },
+        head: [["Poço", "Nomenclatura", "Cód.", "Hora", "NA Ini.", "NA Fin.", "Fase Livre", "Leituras"]],
+        body: amostras.map(a => [
+          a.poco || "—",
+          a.nomenclatura || "—",
+          a.identificacao_codigo || "—",
+          a.hora_inicio || "—",
+          a.na_inicial ? `${a.na_inicial} m` : "—",
+          a.na_final   ? `${a.na_final} m`   : "—",
+          a.fase_livre ? "DETECTADA" : "Não",
+          String(a.leituras?.length || 0),
+        ]),
+        theme: "grid",
+        headStyles: { fillColor: brandPurple, textColor: 255, fontStyle: "bold", fontSize: 8 },
+        styles: { fontSize: 8, cellPadding: 3, halign: "center" },
+        columnStyles: { 0: { halign: "left" }, 1: { halign: "left" } },
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 6) {
+            if (String(data.cell.raw) === "DETECTADA")
+              data.cell.styles.textColor = [200, 0, 0];
+          }
+        },
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 16;
+
+      // ── Leituras por poço ──
+      for (const amostra of amostras) {
+        checkPageBreak(50);
+
+        // Badge do poço
+        doc.setFillColor(...brandBlue);
+        doc.roundedRect(marginX, currentY, pageWidth - marginX * 2, 10, 2, 2, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.setTextColor(...brandPurple);
-        doc.text(`POÇO: ${amostra.poco} | ${amostra.nomenclatura || "Sem nomenclatura"}`, marginX, currentY);
-        
-        doc.setDrawColor(...brandGreen);
-        doc.setLineWidth(0.8);
-        doc.line(marginX, currentY + 2, marginX + 10, currentY + 2);
-        currentY += 8;
+        doc.text(`POÇO: ${amostra.poco}   |   ${amostra.nomenclatura || "Sem nomenclatura"}   |   Cód: ${amostra.identificacao_codigo || "—"}`, marginX + 3, currentY + 7);
+        currentY += 13;
 
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(80);
-        
-        const infoLinha1 = `Cód: ${amostra.identificacao_codigo || "-"}   |   Hora Início: ${amostra.hora_inicio || "-"}   |   NA Inicial: ${amostra.na_inicial || "-"} m   |   NA Final: ${amostra.na_final || "-"} m`;
-        doc.text(infoLinha1, marginX, currentY);
+        doc.text(
+          `Hora Início: ${amostra.hora_inicio || "—"}   |   NA Inicial: ${amostra.na_inicial || "—"} m   |   NA Final: ${amostra.na_final || "—"} m`,
+          marginX, currentY
+        );
         currentY += 5;
 
         if (amostra.fase_livre) {
           doc.setTextColor(200, 0, 0);
           doc.setFont("helvetica", "bold");
-          doc.text(`Fase Livre: DETECTADA (Espessura: ${amostra.espessura_fl || "-"} m)`, marginX, currentY);
+          doc.text(`⚠ Fase Livre DETECTADA — Espessura: ${amostra.espessura_fl || "—"} m`, marginX, currentY);
         } else {
-          doc.setTextColor(120);
-          doc.text("Fase Livre: Não Detectada", marginX, currentY);
+          doc.setTextColor(100);
+          doc.text("Fase Livre: Não detectada", marginX, currentY);
         }
-        currentY += 6;
+        currentY += 7;
 
         autoTable(doc, {
           startY: currentY,
           margin: { left: marginX, right: marginX },
           head: [["Horário", "NA (m)", "pH", "ORP (mV)", "OD (mg/L)", "Cond. (µS/cm)"]],
-          body: amostra.leituras?.map((l: any) => [
-            l.horario || "-", l.na || "-", l.ph || "-", l.orp || "-", l.od || "-", l.condutividade || "-"
-          ]) || [],
-          theme: 'striped',
-          headStyles: { fillColor: brandPurple, textColor: 255, fontStyle: "bold", fontSize: 8 },
-          styles: { fontSize: 8, cellPadding: 3, textColor: 50, halign: "center" },
-          alternateRowStyles: { fillColor: [250, 250, 252] }
+          body: amostra.leituras?.length
+            ? amostra.leituras.map((l: any) => [l.horario || "—", l.na || "—", l.ph || "—", l.orp || "—", l.od || "—", l.condutividade || "—"])
+            : [["Nenhuma leitura registrada", "", "", "", "", ""]],
+          theme: "striped",
+          headStyles: { fillColor: brandBlue, textColor: 255, fontStyle: "bold", fontSize: 8 },
+          styles: { fontSize: 8, cellPadding: 3, halign: "center", textColor: 50 },
+          alternateRowStyles: { fillColor: [240, 249, 255] },
         });
-
-        currentY = (doc as any).lastAutoTable.finalY + 15;
+        currentY = (doc as any).lastAutoTable.finalY + 14;
       }
 
+      // ── Rodapés ──
       const totalP = (doc as any).internal.getNumberOfPages();
-      for (let i = 1; i <= totalP; i++) {
+      for (let i = 2; i <= totalP; i++) {
         doc.setPage(i);
-        doc.setFontSize(7);
-        doc.setTextColor(180);
-        doc.text(`Documento gerado eletronicamente - Página ${i} de ${totalP}`, pageWidth / 2, 290, { align: "center" });
+        drawPageFooter(i - 1, totalP - 1);
       }
 
-      doc.save(`Compilado_FQ_${projectName}_${dataCampanha}.pdf`);
+      doc.save(`FQ_${projectName}_${dataCampanha}.pdf`);
     } catch (error) {
-      alert("Erro ao gerar o PDF Geral.");
+      alert("Erro ao gerar o PDF.");
+      console.error(error);
     } finally {
       setGeneratingPdf(null);
     }
   }
 
-  // ================= GERAR EXCEL (A MÁGICA ACONTECE AQUI) =================
+  // ================= GERAR EXCEL =================
   async function gerarExcelGeral(dataCampanha: string, amostras: Sampling[]) {
     setGeneratingExcel(dataCampanha);
     try {
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Físico-Químicos", {
-        views: [{ showGridLines: false }] // Esconde as linhas de grade padrão do Excel para ficar mais limpo
+      workbook.creator = "GreenSoil do Brasil";
+      workbook.created = new Date();
+
+      // ── Aba 1: Resumo ──
+      const resumo = workbook.addWorksheet("Resumo da Campanha", { views: [{ showGridLines: false }] });
+      resumo.columns = [{ width: 22 }, { width: 20 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 18 }, { width: 18 }];
+
+      try {
+        const resp = await fetch("/logo.png");
+        const buf = await resp.arrayBuffer();
+        const logoId = workbook.addImage({ buffer: buf, extension: "png" });
+        resumo.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 3 }, editAs: "oneCell" });
+      } catch (_) {}
+
+      ["A1:G1","A2:G2","A3:G3"].forEach(r => resumo.mergeCells(r));
+      [1,2,3].forEach(r => {
+        const row = resumo.getRow(r);
+        row.height = 22;
+        row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+      });
+      const rr1 = resumo.getRow(1);
+      rr1.getCell(1).value = "RELATÓRIO DE PARÂMETROS FÍSICO-QUÍMICOS";
+      rr1.getCell(1).font = { name: "Calibri", size: 15, bold: true, color: { argb: "FFFFFFFF" } };
+      rr1.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
+
+      const rr2 = resumo.getRow(2);
+      rr2.getCell(1).value = `Projeto: ${projectName}   |   Campanha: ${formatDateBr(dataCampanha)}`;
+      rr2.getCell(1).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF80B02D" } };
+      rr2.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
+
+      const rr3 = resumo.getRow(3);
+      rr3.getCell(1).value = `Gerado em: ${new Date().toLocaleString("pt-BR")}   |   GreenSoil do Brasil LTDA`;
+      rr3.getCell(1).font = { name: "Calibri", size: 9, color: { argb: "FFAAAAAA" } };
+      rr3.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
+
+      resumo.addRow([]);
+
+      const rH = resumo.addRow(["Poço", "Nomenclatura / Cód.", "Hora Início", "NA Inicial (m)", "NA Final (m)", "Fase Livre", "Qtd. Leituras"]);
+      rH.height = 20;
+      rH.eachCell(c => {
+        c.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF80B02D" } };
+        c.alignment = { vertical: "middle", horizontal: "center" };
+        c.border = { bottom: { style: "medium", color: { argb: "FF5a7e20" } } };
       });
 
-      // Largura das Colunas
-      sheet.columns = [
-        { width: 15 }, // Horário
-        { width: 12 }, // NA
-        { width: 12 }, // pH
-        { width: 15 }, // ORP
-        { width: 15 }, // OD
-        { width: 25 }, // Condutividade
-      ];
-
-      // Cabeçalho Principal (Verde GreenSoil)
-      const titleRow = sheet.addRow(["RELATÓRIO DE PARÂMETROS FÍSICO-QUÍMICOS"]);
-      sheet.mergeCells("A1:F1");
-      titleRow.height = 30;
-      titleRow.font = { name: 'Arial', size: 14, bold: true, color: { argb: "FFFFFFFF" } };
-      titleRow.alignment = { vertical: "middle", horizontal: "center" };
-      titleRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF80B02D" } }; // Verde
-
-      // Subtítulo (Projeto e Data)
-      const subRow = sheet.addRow([`PROJETO: ${projectName}   |   DATA: ${formatDateBr(dataCampanha)}`]);
-      sheet.mergeCells("A2:F2");
-      subRow.height = 20;
-      subRow.font = { name: 'Arial', size: 10, bold: true, color: { argb: "FF391E2A" } }; // Roxo escuro
-      subRow.alignment = { vertical: "middle", horizontal: "center" };
-      
-      sheet.addRow([]); // Espaço
-
-      // Iterando sobre as amostras (Poços)
-      amostras.forEach((amostra) => {
-        // Linha do Título do Poço
-        const pocoTitle = sheet.addRow([`POÇO: ${amostra.poco} / ${amostra.nomenclatura || "-"}`]);
-        sheet.mergeCells(`A${pocoTitle.number}:F${pocoTitle.number}`);
-        pocoTitle.font = { name: 'Arial', size: 12, bold: true, color: { argb: "FFFFFFFF" } };
-        pocoTitle.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } }; // Roxo escuro
-        pocoTitle.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
-
-        // Linha de Informações Extras do Poço
-        const info1 = `Cód: ${amostra.identificacao_codigo || "-"}   |   Hora Início: ${amostra.hora_inicio || "-"}`;
-        const info2 = `NA Inicial: ${amostra.na_inicial || "-"}m   |   NA Final: ${amostra.na_final || "-"}m`;
-        const fl = amostra.fase_livre ? `Fase Livre: Sim (${amostra.espessura_fl}m)` : "Fase Livre: Não";
-        
-        const infoRow = sheet.addRow([`${info1}   |   ${info2}   |   ${fl}`]);
-        sheet.mergeCells(`A${infoRow.number}:F${infoRow.number}`);
-        infoRow.font = { name: 'Arial', size: 9, italic: true, color: { argb: "FF555555" } };
-        infoRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } }; // Cinza clarinho
-        infoRow.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
-
-        // Cabeçalho da Tabela de Leituras
-        const headerRow = sheet.addRow(["Horário", "NA (m)", "pH", "ORP (mV)", "OD (mg/L)", "Cond. (µS/cm)"]);
-        headerRow.font = { name: 'Arial', size: 10, bold: true };
-        headerRow.eachCell((cell) => {
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } }; // Cinza médio
-          cell.alignment = { vertical: "middle", horizontal: "center" };
-          cell.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+      amostras.forEach((a, i) => {
+        const row = resumo.addRow([
+          a.poco || "—",
+          `${a.nomenclatura || "—"} / ${a.identificacao_codigo || "—"}`,
+          a.hora_inicio || "—",
+          a.na_inicial || "—",
+          a.na_final || "—",
+          a.fase_livre ? `✓ Sim (${a.espessura_fl || "?"}m)` : "Não",
+          a.leituras?.length || 0,
+        ]);
+        row.height = 18;
+        const bg = i % 2 === 0 ? "FFFFFFFF" : "FFF9FAFB";
+        row.eachCell((c, col) => {
+          c.font = { name: "Calibri", size: 10 };
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+          c.alignment = { vertical: "middle", horizontal: col === 1 ? "left" : "center" };
+          c.border = { top: { style: "hair", color: { argb: "FFDDDDDD" } }, bottom: { style: "hair", color: { argb: "FFDDDDDD" } } };
         });
-
-        // Inserindo as Leituras
-        if (amostra.leituras && amostra.leituras.length > 0) {
-          amostra.leituras.forEach((l: any) => {
-            const row = sheet.addRow([l.horario || "-", l.na || "-", l.ph || "-", l.orp || "-", l.od || "-", l.condutividade || "-"]);
-            row.eachCell((cell) => {
-              cell.alignment = { vertical: "middle", horizontal: "center" };
-              cell.border = { top: { style: "thin", color: { argb: "FFEEEEEE" } }, bottom: { style: "thin", color: { argb: "FFEEEEEE" } }, left: { style: "thin", color: { argb: "FFEEEEEE" } }, right: { style: "thin", color: { argb: "FFEEEEEE" } } };
-            });
-          });
-        } else {
-          const emptyRow = sheet.addRow(["Nenhuma leitura registrada para este poço."]);
-          sheet.mergeCells(`A${emptyRow.number}:F${emptyRow.number}`);
-          emptyRow.font = { italic: true, color: { argb: "FFAAAAAA" } };
-          emptyRow.alignment = { horizontal: "center" };
+        if (a.fase_livre) {
+          row.getCell(6).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFDC2626" } };
         }
-
-        sheet.addRow([]); // Espaço entre um poço e outro
       });
 
-      // Gerar e Baixar
+      resumo.headerFooter.oddFooter = `&L&8GreenSoil do Brasil LTDA&R&8Página &P de &N`;
+
+      // ── Aba 2: Leituras detalhadas ──
+      const sheet = workbook.addWorksheet("Leituras Detalhadas", { views: [{ showGridLines: false, state: "frozen", ySplit: 5 }] });
+      sheet.columns = [{ width: 24 }, { width: 20 }, { width: 14 }, { width: 12 }, { width: 14 }, { width: 14 }, { width: 20 }];
+
+      ["A1:G1","A2:G2","A3:G3"].forEach(r => sheet.mergeCells(r));
+      [1,2,3].forEach(r => {
+        const row = sheet.getRow(r);
+        row.height = 22;
+        row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+      });
+
+      sheet.getRow(1).getCell(1).value = "LEITURAS FÍSICO-QUÍMICAS — DETALHADAS";
+      sheet.getRow(1).getCell(1).font = { name: "Calibri", size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+      sheet.getRow(1).getCell(1).alignment = { vertical: "middle", horizontal: "center" };
+      sheet.getRow(2).getCell(1).value = `Projeto: ${projectName}   |   Campanha: ${formatDateBr(dataCampanha)}`;
+      sheet.getRow(2).getCell(1).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF80B02D" } };
+      sheet.getRow(2).getCell(1).alignment = { vertical: "middle", horizontal: "center" };
+      sheet.getRow(3).getCell(1).value = "";
+      sheet.addRow([]);
+
+      const dH = sheet.addRow(["Poço / Nomenclatura", "Código", "Horário", "NA (m)", "pH", "ORP (mV)", "OD (mg/L)"]);
+      dH.height = 20;
+      dH.eachCell(c => {
+        c.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2f7ea1" } };
+        c.alignment = { vertical: "middle", horizontal: "center" };
+        c.border = { bottom: { style: "medium", color: { argb: "FF1f5c78" } } };
+      });
+      sheet.autoFilter = { from: "A5", to: "G5" };
+
+      let rowIdx = 0;
+      amostras.forEach((a) => {
+        (a.leituras?.length ? a.leituras : [null]).forEach((l: any, li: number) => {
+          const row = sheet.addRow([
+            li === 0 ? `${a.poco} / ${a.nomenclatura || "—"}` : "",
+            li === 0 ? a.identificacao_codigo || "—" : "",
+            l?.horario || "—",
+            l?.na || "—",
+            l?.ph || "—",
+            l?.orp || "—",
+            l?.od || "—",
+          ]);
+          row.height = 17;
+          const bg = rowIdx % 2 === 0 ? "FFFFFFFF" : "FFF0F9FF";
+          row.eachCell(c => {
+            c.font = { name: "Calibri", size: 10 };
+            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+            c.alignment = { vertical: "middle", horizontal: "center" };
+            c.border = { top: { style: "hair", color: { argb: "FFDDDDDD" } }, bottom: { style: "hair", color: { argb: "FFDDDDDD" } } };
+          });
+          row.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+          rowIdx++;
+        });
+      });
+
+      sheet.headerFooter.oddFooter = `&L&8GreenSoil do Brasil LTDA&R&8Página &P de &N`;
+
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      saveAs(blob, `Compilado_FQ_${projectName}_${dataCampanha}.xlsx`);
+      saveAs(blob, `FQ_${projectName}_${dataCampanha}.xlsx`);
 
     } catch (error) {
       console.error(error);

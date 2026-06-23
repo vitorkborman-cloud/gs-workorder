@@ -131,123 +131,179 @@ export default function WorkOrderPage() {
     load();
   }
 
-  // ================= GERADOR DE EXCEL (BONITO E SEM FOTOS) =================
+  // ================= GERADOR DE EXCEL =================
   async function gerarExcel() {
     if (!workOrder) return;
     setGeneratingExcel(true);
 
     try {
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Work Order", {
-        views: [{ showGridLines: false }]
-      });
+      workbook.creator = "GreenSoil do Brasil";
+      workbook.created = new Date();
 
-      // Define as larguras das colunas
+      const sheet = workbook.addWorksheet("Work Order", { views: [{ showGridLines: false, state: "frozen", ySplit: 6 }] });
+
       sheet.columns = [
-        { width: 45 }, // A: Descrição / Equipamento
-        { width: 20 }, // B: Status / Medição
-        { width: 60 }, // C: Observações
+        { width: 5  },  // A: nº
+        { width: 50 },  // B: descrição
+        { width: 18 },  // C: status
+        { width: 55 },  // D: observações
       ];
 
-      // --- 1. TÍTULO E CABEÇALHO ---
-      const titleRow = sheet.addRow(["WORK ORDER - " + workOrder.title.toUpperCase()]);
-      sheet.mergeCells("A1:C1");
-      titleRow.height = 35;
-      titleRow.font = { name: 'Arial', size: 14, bold: true, color: { argb: "FFFFFFFF" } };
-      titleRow.alignment = { vertical: "middle", horizontal: "center" };
-      titleRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } }; // Roxo da marca
+      // ── Tenta embutir logo ──
+      try {
+        const resp = await fetch("/logo.png");
+        const buf = await resp.arrayBuffer();
+        const logoId = workbook.addImage({ buffer: buf, extension: "png" });
+        sheet.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 3 }, editAs: "oneCell" });
+      } catch (_) {}
 
+      // ── Linha 1-3: bloco de capa ──
       const projName = workOrder.projects?.name ?? "N/A";
-      const dateStr = new Date(workOrder.created_at).toLocaleDateString();
-      const subRow = sheet.addRow([`PROJETO: ${projName}   |   DATA: ${dateStr}`]);
-      sheet.mergeCells("A2:C2");
-      subRow.height = 20;
-      subRow.font = { name: 'Arial', size: 10, bold: true, color: { argb: "FF333333" } };
-      subRow.alignment = { vertical: "middle", horizontal: "center" };
-      subRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+      const dateStr  = new Date(workOrder.created_at).toLocaleDateString("pt-BR");
+      const now      = new Date().toLocaleString("pt-BR");
 
-      sheet.addRow([]);
-
-      // --- 2. CHECKLIST DE ATIVIDADES ---
-      const actTitle = sheet.addRow(["CHECKLIST DE ATIVIDADES"]);
-      sheet.mergeCells(`A${actTitle.number}:C${actTitle.number}`);
-      actTitle.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      actTitle.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF80B02D" } }; // Verde da marca
-
-      const actHeader = sheet.addRow(["Descrição da Atividade", "Status", "Observações de Campo"]);
-      actHeader.font = { bold: true };
-      actHeader.eachCell(c => {
-        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
-        c.border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
-        c.alignment = { vertical: 'middle', horizontal: 'center' };
+      ["A1:D1", "A2:D2", "A3:D3"].forEach(r => sheet.mergeCells(r));
+      [1,2,3].forEach(r => {
+        const row = sheet.getRow(r);
+        row.height = 22;
+        row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
       });
 
-      activities.forEach(act => {
-        const statusStr = act.status === "concluído" ? "Concluído" : act.status === "não concluído" ? "Não Concluído" : "Pendente";
-        const row = sheet.addRow([act.description, statusStr, act.note || "-"]);
-        
-        row.eachCell((c, colNumber) => {
-          c.border = { top: {style:'thin', color: {argb:'FFEEEEEE'}}, bottom:{style:'thin', color: {argb:'FFEEEEEE'}}, left:{style:'thin', color: {argb:'FFEEEEEE'}}, right:{style:'thin', color: {argb:'FFEEEEEE'}} };
-          c.alignment = { vertical: 'middle', wrapText: true };
-          if (colNumber === 2) c.alignment = { vertical: 'middle', horizontal: 'center' }; // Centraliza o status
+      const r1 = sheet.getRow(1);
+      r1.getCell(1).value = "WORK ORDER — " + workOrder.title.toUpperCase();
+      r1.getCell(1).font = { name: "Calibri", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+      r1.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
+
+      const r2 = sheet.getRow(2);
+      r2.getCell(1).value = `Projeto: ${projName}   |   Data: ${dateStr}`;
+      r2.getCell(1).font = { name: "Calibri", size: 10, color: { argb: "FF80B02D" }, bold: true };
+      r2.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
+
+      const r3 = sheet.getRow(3);
+      r3.getCell(1).value = `Gerado em: ${now}   |   GreenSoil do Brasil LTDA`;
+      r3.getCell(1).font = { name: "Calibri", size: 9, color: { argb: "FFAAAAAA" } };
+      r3.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
+
+      // ── Linha 4: resumo ──
+      const total     = activities.length;
+      const concluido = activities.filter(a => a.status === "concluído").length;
+      const pendente  = total - concluido;
+
+      sheet.mergeCells("A4:D4");
+      const r4 = sheet.getRow(4);
+      r4.height = 20;
+      r4.getCell(1).value = `Total: ${total} atividades   ✓ Concluídas: ${concluido}   ✗ Pendentes/Não concluídas: ${pendente}`;
+      r4.getCell(1).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF391E2A" } };
+      r4.getCell(1).alignment = { vertical: "middle", horizontal: "center" };
+      r4.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF0FDF4" } };
+
+      // ── Linha 5: espaço ──
+      sheet.getRow(5).height = 6;
+
+      // ── Linha 6: cabeçalho da tabela ──
+      const hdr = sheet.addRow(["#", "Descrição da Atividade", "Status", "Observações de Campo"]);
+      hdr.height = 22;
+      hdr.eachCell(c => {
+        c.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF80B02D" } };
+        c.alignment = { vertical: "middle", horizontal: "center" };
+        c.border = { bottom: { style: "medium", color: { argb: "FF5a7e20" } } };
+      });
+      sheet.autoFilter = { from: "A6", to: "D6" };
+
+      // ── Dados das atividades ──
+      activities.forEach((act, i) => {
+        const statusStr =
+          act.status === "concluído" ? "✓  Concluído" :
+          act.status === "não concluído" ? "✗  Não Concluído" : "—  Pendente";
+
+        const row = sheet.addRow([i + 1, act.description, statusStr, act.note || "—"]);
+        row.height = 18;
+
+        const bgColor = i % 2 === 0 ? "FFFFFFFF" : "FFF9FAFB";
+        row.eachCell((c, col) => {
+          c.font = { name: "Calibri", size: 10 };
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bgColor } };
+          c.alignment = { vertical: "middle", wrapText: col === 4, horizontal: col === 1 || col === 3 ? "center" : "left" };
+          c.border = {
+            top:    { style: "hair", color: { argb: "FFDDDDDD" } },
+            bottom: { style: "hair", color: { argb: "FFDDDDDD" } },
+            left:   { style: "hair", color: { argb: "FFDDDDDD" } },
+            right:  { style: "hair", color: { argb: "FFDDDDDD" } },
+          };
         });
 
-        const statusCell = row.getCell(2);
-        if (statusStr === "Não Concluído" || statusStr === "Pendente") {
-          statusCell.font = { color: { argb: "FFDC2626" }, bold: true }; // Vermelho
+        const sc = row.getCell(3);
+        if (act.status === "concluído") {
+          sc.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF16A34A" } };
+        } else if (act.status === "não concluído") {
+          sc.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFDC2626" } };
         } else {
-          statusCell.font = { color: { argb: "FF16A34A" }, bold: true }; // Verde
+          sc.font = { name: "Calibri", size: 10, color: { argb: "FF888888" } };
         }
       });
 
       sheet.addRow([]);
 
-      // --- 3. DADOS DO SISTEMA ---
+      // ── Dados do sistema ──
       const sysData: SystemData[] = workOrder.system_data || [];
       if (sysData.length > 0) {
-        const sysTitle = sheet.addRow(["DADOS DO SISTEMA (Equipamentos e Medições)"]);
-        sheet.mergeCells(`A${sysTitle.number}:C${sysTitle.number}`);
-        sysTitle.font = { bold: true, color: { argb: "FFFFFFFF" } };
-        sysTitle.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF80B02D" } };
+        const sT = sheet.addRow(["", "DADOS DO SISTEMA — Equipamentos e Medições", "", ""]);
+        sheet.mergeCells(`A${sT.number}:D${sT.number}`);
+        sT.height = 20;
+        sT.getCell(1).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+        sT.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+        sT.getCell(1).alignment = { vertical: "middle", horizontal: "center" };
 
-        const sysHeader = sheet.addRow(["Equipamento", "Medição Registrada", ""]);
-        sheet.mergeCells(`B${sysHeader.number}:C${sysHeader.number}`);
-        sysHeader.font = { bold: true };
-        sysHeader.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
-        sysHeader.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
-        sysHeader.getCell(1).border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
-        sysHeader.getCell(2).border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
-        sysHeader.alignment = { vertical: 'middle', horizontal: 'center' };
-
-        sysData.forEach((item) => {
-          const row = sheet.addRow([item.equipamento || "-", item.medicao || "-", ""]);
-          sheet.mergeCells(`B${row.number}:C${row.number}`);
-          row.getCell(1).border = { top: {style:'thin', color: {argb:'FFEEEEEE'}}, bottom:{style:'thin', color: {argb:'FFEEEEEE'}}, left:{style:'thin', color: {argb:'FFEEEEEE'}}, right:{style:'thin', color: {argb:'FFEEEEEE'}} };
-          row.getCell(2).border = { top: {style:'thin', color: {argb:'FFEEEEEE'}}, bottom:{style:'thin', color: {argb:'FFEEEEEE'}}, left:{style:'thin', color: {argb:'FFEEEEEE'}}, right:{style:'thin', color: {argb:'FFEEEEEE'}} };
-          row.alignment = { vertical: 'middle', horizontal: 'center' };
+        const sH = sheet.addRow(["#", "Equipamento", "Medição Registrada", ""]);
+        sheet.mergeCells(`C${sH.number}:D${sH.number}`);
+        sH.height = 18;
+        sH.eachCell(c => {
+          c.font = { name: "Calibri", size: 10, bold: true };
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+          c.alignment = { vertical: "middle", horizontal: "center" };
+          c.border = { bottom: { style: "thin", color: { argb: "FFCCCCCC" } } };
         });
 
+        sysData.forEach((item, i) => {
+          const row = sheet.addRow([i + 1, item.equipamento || "—", item.medicao || "—", ""]);
+          sheet.mergeCells(`C${row.number}:D${row.number}`);
+          row.height = 18;
+          row.eachCell(c => {
+            c.font = { name: "Calibri", size: 10 };
+            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: i % 2 === 0 ? "FFFFFFFF" : "FFF9FAFB" } };
+            c.alignment = { vertical: "middle", horizontal: "center" };
+            c.border = { top: { style: "hair", color: { argb: "FFDDDDDD" } }, bottom: { style: "hair", color: { argb: "FFDDDDDD" } } };
+          });
+        });
         sheet.addRow([]);
       }
 
-      // --- 4. INFORMAÇÕES ADICIONAIS ---
+      // ── Informações adicionais ──
       if (workOrder.additional_info) {
-        const addTitle = sheet.addRow(["INFORMAÇÕES GERAIS ADICIONAIS"]);
-        sheet.mergeCells(`A${addTitle.number}:C${addTitle.number}`);
-        addTitle.font = { bold: true, color: { argb: "FFFFFFFF" } };
-        addTitle.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+        const aT = sheet.addRow(["", "INFORMAÇÕES GERAIS ADICIONAIS", "", ""]);
+        sheet.mergeCells(`A${aT.number}:D${aT.number}`);
+        aT.height = 20;
+        aT.getCell(1).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+        aT.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+        aT.getCell(1).alignment = { vertical: "middle", horizontal: "center" };
 
-        const addRow = sheet.addRow([workOrder.additional_info]);
-        sheet.mergeCells(`A${addRow.number}:C${addRow.number}`);
-        addRow.height = 80;
-        addRow.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
-        addRow.getCell(1).border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
-        addRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+        const aR = sheet.addRow(["", workOrder.additional_info, "", ""]);
+        sheet.mergeCells(`A${aR.number}:D${aR.number}`);
+        aR.height = 60;
+        aR.getCell(1).font = { name: "Calibri", size: 10 };
+        aR.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+        aR.getCell(1).alignment = { vertical: "top", horizontal: "left", wrapText: true, indent: 1 };
+        aR.getCell(1).border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
       }
+
+      // ── Rodapé ──
+      sheet.headerFooter.oddFooter = `&L&8GreenSoil do Brasil LTDA — Documento gerado eletronicamente&R&8Página &P de &N`;
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      saveAs(blob, `WO_${workOrder.title.replace(/\s+/g, '_')}.xlsx`);
+      saveAs(blob, `WO_${workOrder.title.replace(/\s+/g, "_")}.xlsx`);
 
     } catch (error) {
       console.error(error);
