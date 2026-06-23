@@ -50,6 +50,7 @@ export default function DashboardPage() {
   const [totalProjects, setTotalProjects] = useState(0);
   const [totalActivities, setTotalActivities] = useState(0);
   const [doneActivities, setDoneActivities] = useState(0);
+  const [curveData, setCurveData] = useState<{ name: string; criadas: number; concluidas: number }[]>([]);
 
   useEffect(() => {
     if (isMobileDevice()) {
@@ -60,22 +61,73 @@ export default function DashboardPage() {
   }, []);
 
   async function load() {
-    const { data: p } = await supabase.from("projects").select("*");
+    const [{ data: p }, { data: a }] = await Promise.all([
+      supabase.from("projects").select("*"),
+      supabase.from("activities").select("created_at, updated_at, status"),
+    ]);
 
-    const sortedProjects =
-      p?.sort((a, b) =>
-        a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
-      ) || [];
+    const sortedProjects = p?.sort((a, b) =>
+      a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
+    ) || [];
 
     setProjects(sortedProjects);
     setTotalProjects(sortedProjects.length);
 
-    const { data: a } = await supabase.from("activities").select("status");
-
     if (a) {
       setTotalActivities(a.length);
       setDoneActivities(a.filter((x) => x.status === "concluído").length);
+      setCurveData(buildCurveData(a));
     }
+  }
+
+  function getWeekKey(dateStr: string): string {
+    const date = new Date(dateStr);
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const day = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+  }
+
+  function weekLabel(key: string): string {
+    // key = "2025-W03" → pega a segunda-feira da semana
+    const [year, w] = key.split("-W");
+    const jan4 = new Date(Date.UTC(Number(year), 0, 4));
+    const weekStart = new Date(jan4);
+    weekStart.setUTCDate(jan4.getUTCDate() - (jan4.getUTCDay() || 7) + 1 + (Number(w) - 1) * 7);
+    return weekStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+  }
+
+  function buildCurveData(activities: any[]) {
+    const createdByWeek: Record<string, number> = {};
+    const completedByWeek: Record<string, number> = {};
+
+    activities.forEach((a) => {
+      if (a.created_at) {
+        const wk = getWeekKey(a.created_at);
+        createdByWeek[wk] = (createdByWeek[wk] || 0) + 1;
+      }
+      if (a.status === "concluído" && a.updated_at) {
+        const wk = getWeekKey(a.updated_at);
+        completedByWeek[wk] = (completedByWeek[wk] || 0) + 1;
+      }
+    });
+
+    const allWeeks = [...new Set([...Object.keys(createdByWeek), ...Object.keys(completedByWeek)])].sort();
+
+    let cumCreated = 0;
+    let cumCompleted = 0;
+
+    const points = [{ name: "Início", criadas: 0, concluidas: 0 }];
+
+    allWeeks.forEach((wk) => {
+      cumCreated += createdByWeek[wk] || 0;
+      cumCompleted += completedByWeek[wk] || 0;
+      points.push({ name: weekLabel(wk), criadas: cumCreated, concluidas: cumCompleted });
+    });
+
+    return points;
   }
 
   async function createProject() {
@@ -94,11 +146,6 @@ export default function DashboardPage() {
   }
 
   const progress = totalActivities === 0 ? 0 : Math.round((doneActivities / totalActivities) * 100);
-
-  const curveData = [
-    { name: "Início", planejado: 0, executado: 0 },
-    { name: "Planejado", planejado: 100, executado: progress }
-  ];
 
   return (
     <AdminShell>
@@ -199,57 +246,66 @@ export default function DashboardPage() {
           <div className="mb-8">
             <h2 className="text-xl font-bold text-[#391e2a] flex items-center gap-2">
               <span className="w-2 h-6 bg-[#80b02d] rounded-full inline-block"></span>
-              Curva S de Progresso
+              Curva S — Atividades Acumuladas por Semana
             </h2>
             <p className="text-sm text-gray-500 mt-1 ml-4">
-              Comparativo físico entre planejamento esperado e execução real
+              Atividades criadas vs. concluídas acumuladas semana a semana
             </p>
           </div>
 
-          <div style={{ width: "100%", height: 350 }}>
-            <ResponsiveContainer>
-              <LineChart data={curveData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 600 }} 
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#6B7280', fontSize: 12 }} 
-                  dx={-10}
-                />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
-                  itemStyle={{ color: '#391e2a' }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                
-                <Line
-                  name="Avanço Planejado (%)"
-                  type="monotone"
-                  dataKey="planejado"
-                  stroke="#E5E7EB"
-                  strokeWidth={4}
-                  dot={{ r: 6, fill: '#E5E7EB', strokeWidth: 0 }}
-                  activeDot={{ r: 8 }}
-                />
-                <Line
-                  name="Avanço Executado (%)"
-                  type="monotone"
-                  dataKey="executado"
-                  stroke="#80b02d"
-                  strokeWidth={4}
-                  dot={{ r: 6, fill: '#80b02d', strokeWidth: 0 }}
-                  activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {curveData.length <= 1 ? (
+            <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+              Nenhuma atividade registrada ainda.
+            </div>
+          ) : (
+            <div style={{ width: "100%", height: 350 }}>
+              <ResponsiveContainer>
+                <LineChart data={curveData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#6B7280', fontSize: 11, fontWeight: 600 }}
+                    dy={10}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#6B7280', fontSize: 12 }}
+                    dx={-10}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
+                    itemStyle={{ color: '#391e2a' }}
+                    formatter={(value: number, name: string) => [value, name]}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+
+                  <Line
+                    name="Criadas (acumulado)"
+                    type="monotone"
+                    dataKey="criadas"
+                    stroke="#391e2a"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#391e2a', strokeWidth: 0 }}
+                    activeDot={{ r: 7, stroke: '#fff', strokeWidth: 2 }}
+                  />
+                  <Line
+                    name="Concluídas (acumulado)"
+                    type="monotone"
+                    dataKey="concluidas"
+                    stroke="#80b02d"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#80b02d', strokeWidth: 0 }}
+                    activeDot={{ r: 7, stroke: '#fff', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         {/* ================= PORTFÓLIO DE PROJETOS ================= */}
