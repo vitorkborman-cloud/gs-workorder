@@ -127,7 +127,11 @@ export default function ManutencoesPage() {
       .select()
       .single();
 
-    if (!error && data) {
+    if (error) {
+      alert("Erro ao adicionar equipamento: " + error.message);
+      return;
+    }
+    if (data) {
       setEquipments((prev) => [...prev, data]);
     }
   }
