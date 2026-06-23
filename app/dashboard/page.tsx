@@ -61,9 +61,9 @@ export default function DashboardPage() {
   }, []);
 
   async function load() {
-    const [{ data: p }, { data: a }] = await Promise.all([
+    const [{ data: p }, { data: wos }] = await Promise.all([
       supabase.from("projects").select("*"),
-      supabase.from("activities").select("created_at, updated_at, status"),
+      supabase.from("work_orders").select("id"),
     ]);
 
     const sortedProjects = p?.sort((a, b) =>
@@ -72,6 +72,14 @@ export default function DashboardPage() {
 
     setProjects(sortedProjects);
     setTotalProjects(sortedProjects.length);
+
+    const woIds = wos?.map((w) => w.id) || [];
+    if (woIds.length === 0) return;
+
+    const { data: a } = await supabase
+      .from("activities")
+      .select("created_at, updated_at, status")
+      .in("work_order_id", woIds);
 
     if (a) {
       setTotalActivities(a.length);
