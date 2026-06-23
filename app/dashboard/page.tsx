@@ -82,11 +82,13 @@ export default function DashboardPage() {
     const woIds = (wos || []).map((w) => w.id);
     if (woIds.length === 0) return;
 
-    // 3. Atividades filtradas pelos work orders (respeita RLS)
-    const { data: a } = await supabase
+    // 3. Atividades filtradas pelos work orders
+    const { data: a, error: aErr } = await supabase
       .from("activities")
       .select("created_at, updated_at, status")
       .in("work_order_id", woIds);
+
+    console.log("[dashboard] woIds:", woIds.length, "activities:", a?.length, "error:", aErr);
 
     if (a) {
       setTotalActivities(a.length);
