@@ -156,6 +156,7 @@ export default function ManutencoesPage() {
   }
 
   async function resetTimer(id: string) {
+    if (!confirm("Resetar o cronômetro? O tempo decorrido será perdido.")) return;
     const now = new Date().toISOString();
     await supabase
       .from("preventive_maintenances")
