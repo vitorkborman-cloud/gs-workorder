@@ -83,12 +83,10 @@ export default function DashboardPage() {
     if (woIds.length === 0) return;
 
     // 3. Atividades filtradas pelos work orders
-    const { data: a, error: aErr } = await supabase
+    const { data: a } = await supabase
       .from("activities")
-      .select("created_at, updated_at, status")
+      .select("created_at, status")
       .in("work_order_id", woIds);
-
-    console.log("[dashboard] woIds:", woIds.length, "activities:", a?.length, "error:", aErr);
 
     if (a) {
       setTotalActivities(a.length);
@@ -121,12 +119,10 @@ export default function DashboardPage() {
     const completedByWeek: Record<string, number> = {};
 
     activities.forEach((a) => {
-      if (a.created_at) {
-        const wk = getWeekKey(a.created_at);
-        createdByWeek[wk] = (createdByWeek[wk] || 0) + 1;
-      }
-      if (a.status === "concluído" && a.updated_at) {
-        const wk = getWeekKey(a.updated_at);
+      if (!a.created_at) return;
+      const wk = getWeekKey(a.created_at);
+      createdByWeek[wk] = (createdByWeek[wk] || 0) + 1;
+      if (a.status === "concluído") {
         completedByWeek[wk] = (completedByWeek[wk] || 0) + 1;
       }
     });
