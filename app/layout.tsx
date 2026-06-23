@@ -1,5 +1,6 @@
 import "./globals.css";
 import Script from "next/script";
+import { ToastProvider } from "../components/Toast";
 
 export const metadata = {
   title: "GS Work Order",
@@ -18,7 +19,9 @@ export default function RootLayout({
       <head />
       <body className="min-h-screen bg-background text-foreground antialiased">
         <div className="theme light">
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </div>
 
         {/* Registro do Service Worker */}

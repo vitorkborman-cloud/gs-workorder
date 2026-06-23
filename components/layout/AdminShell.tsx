@@ -3,9 +3,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase"; // Atenção ao atalho @/lib/supabase
+import { supabase } from "@/lib/supabase";
 
 // Ícones minimalistas para o menu
 const Icons = {
@@ -16,6 +16,7 @@ const Icons = {
 
 export default function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [projects, setProjects] = useState<any[]>([]);
 
   useEffect(() => {
@@ -111,7 +112,13 @@ export default function AdminShell({ children }: { children: ReactNode }) {
 
         {/* FOOTER */}
         <div className="p-4 border-t border-white/10 shrink-0 bg-[#391e2a]">
-          <button className="w-full bg-white/10 hover:bg-red-500/80 hover:text-white rounded-lg py-2.5 text-sm font-semibold transition-colors">
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.push("/login");
+            }}
+            className="w-full bg-white/10 hover:bg-red-500/80 hover:text-white rounded-lg py-2.5 text-sm font-semibold transition-colors"
+          >
             Sair do sistema
           </button>
         </div>

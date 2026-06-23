@@ -17,19 +17,27 @@ export default function MobileWorkOrders() {
   const projectId = params.id as string;
 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 20;
 
-  async function load() {
+  async function load(currentPage = 0) {
+    const from = currentPage * PAGE_SIZE;
     const { data } = await supabase
       .from("work_orders")
       .select("*")
       .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
 
-    if (data) setWorkOrders(data);
+    if (data) {
+      setWorkOrders((prev) => currentPage === 0 ? data : [...prev, ...data]);
+      setHasMore(data.length === PAGE_SIZE);
+    }
   }
 
   useEffect(() => {
-    load();
+    load(0);
   }, []);
 
   return (
@@ -46,7 +54,7 @@ export default function MobileWorkOrders() {
           </div>
         )}
 
-        {workOrders.map((wo) => (
+        {workOrders.map((wo, idx) => (
           <button
             key={wo.id}
             onClick={() =>
@@ -87,6 +95,15 @@ export default function MobileWorkOrders() {
             </div>
           </button>
         ))}
+
+        {hasMore && (
+          <button
+            onClick={() => { const next = page + 1; setPage(next); load(next); }}
+            className="w-full py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition active:scale-[0.98]"
+          >
+            Carregar mais
+          </button>
+        )}
 
       </div>
     </MobileShell>

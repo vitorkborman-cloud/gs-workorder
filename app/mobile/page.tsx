@@ -24,6 +24,21 @@ type Project = {
   favorite?: boolean;
 };
 
+const FAVORITES_KEY = "gs_favorite_projects";
+
+function loadFavorites(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveFavorites(ids: Set<string>) {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify([...ids]));
+}
+
 export default function MobileHome() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [search, setSearch] = useState("");
@@ -31,28 +46,56 @@ export default function MobileHome() {
   const router = useRouter();
 
   async function loadProjects() {
-    const { data: p } = await supabase
-      .from("projects")
-      .select("*");
+    const { data: p } = await supabase.from("projects").select("*");
 
     if (p) {
-      const sorted = p.sort((a, b) =>
-        a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
-      );
+      const favorites = loadFavorites();
+      const sorted = p
+        .map((proj) => ({ ...proj, favorite: favorites.has(proj.id) }))
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
       setProjects(sorted);
     }
+
+    // Fix 5: verifica manutenções com prazo próximo ao abrir o app
+    checkMaintenanceNotifications();
   }
 
   useEffect(() => {
     loadProjects();
   }, []);
 
+  async function checkMaintenanceNotifications() {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    const { data } = await supabase
+      .from("preventive_maintenances")
+      .select("id, name, max_hours, started_at, project_id, projects(name)");
+    if (!data) return;
+    const notified: string[] = JSON.parse(localStorage.getItem("gs_notified_maintenance") || "[]");
+    const newNotified = [...notified];
+    data.forEach((eq: any) => {
+      if (!eq.name || !eq.max_hours) return;
+      const elapsed = (Date.now() - new Date(eq.started_at).getTime()) / 3_600_000;
+      const remaining = Number(eq.max_hours) - elapsed;
+      const key = `${eq.id}-${Math.floor(elapsed / eq.max_hours * 10)}`;
+      if (remaining <= 168 && remaining > 0 && !notified.includes(key)) {
+        const projectName = eq.projects?.name || "Projeto";
+        new Notification(`GS ${projectName}`, {
+          body: `Faltam 7 dias para a troca do ${eq.name}`,
+          icon: "/logo.png",
+        });
+        newNotified.push(key);
+      }
+    });
+    localStorage.setItem("gs_notified_maintenance", JSON.stringify(newNotified));
+  }
+
   function toggleFavorite(id: string) {
-    // ATENÇÃO: Isso muda só na tela. Depois lembre de salvar essa preferência no banco se necessário!
+    const favorites = loadFavorites();
+    if (favorites.has(id)) favorites.delete(id);
+    else favorites.add(id);
+    saveFavorites(favorites);
     setProjects((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, favorite: !p.favorite } : p
-      )
+      prev.map((p) => (p.id === id ? { ...p, favorite: favorites.has(id) } : p))
     );
   }
 

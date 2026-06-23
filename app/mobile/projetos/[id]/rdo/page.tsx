@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, ChangeEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import MobileShell from "@/components/layout/MobileShell";
 import SignaturePad from "@/components/SignaturePad";
+import { useToast } from "@/components/Toast";
 
 // Ícones simples em SVG para manter o código portátil
 const Icons = {
@@ -47,6 +48,7 @@ export default function RdoPage() {
   const params = useParams();
   const projectId = params?.id as string;
 
+  const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados do Relatório
@@ -135,7 +137,7 @@ export default function RdoPage() {
 
     const novosArquivos = Array.from(files);
     
-    alert(`Processando e comprimindo ${novosArquivos.length} imagens...`);
+    showToast(`Processando ${novosArquivos.length} imagens...`, "info");
 
     for (const file of novosArquivos) {
       try {
@@ -294,13 +296,13 @@ export default function RdoPage() {
 
       if (error) throw error;
 
-      alert(finalizar ? "RDO Finalizado com sucesso!" : "Rascunho salvo com sucesso!");
+      showToast(finalizar ? "RDO Finalizado com sucesso!" : "Rascunho salvo com sucesso!");
       
       if (finalizar) router.push(`/mobile/projetos/${projectId}`);
       else await loadDraft(); 
 
      } catch (error: any) {
-      alert("Erro ao salvar: " + error.message);
+      showToast("Erro ao salvar: " + error.message, "error");
     } finally {
       setSaving(false);
     }
