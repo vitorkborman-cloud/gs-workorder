@@ -147,6 +147,43 @@ export default function MobileProjetoPage() {
           </div>
         </button>
 
+        {/* MANUTENÇÕES PREVENTIVAS */}
+        <button
+          onClick={() =>
+            router.push(`/mobile/projetos/${projectId}/manutencoes`)
+          }
+          className="
+            w-full
+            rounded-2xl
+            p-5
+            bg-gradient-to-br
+            from-[#b06a2d]
+            to-[#7a4a1e]
+            text-white
+            shadow-lg
+            active:scale-[0.96]
+            transition
+          "
+        >
+          <div className="grid grid-cols-[1fr_auto] items-center">
+
+            <div className="text-left">
+              <div className="text-lg font-semibold tracking-tight">
+                Manutenções preventivas
+              </div>
+
+              <div className="text-sm opacity-90 mt-1">
+                Registrar manutenção de equipamentos
+              </div>
+            </div>
+
+            <div className="text-xl opacity-80 pl-4">
+              🔧
+            </div>
+
+          </div>
+        </button>
+
         {/* RELATÓRIO DIÁRIO DE OBRA */}
 <button
   onClick={() =>
