@@ -303,7 +303,7 @@ export default function FisicoQuimicosDesktopPage() {
         const resp = await fetch("/logo.png");
         const buf = await resp.arrayBuffer();
         const logoId = workbook.addImage({ buffer: buf, extension: "png" });
-        resumo.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 3 }, editAs: "oneCell" } as any);
+        resumo.addImage(logoId, { tl: { col: 0.15, row: 0.15 }, ext: { width: 140, height: 42 } } as any);
       } catch (_) {}
 
       ["A1:G1","A2:G2","A3:G3"].forEach(r => resumo.mergeCells(r));

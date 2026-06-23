@@ -155,7 +155,7 @@ export default function WorkOrderPage() {
         const resp = await fetch("/logo.png");
         const buf = await resp.arrayBuffer();
         const logoId = workbook.addImage({ buffer: buf, extension: "png" });
-        sheet.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 3 }, editAs: "oneCell" } as any);
+        sheet.addImage(logoId, { tl: { col: 0.15, row: 0.15 }, ext: { width: 140, height: 42 } } as any);
       } catch (_) {}
 
       // ── Linha 1-3: bloco de capa ──
