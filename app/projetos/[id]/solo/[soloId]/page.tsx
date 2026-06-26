@@ -222,6 +222,12 @@ export default function SoloDetailPage() {
     };
 
     const profTotal = parseFloat(data.profundidade_total) || (layers.length ? parseFloat(String(layers[layers.length - 1].ate)) : 10);
+
+    // Altura total do container do construtivo em px (igual à soma das linhas renderizadas)
+    const totalOverlayH = TOP_OFFSET
+      + layers.reduce((s, l) => s + Math.max(40, (parseFloat(String(l.ate)) - parseFloat(String(l.de))) * ESCALA), 0)
+      + (hasWell ? 55 : 0);
+
     let construtivoHTML = "";
 
     if (hasWell) {
@@ -252,7 +258,11 @@ export default function SoloDetailPage() {
 
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
-      construtivoHTML += `<div style="position:absolute;left:10px;width:160px;top:${yNA}px;border-top:1.5px solid #005fcc;z-index:10;"></div><div style="position:absolute;left:25px;top:${yNA - 6}px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #005fcc;z-index:11;"></div><div style="position:absolute;left:12px;top:${yNA - 22}px;background-color:white;border:1px solid #005fcc;padding:2px 4px;color:#005fcc;font-size:10px;font-weight:bold;border-radius:3px;z-index:11;">NA: ${nivelAgua}m</div>`;
+      // Linha azul tracejada + label mais limpa
+      construtivoHTML += `
+        <div style="position:absolute;left:0;width:180px;top:${yNA}px;height:0;border-top:2px dashed #005fcc;z-index:12;"></div>
+        <div style="position:absolute;left:4px;top:${yNA - 18}px;background-color:#005fcc;color:white;padding:2px 6px;font-size:9px;font-weight:bold;border-radius:3px;z-index:13;white-space:nowrap;">▼ NA: ${nivelAgua}m</div>
+      `;
     }
 
     const nom  = data.nomenclatura_poco?.trim();
@@ -307,7 +317,7 @@ export default function SoloDetailPage() {
           <div style="flex:1;">Descrição Litológica</div>
         </div>
         <div style="position:relative;width:100%;">
-          <div style="position:absolute;top:0;left:130px;width:180px;height:100%;pointer-events:none;z-index:10;">${construtivoHTML}</div>
+          <div style="position:absolute;top:0;left:130px;width:180px;height:${totalOverlayH}px;pointer-events:none;z-index:10;overflow:visible;">${construtivoHTML}</div>
           ${hasWell ? `<div class="linha-camada" style="height:${TOP_OFFSET}px;min-height:${TOP_OFFSET}px;border-bottom:2px solid #391e2a;background-color:#fff;"><div class="celula" style="width:65px;"></div><div class="celula" style="width:65px;"></div><div class="celula" style="width:180px;"></div><div class="celula" style="flex:1;"></div></div>` : ""}
           ${layers.map(l => {
             const esp    = parseFloat(String(l.ate)) - parseFloat(String(l.de));
