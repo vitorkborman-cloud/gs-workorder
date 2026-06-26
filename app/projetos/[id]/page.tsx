@@ -10,6 +10,7 @@ type WorkOrder = { id: string; title: string; finalized: boolean; created_at: st
 type Perfil = { id: string; nome_sondagem: string; nomenclatura_poco: string; created_at: string; };
 type RDO = { id: string; data: string; created_at: string; };
 type CampanhaFQ = { data: string; quantidade: number; };
+type ProjectDoc = { id: string; name: string; file_url: string; file_type: string; file_size: number; created_at: string; };
 
 function formatDateBr(d: string) {
   if (!d) return "Sem data";
@@ -71,8 +72,10 @@ export default function ProjetoPage() {
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [rdos, setRdos] = useState<RDO[]>([]);
   const [campanhasFQ, setCampanhasFQ] = useState<CampanhaFQ[]>([]);
+  const [docs, setDocs] = useState<ProjectDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobile, setMobile] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     setMobile(isMobileDevice());
@@ -80,14 +83,16 @@ export default function ProjetoPage() {
   }, []);
 
   async function load() {
-    const [{ data: wo }, { data: sd }, { data: rdoData }, { data: fqData }] = await Promise.all([
+    const [{ data: wo }, { data: sd }, { data: rdoData }, { data: fqData }, { data: docsData }] = await Promise.all([
       supabase.from("work_orders").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
       supabase.from("soil_descriptions").select("id, nome_sondagem, nomenclatura_poco, created_at").eq("project_id", projectId).eq("finalized", true).order("created_at", { ascending: false }),
       supabase.from("rdo_reports").select("id, data, created_at").eq("project_id", projectId).eq("draft", false).order("created_at", { ascending: false }),
       supabase.from("water_samplings").select("id, data").eq("project_id", projectId).eq("finalized", true),
+      supabase.from("project_documents").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
     ]);
 
     if (wo) setWorkOrders(wo);
+    if (docsData) setDocs(docsData);
     if (sd) setPerfis(sd);
     if (rdoData) setRdos(rdoData);
     if (fqData) {
@@ -102,6 +107,44 @@ export default function ProjetoPage() {
     if (!title) return;
     await supabase.from("work_orders").insert({ title, project_id: projectId });
     load();
+  }
+
+  async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const path = `${projectId}/${Date.now()}_${file.name}`;
+      const { error: upErr } = await supabase.storage.from("project-documents").upload(path, file);
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("project-documents").getPublicUrl(path);
+      await supabase.from("project_documents").insert({
+        project_id: projectId,
+        name: file.name,
+        file_url: publicUrl,
+        file_type: file.type,
+        file_size: file.size,
+      });
+      load();
+    } catch (err: any) {
+      alert("Erro ao fazer upload: " + err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function deleteDoc(id: string, name: string) {
+    if (!confirm(`Excluir "${name}"?`)) return;
+    await supabase.from("project_documents").delete().eq("id", id);
+    load();
+  }
+
+  function formatSize(bytes: number) {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   async function deleteWorkOrder(id: string, title: string) {
@@ -233,6 +276,54 @@ export default function ProjetoPage() {
                     </p>
                     <p className="text-xs text-gray-400 mt-1">{new Date(p.created_at).toLocaleDateString("pt-BR")}</p>
                   </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <div className="border-t border-gray-100" />
+
+        {/* ── DOCUMENTOS ── */}
+        <section>
+          <SectionHeader
+            title="Documentos"
+            subtitle="Arquivos disponíveis para consulta em campo"
+            count={docs.length}
+            action={
+              <label className={`flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer ${uploading ? "bg-gray-200 text-gray-400" : "bg-indigo-500 hover:bg-indigo-600 text-white hover:-translate-y-0.5"}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                {uploading ? "Enviando..." : "Anexar arquivo"}
+                <input type="file" className="hidden" onChange={uploadDoc} disabled={uploading} />
+              </label>
+            }
+          />
+
+          {docs.length === 0 ? (
+            <EmptyState message="Nenhum documento anexado ainda." />
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {docs.map((doc) => (
+                <div key={doc.id} className="relative group">
+                  <DeleteBtn onClick={(e) => { e.stopPropagation(); deleteDoc(doc.id, doc.name); }} />
+                  <a
+                    href={doc.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500 mb-3 shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <p className="font-bold text-[#391e2a] text-sm leading-snug break-all flex-1">{doc.name}</p>
+                    <p className="text-xs text-gray-400 mt-2">
+                      {formatSize(doc.file_size)} · {new Date(doc.created_at).toLocaleDateString("pt-BR")}
+                    </p>
+                  </a>
                 </div>
               ))}
             </div>

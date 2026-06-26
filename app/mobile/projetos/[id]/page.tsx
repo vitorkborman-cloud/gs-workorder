@@ -60,6 +60,19 @@ const modules = [
     ),
   },
   {
+    key: "documentos",
+    label: "Documentos",
+    description: "Arquivos e referências do projeto",
+    color: "#6366f1",
+    bg: "from-[#6366f1] to-[#4f46e5]",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"
+          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
     key: "rdo",
     label: "Relatório Diário de Obra",
     description: "Atividades e fotos do dia",
