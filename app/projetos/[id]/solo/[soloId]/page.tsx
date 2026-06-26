@@ -291,20 +291,20 @@ export default function SoloDetailPage() {
       }
     }
 
-    // NA — linha azul tracejada + label direita
+    // NA — linha azul tracejada + label com fundo branco para legibilidade
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
       cHTML += `<div style="position:absolute;left:0;width:170px;top:${yNA}px;border-top:2px dashed #1d6fd8;z-index:12;"></div>`;
-      cHTML += `<div style="${txtS("#1d6fd8")}left:${tR + 4}px;top:${yNA - 12}px;">NA: ${nivelAgua}m</div>`;
+      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 11}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:3px;padding:1px 5px;font-size:8px;font-weight:800;color:#1d6fd8;z-index:14;white-space:nowrap;">NA: ${nivelAgua}m</div>`;
     }
 
     // ── LEGENDA (solos presentes) ──────────────────────────────────────────
     const uniqueTypes = [...new Set(layers.map(l => l.tipo).filter(Boolean))];
     const legendItems = uniqueTypes.map(tipo => {
       const st = soloStyle(tipo);
-      return `<div style="display:flex;align-items:center;gap:6px;margin:3px 0;">
-        <div style="width:22px;height:13px;border:0.5px solid #888;flex-shrink:0;${st}"></div>
-        <span style="font-size:8.5px;color:#333;">${tipo}</span>
+      return `<div style="display:flex;align-items:center;gap:7px;padding:4px 8px;background:white;border-radius:3px;border:0.5px solid #e0e0e0;">
+        <div style="width:26px;height:16px;border:0.5px solid #888;flex-shrink:0;border-radius:2px;${st}"></div>
+        <span style="font-size:9px;font-weight:600;color:#333;white-space:nowrap;">${tipo}</span>
       </div>`;
     }).join("");
 
@@ -368,7 +368,7 @@ export default function SoloDetailPage() {
   /* ── legend ── */
   .legend { margin-top: 10px; border: 1.5px solid #391e2a; border-radius: 4px; overflow: hidden; }
   .legend-title { background: #391e2a; color: #fff; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 5px 10px; border-bottom: 2px solid #80b02d; }
-  .legend-body { display: flex; flex-wrap: wrap; gap: 0; padding: 8px 10px; background: #fafafa; }
+  .legend-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 10px; background: #f5f5f5; }
 
   /* ── footer ── */
   .footer { margin-top: 10px; padding-top: 7px; border-top: 2px solid #80b02d; display: flex; justify-content: space-between; align-items: flex-start; }
