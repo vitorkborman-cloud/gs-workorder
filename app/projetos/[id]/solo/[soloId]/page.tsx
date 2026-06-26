@@ -145,6 +145,25 @@ export default function SoloDetailPage() {
     return [200, 180, 140];
   }
 
+  // ─── gera um tile de textura como data URI (suportado pelo html2canvas) ──
+
+  function makeTile(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void): string {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d")!;
+    draw(ctx);
+    return c.toDataURL("image/png");
+  }
+
+  // Pré-gera os tiles uma vez
+  const TILE = {
+    areia:  makeTile(6, 6,   ctx => { ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.beginPath(); ctx.arc(3, 3, 1, 0, Math.PI * 2); ctx.fill(); }),
+    argila: makeTile(1, 7,   ctx => { ctx.fillStyle = "rgba(0,0,0,0.2)";  ctx.fillRect(0, 6, 1, 1); }),
+    silte:  makeTile(6, 6,   ctx => { ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(0, 5); ctx.stroke(); }),
+    brita:  makeTile(14, 14, ctx => { ctx.strokeStyle = "rgba(80,80,80,0.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(7, 7, 4, 0, Math.PI * 2); ctx.stroke(); }),
+    filtro: makeTile(1, 4,   ctx => { ctx.fillStyle = "#333"; ctx.fillRect(0, 3, 1, 1); }),
+  };
+
   // ─── gerador de HTML (idêntico ao Puppeteer) ─────────────────────────────
 
   function buildProfileHTML(logoBase64: string): string {
@@ -175,6 +194,8 @@ export default function SoloDetailPage() {
     const getEstiloSolo = (tipo: string) => {
       if (!tipo) return "background-color: #f0f0f0;";
       const t = tipo.toLowerCase().trim();
+
+      // Cor de fundo
       let bgColor = "#e0e0e0";
       if (t.includes("brita") || t.includes("rach") || t.includes("concreto") || t.includes("cascalho")) bgColor = "#cccccc";
       else if (t.includes("aterro") || t.includes("orgânica") || t.includes("turfa")) bgColor = "#8b7355";
@@ -182,25 +203,22 @@ export default function SoloDetailPage() {
       else if (t.startsWith("silte")) bgColor = t.includes("aren") ? "#D1B280" : t.includes("argil") ? "#B88655" : "#C19A6B";
       else if (t.startsWith("argila")) bgColor = t.includes("aren") ? "#CC6B58" : t.includes("silt") ? "#B86554" : "#D47A6A";
 
-      const texturas: string[] = [], sizes: string[] = [];
+      // Textura como data URI tile (suportado pelo html2canvas)
+      let tile = "", tileSize = "6px 6px";
       if (t.includes("brita") || t.includes("rach") || t.includes("cascalho")) {
-        texturas.push("radial-gradient(circle at 30% 30%, #777 20%, transparent 22%)", "radial-gradient(circle at 70% 70%, #666 22%, transparent 24%)");
-        const size = t.includes("rach") ? "24px 24px" : "14px 14px";
-        sizes.push(size, size);
+        tile = TILE.brita; tileSize = "14px 14px";
+      } else if (t.includes("areia") || t.includes("arenos")) {
+        tile = TILE.areia; tileSize = "6px 6px";
+      } else if (t.includes("argila") || t.includes("argilos")) {
+        tile = TILE.argila; tileSize = "1px 7px";
+      } else if (t.includes("silte") || t.includes("siltos")) {
+        tile = TILE.silte; tileSize = "6px 6px";
       }
-      if (t.includes("areia") || t.includes("arenos")) {
-        texturas.push("radial-gradient(circle, rgba(0,0,0,0.35) 1px, transparent 1px)");
-        sizes.push("6px 6px");
-      }
-      if (t.includes("argila") || t.includes("argilos")) {
-        texturas.push("repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(0,0,0,0.2) 6px, rgba(0,0,0,0.2) 7px)");
-        sizes.push("100% 100%");
-      }
-      if (t.includes("silte") || t.includes("siltos")) {
-        texturas.push("repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.15) 5px, rgba(0,0,0,0.15) 6px)");
-        sizes.push("100% 100%");
-      }
-      return `background-color: ${bgColor};${texturas.length ? ` background-image: ${texturas.join(", ")}; background-size: ${sizes.join(", ")};` : ""}`;
+
+      const texStyle = tile
+        ? ` background-image: url(${tile}); background-size: ${tileSize}; background-repeat: repeat;`
+        : "";
+      return `background-color: ${bgColor};${texStyle}`;
     };
 
     const profTotal = parseFloat(data.profundidade_total) || (layers.length ? parseFloat(String(layers[layers.length - 1].ate)) : 10);
@@ -213,7 +231,7 @@ export default function SoloDetailPage() {
         const ySolo = getY(0), hBentonita = getY(preFiltroTopo) - ySolo;
         construtivoHTML += `<div style="position:absolute;left:${leftPoco}px;width:${widthPoco}px;top:${ySolo}px;height:${hBentonita}px;background-color:#c98a51;border-left:0.5px solid #333;border-right:0.5px solid #333;z-index:4;"></div>`;
         const hPreFiltro = yF - getY(preFiltroTopo);
-        construtivoHTML += `<div style="position:absolute;left:${leftPoco}px;width:${widthPoco}px;top:${getY(preFiltroTopo)}px;height:${hPreFiltro}px;background-color:#fce663;background-image:radial-gradient(black 1px,transparent 1px);background-size:6px 6px;border-left:0.5px solid #333;border-right:0.5px solid #333;border-bottom:0.5px solid #333;z-index:4;"></div>`;
+        construtivoHTML += `<div style="position:absolute;left:${leftPoco}px;width:${widthPoco}px;top:${getY(preFiltroTopo)}px;height:${hPreFiltro}px;background-color:#fce663;background-image:url(${TILE.areia});background-size:6px 6px;background-repeat:repeat;border-left:0.5px solid #333;border-right:0.5px solid #333;border-bottom:0.5px solid #333;z-index:4;"></div>`;
       }
       if (!isNaN(filtroTopo)) {
         construtivoHTML += `<div style="position:absolute;left:${leftTubo - 8}px;width:${widthTubo + 16}px;top:0;height:10px;background-color:#888;border:1.5px solid #333;z-index:6;"></div>`;
@@ -221,7 +239,7 @@ export default function SoloDetailPage() {
       }
       if (!isNaN(filtroTopo) && !isNaN(filtroBase)) {
         const yTF = getY(filtroTopo), yBF = getY(filtroBase);
-        construtivoHTML += `<div style="position:absolute;left:${leftTubo}px;width:${widthTubo}px;top:${yTF}px;height:${yBF - yTF}px;background-color:white;background-image:repeating-linear-gradient(0deg,transparent,transparent 3px,#333 3px,#333 4px);border:1.5px solid #333;border-top:none;border-bottom:none;z-index:5;"></div>`;
+        construtivoHTML += `<div style="position:absolute;left:${leftTubo}px;width:${widthTubo}px;top:${yTF}px;height:${yBF - yTF}px;background-color:white;background-image:url(${TILE.filtro});background-size:1px 4px;background-repeat:repeat;border:1.5px solid #333;border-top:none;border-bottom:none;z-index:5;"></div>`;
         construtivoHTML += `<div style="position:absolute;left:115px;width:10px;top:${yTF}px;border-top:0.5px dashed #333;z-index:10;"></div><div style="position:absolute;left:128px;top:${yTF - 8}px;background-color:white;border:0.5px solid #333;padding:2px 4px;font-size:9px;font-weight:bold;border-radius:3px;z-index:11;">${filtroTopo}m</div>`;
         construtivoHTML += `<div style="position:absolute;left:115px;width:10px;top:${yBF}px;border-top:0.5px dashed #333;z-index:10;"></div><div style="position:absolute;left:128px;top:${yBF - 8}px;background-color:white;border:0.5px solid #333;padding:2px 4px;font-size:9px;font-weight:bold;border-radius:3px;z-index:11;">${filtroBase}m</div>`;
         if (getY(profTotal) - yBF > 0) construtivoHTML += `<div style="position:absolute;left:${leftTubo}px;width:${widthTubo}px;top:${yBF}px;height:${getY(profTotal) - yBF}px;background-color:white;border:1.5px solid #333;border-top:none;border-bottom:none;z-index:5;"></div>`;
@@ -373,8 +391,8 @@ export default function SoloDetailPage() {
         pdf.addImage(imgData, "JPEG", 0, -offsetY, imgW, imgH);
         remaining -= pageH;
         offsetY   += pageH;
-        // Só cria nova página se sobrar conteúdo significativo (mais de 5mm)
-        if (remaining > 5) pdf.addPage();
+        // Só cria nova página se sobrar conteúdo significativo (mais de 15mm)
+        if (remaining > 15) pdf.addPage();
       }
 
       const nom   = data.nomenclatura_poco?.trim();
