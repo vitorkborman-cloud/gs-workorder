@@ -369,11 +369,11 @@ export default function SoloDetailPage() {
       let offsetY   = 0;
 
       while (remaining > 0) {
-        // posiciona a imagem deslocada para mostrar a fatia correta
         pdf.addImage(imgData, "JPEG", 0, -offsetY, imgW, imgH);
         remaining -= pageH;
         offsetY   += pageH;
-        if (remaining > 0) pdf.addPage();
+        // Só cria nova página se sobrar conteúdo significativo (mais de 5mm)
+        if (remaining > 5) pdf.addPage();
       }
 
       const nom   = data.nomenclatura_poco?.trim();
