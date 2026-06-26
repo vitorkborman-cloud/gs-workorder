@@ -321,24 +321,39 @@ export default function SoloDetailPage() {
       // 2. Gera o HTML idêntico ao que o Puppeteer usava
       const html = buildProfileHTML(logoB64);
 
-      // 3. Renderiza em div oculto fora da viewport
-      const container = document.createElement("div");
-      container.style.cssText = "position:fixed;top:-99999px;left:-99999px;width:794px;background:white;";
-      container.innerHTML = html.replace(/<!DOCTYPE[^>]*>|<html[^>]*>|<\/html>|<head>[\s\S]*?<\/head>|<body>|<\/body>/gi, "");
-      document.body.appendChild(container);
+      // 3. Renderiza o HTML completo num iframe oculto (mantém CSS intacto)
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText = "position:fixed;top:-99999px;left:-99999px;width:794px;height:2000px;border:none;visibility:hidden;";
+      document.body.appendChild(iframe);
 
-      // 4. Captura com html2canvas em alta resolução (scale 3 = ~300dpi)
+      await new Promise<void>((resolve) => {
+        iframe.onload = () => resolve();
+        iframe.srcdoc = html;
+      });
+
+      // Aguarda imagens e fontes carregarem
+      await new Promise(r => setTimeout(r, 800));
+
+      // Ajusta altura do iframe ao conteúdo real
+      const iframeDoc = iframe.contentDocument!;
+      const contentH = iframeDoc.documentElement.scrollHeight;
+      iframe.style.height = contentH + "px";
+      await new Promise(r => setTimeout(r, 200));
+
+      // 4. Captura com html2canvas em alta resolução (scale 3 ≈ 300dpi)
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(container, {
+      const canvas = await html2canvas(iframeDoc.body, {
         scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#ffffff",
         logging: false,
         windowWidth: 794,
+        scrollX: 0,
+        scrollY: 0,
       });
 
-      document.body.removeChild(container);
+      document.body.removeChild(iframe);
 
       // 5. Monta o PDF A4, distribuindo em páginas se necessário
       const pdf      = new jsPDF("p", "mm", "a4");
