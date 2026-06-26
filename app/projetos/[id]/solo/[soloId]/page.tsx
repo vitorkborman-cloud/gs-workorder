@@ -288,28 +288,27 @@ export default function SoloDetailPage() {
         // Tampa inferior
         construtivoHTML += `<div style="position:absolute;left:${tL}px;width:${TUBE_W}px;top:${yF - 5}px;height:5px;background-color:#333;z-index:6;"></div>`;
 
-        // Labels de profundidade (lado direito, zona livre)
-        const labelStyle = `position:absolute;background-color:white;border:0.5px solid #555;padding:1px 4px;font-size:8px;font-weight:bold;border-radius:2px;z-index:13;white-space:nowrap;`;
-        construtivoHTML += `<div style="${labelStyle}left:${LBL_TXT}px;top:${yTF - 9}px;">${filtroTopo}m</div>`;
+        // Labels de profundidade — texto simples sem caixa
+        const txtStyle = `position:absolute;font-size:9px;font-weight:bold;color:#333;z-index:13;white-space:nowrap;text-shadow:0 0 3px white,0 0 3px white;`;
+        construtivoHTML += `<div style="${txtStyle}left:${LBL_TXT}px;top:${yTF - 10}px;">${filtroTopo}m</div>`;
         construtivoHTML += `<div style="position:absolute;left:${LBL}px;width:12px;top:${yTF}px;border-top:0.5px dashed #555;z-index:11;"></div>`;
-        construtivoHTML += `<div style="${labelStyle}left:${LBL_TXT}px;top:${yBF - 9}px;">${filtroBase}m</div>`;
+        construtivoHTML += `<div style="${txtStyle}left:${LBL_TXT}px;top:${yBF - 10}px;">${filtroBase}m</div>`;
         construtivoHTML += `<div style="position:absolute;left:${LBL}px;width:12px;top:${yBF}px;border-top:0.5px dashed #555;z-index:11;"></div>`;
 
-        // Diâmetros (abaixo do fundo do poço, centrados)
-        const dP = data.diametro_poco      || "—";
-        const dS = data.diametro_sondagem  || "—";
-        const dStyle = `position:absolute;background-color:white;border:0.5px solid #555;font-size:8px;font-weight:bold;padding:2px 5px;border-radius:2px;z-index:13;white-space:nowrap;`;
-        const dW = 52; // largura estimada da caixa de diâmetro
-        construtivoHTML += `<div style="${dStyle}left:${CX - dW / 2}px;top:${yF + 6}px;">Ø ${dP}</div>`;
-        construtivoHTML += `<div style="${dStyle}left:${CX - dW / 2}px;top:${yF + 22}px;">Ø ${dS}</div>`;
+        // Diâmetros — texto simples abaixo do poço
+        const dP = data.diametro_poco     || "—";
+        const dS = data.diametro_sondagem || "—";
+        const dTxt = `position:absolute;font-size:9px;font-weight:bold;color:#333;z-index:13;white-space:nowrap;text-shadow:0 0 3px white,0 0 3px white;`;
+        construtivoHTML += `<div style="${dTxt}left:${CX - 22}px;top:${yF + 6}px;">Ø ${dP}</div>`;
+        construtivoHTML += `<div style="${dTxt}left:${CX - 22}px;top:${yF + 20}px;">Ø ${dS}</div>`;
       }
     }
 
-    // Nível d'água (NA) — linha tracejada azul + label na zona direita
+    // NA — linha tracejada azul + texto simples
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
       construtivoHTML += `<div style="position:absolute;left:0;width:180px;top:${yNA}px;border-top:1.5px dashed #005fcc;z-index:12;"></div>`;
-      construtivoHTML += `<div style="position:absolute;left:${LBL_TXT}px;top:${yNA - 11}px;background-color:white;border:1px solid #005fcc;color:#005fcc;font-size:8px;font-weight:bold;padding:1px 4px;border-radius:2px;z-index:13;white-space:nowrap;">NA: ${nivelAgua}m</div>`;
+      construtivoHTML += `<div style="position:absolute;left:${LBL_TXT}px;top:${yNA - 12}px;font-size:9px;font-weight:bold;color:#005fcc;z-index:13;white-space:nowrap;text-shadow:0 0 3px white,0 0 3px white;">NA: ${nivelAgua}m</div>`;
     }
 
     const nom  = data.nomenclatura_poco?.trim();
