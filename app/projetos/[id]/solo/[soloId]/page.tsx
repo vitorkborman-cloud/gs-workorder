@@ -292,14 +292,15 @@ export default function SoloDetailPage() {
           <div style="position:absolute;top:0;left:130px;width:180px;height:100%;pointer-events:none;z-index:10;">${construtivoHTML}</div>
           ${hasWell ? `<div class="linha-camada" style="height:${TOP_OFFSET}px;min-height:${TOP_OFFSET}px;border-bottom:2px solid #391e2a;background-color:#fff;"><div class="celula" style="width:65px;"></div><div class="celula" style="width:65px;"></div><div class="celula" style="width:180px;"></div><div class="celula" style="flex:1;"></div></div>` : ""}
           ${layers.map(l => {
-            const esp = parseFloat(String(l.ate)) - parseFloat(String(l.de));
+            const esp    = parseFloat(String(l.ate)) - parseFloat(String(l.de));
+            const rowH   = Math.max(40, esp * ESCALA); // mesmo cálculo do getY() — garante alinhamento
             const estilo = getEstiloSolo(l.tipo);
-            return `<div class="linha-camada" style="min-height:max(40px,calc(${esp} * var(--escala)));">
+            return `<div class="linha-camada" style="height:${rowH}px;min-height:${rowH}px;">
               <div class="celula cel-prof" style="width:65px;"><span>${l.de}</span><span>${l.ate}</span></div>
               <div class="celula cel-voc" style="width:65px;">${l.leitura_voc || "—"}</div>
               <div class="celula" style="width:180px;${estilo}"></div>
               <div class="celula cel-desc" style="flex:1;">
-                <div style="width:28px;height:28px;min-width:28px;border:0.5px solid #333;border-radius:4px;${estilo}"></div>
+                <div style="width:28px;height:28px;min-width:28px;border:0.5px solid #333;border-radius:4px;flex-shrink:0;${estilo}"></div>
                 <div class="desc-text-container" style="margin-left:12px;"><b style="color:#391e2a;font-size:13px;">${(l.tipo || "N/A").toUpperCase()}</b>${l.coloracao ? `<div style="margin-top:2px;color:#555;">Observações: ${l.coloracao}</div>` : ""}</div>
               </div>
             </div>`;
