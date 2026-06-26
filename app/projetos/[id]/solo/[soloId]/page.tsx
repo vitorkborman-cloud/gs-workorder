@@ -295,7 +295,7 @@ export default function SoloDetailPage() {
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
       cHTML += `<div style="position:absolute;left:0;width:170px;top:${yNA}px;border-top:2px dashed #1d6fd8;z-index:12;"></div>`;
-      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 11}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:3px;width:62px;height:22px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#1d6fd8;z-index:14;">NA: ${nivelAgua}m</div>`;
+      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 16}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:3px;width:62px;height:22px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#1d6fd8;z-index:14;">NA: ${nivelAgua}m</div>`;
     }
 
     // ── LEGENDA (solos presentes) ──────────────────────────────────────────
