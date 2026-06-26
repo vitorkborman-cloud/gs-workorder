@@ -230,39 +230,86 @@ export default function SoloDetailPage() {
 
     let construtivoHTML = "";
 
+    // ── Construtivo do poço ────────────────────────────────────────────────
+    // Layout da coluna de 180px:
+    //   x 0-59   → zona esquerda (livre)
+    //   x 60-119 → tubo/casing/bentonita (centrado)
+    //   x 120-178 → zona de labels (profundidade, diâmetros, NA)
+
+    const CX    = 90;  // centro horizontal do tubo
+    const TUBE_W = 16; // largura do tubo interno
+    const CASO_W = 48; // largura do casing/bentonita
+    const tL = CX - TUBE_W / 2;   // left do tubo = 82
+    const tR = CX + TUBE_W / 2;   // right do tubo = 98
+    const cL = CX - CASO_W / 2;   // left do casing = 66
+    // zona de labels à direita
+    const LBL = 122; // x onde começa a linha tracejada → label
+    const LBL_TXT = 136; // x do texto do label
+
     if (hasWell) {
-      const leftPoco = 65, widthPoco = 50, leftTubo = 80, widthTubo = 20;
       const yF = getY(profTotal);
+
+      // Bentonita (selo)
       if (!isNaN(preFiltroTopo)) {
-        const ySolo = getY(0), hBentonita = getY(preFiltroTopo) - ySolo;
-        construtivoHTML += `<div style="position:absolute;left:${leftPoco}px;width:${widthPoco}px;top:${ySolo}px;height:${hBentonita}px;background-color:#c98a51;border-left:0.5px solid #333;border-right:0.5px solid #333;z-index:4;"></div>`;
-        const hPreFiltro = yF - getY(preFiltroTopo);
-        construtivoHTML += `<div style="position:absolute;left:${leftPoco}px;width:${widthPoco}px;top:${getY(preFiltroTopo)}px;height:${hPreFiltro}px;background-color:#fce663;background-image:url(${TILE.areia});background-size:6px 6px;background-repeat:repeat;border-left:0.5px solid #333;border-right:0.5px solid #333;border-bottom:0.5px solid #333;z-index:4;"></div>`;
+        const hBentonita = getY(preFiltroTopo) - TOP_OFFSET;
+        if (hBentonita > 0) {
+          construtivoHTML += `<div style="position:absolute;left:${cL}px;width:${CASO_W}px;top:${TOP_OFFSET}px;height:${hBentonita}px;background-color:#c98a51;border-left:0.5px solid #444;border-right:0.5px solid #444;z-index:4;"></div>`;
+        }
+        // Pré-filtro (pedra brita / areia grossa)
+        const yPF = getY(preFiltroTopo);
+        const hPreFiltro = yF - yPF;
+        if (hPreFiltro > 0) {
+          construtivoHTML += `<div style="position:absolute;left:${cL}px;width:${CASO_W}px;top:${yPF}px;height:${hPreFiltro}px;background-color:#fce663;background-image:url(${TILE.areia});background-size:6px 6px;background-repeat:repeat;border-left:0.5px solid #444;border-right:0.5px solid #444;border-bottom:0.5px solid #444;z-index:4;"></div>`;
+        }
       }
+
+      // Tubo — cabeça (tampão)
       if (!isNaN(filtroTopo)) {
-        construtivoHTML += `<div style="position:absolute;left:${leftTubo - 8}px;width:${widthTubo + 16}px;top:0;height:10px;background-color:#888;border:1.5px solid #333;z-index:6;"></div>`;
-        construtivoHTML += `<div style="position:absolute;left:${leftTubo}px;width:${widthTubo}px;top:10px;height:${getY(filtroTopo) - 10}px;background-color:white;border:1.5px solid #333;border-top:none;z-index:5;"></div>`;
+        construtivoHTML += `<div style="position:absolute;left:${tL - 6}px;width:${TUBE_W + 12}px;top:0;height:9px;background-color:#888;border:1.5px solid #333;z-index:6;"></div>`;
+        // Tubo liso acima da seção filtrante
+        const hLiso = getY(filtroTopo) - 9;
+        if (hLiso > 0) {
+          construtivoHTML += `<div style="position:absolute;left:${tL}px;width:${TUBE_W}px;top:9px;height:${hLiso}px;background-color:white;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+        }
       }
+
       if (!isNaN(filtroTopo) && !isNaN(filtroBase)) {
         const yTF = getY(filtroTopo), yBF = getY(filtroBase);
-        construtivoHTML += `<div style="position:absolute;left:${leftTubo}px;width:${widthTubo}px;top:${yTF}px;height:${yBF - yTF}px;background-color:white;background-image:url(${TILE.filtro});background-size:1px 4px;background-repeat:repeat;border:1.5px solid #333;border-top:none;border-bottom:none;z-index:5;"></div>`;
-        construtivoHTML += `<div style="position:absolute;left:115px;width:10px;top:${yTF}px;border-top:0.5px dashed #333;z-index:10;"></div><div style="position:absolute;left:128px;top:${yTF - 8}px;background-color:white;border:0.5px solid #333;padding:2px 4px;font-size:9px;font-weight:bold;border-radius:3px;z-index:11;">${filtroTopo}m</div>`;
-        construtivoHTML += `<div style="position:absolute;left:115px;width:10px;top:${yBF}px;border-top:0.5px dashed #333;z-index:10;"></div><div style="position:absolute;left:128px;top:${yBF - 8}px;background-color:white;border:0.5px solid #333;padding:2px 4px;font-size:9px;font-weight:bold;border-radius:3px;z-index:11;">${filtroBase}m</div>`;
-        if (getY(profTotal) - yBF > 0) construtivoHTML += `<div style="position:absolute;left:${leftTubo}px;width:${widthTubo}px;top:${yBF}px;height:${getY(profTotal) - yBF}px;background-color:white;border:1.5px solid #333;border-top:none;border-bottom:none;z-index:5;"></div>`;
-        construtivoHTML += `<div style="position:absolute;left:${leftTubo}px;width:${widthTubo}px;top:${getY(profTotal) - 5}px;height:5px;background-color:#333;z-index:6;"></div>`;
-        const dS = data.diametro_sondagem || "Furo", dP = data.diametro_poco || "Tubo";
-        construtivoHTML += `<div style="position:absolute;left:80px;width:20px;top:${yF}px;border-left:0.5px solid #333;border-right:0.5px solid #333;border-bottom:0.5px solid #333;height:8px;z-index:10;"></div><div style="position:absolute;left:90px;top:${yF + 11}px;transform:translateX(-50%);background-color:white;border:0.5px solid #333;padding:2px 4px;font-size:8px;font-weight:bold;z-index:11;white-space:nowrap;border-radius:2px;">Ø ${dP}</div>`;
-        construtivoHTML += `<div style="position:absolute;left:65px;width:50px;top:${yF + 20}px;border-left:0.5px solid #333;border-right:0.5px solid #333;border-bottom:0.5px solid #333;height:8px;z-index:10;"></div><div style="position:absolute;left:90px;top:${yF + 31}px;transform:translateX(-50%);background-color:white;border:0.5px solid #333;padding:2px 4px;font-size:8px;font-weight:bold;z-index:11;white-space:nowrap;border-radius:2px;">Ø ${dS}</div>`;
+
+        // Seção filtrante (tubo ranhurado)
+        construtivoHTML += `<div style="position:absolute;left:${tL}px;width:${TUBE_W}px;top:${yTF}px;height:${yBF - yTF}px;background-color:white;background-image:url(${TILE.filtro});background-size:1px 4px;background-repeat:repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+
+        // Tubo liso abaixo da seção filtrante
+        const hAbaixo = yF - yBF;
+        if (hAbaixo > 0) {
+          construtivoHTML += `<div style="position:absolute;left:${tL}px;width:${TUBE_W}px;top:${yBF}px;height:${hAbaixo}px;background-color:white;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+        }
+
+        // Tampa inferior
+        construtivoHTML += `<div style="position:absolute;left:${tL}px;width:${TUBE_W}px;top:${yF - 5}px;height:5px;background-color:#333;z-index:6;"></div>`;
+
+        // Labels de profundidade (lado direito, zona livre)
+        const labelStyle = `position:absolute;background-color:white;border:0.5px solid #555;padding:1px 4px;font-size:8px;font-weight:bold;border-radius:2px;z-index:13;white-space:nowrap;`;
+        construtivoHTML += `<div style="${labelStyle}left:${LBL_TXT}px;top:${yTF - 9}px;">${filtroTopo}m</div>`;
+        construtivoHTML += `<div style="position:absolute;left:${LBL}px;width:12px;top:${yTF}px;border-top:0.5px dashed #555;z-index:11;"></div>`;
+        construtivoHTML += `<div style="${labelStyle}left:${LBL_TXT}px;top:${yBF - 9}px;">${filtroBase}m</div>`;
+        construtivoHTML += `<div style="position:absolute;left:${LBL}px;width:12px;top:${yBF}px;border-top:0.5px dashed #555;z-index:11;"></div>`;
+
+        // Diâmetros (abaixo do fundo do poço, centrados)
+        const dP = data.diametro_poco      || "—";
+        const dS = data.diametro_sondagem  || "—";
+        const dStyle = `position:absolute;background-color:white;border:0.5px solid #555;font-size:8px;font-weight:bold;padding:2px 5px;border-radius:2px;z-index:13;white-space:nowrap;`;
+        const dW = 52; // largura estimada da caixa de diâmetro
+        construtivoHTML += `<div style="${dStyle}left:${CX - dW / 2}px;top:${yF + 6}px;">Ø ${dP}</div>`;
+        construtivoHTML += `<div style="${dStyle}left:${CX - dW / 2}px;top:${yF + 22}px;">Ø ${dS}</div>`;
       }
     }
 
+    // Nível d'água (NA) — linha tracejada azul + label na zona direita
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
-      // Linha azul tracejada + label mais limpa
-      construtivoHTML += `
-        <div style="position:absolute;left:0;width:180px;top:${yNA}px;height:0;border-top:2px dashed #005fcc;z-index:12;"></div>
-        <div style="position:absolute;left:4px;top:${yNA - 18}px;background-color:#005fcc;color:white;padding:2px 6px;font-size:9px;font-weight:bold;border-radius:3px;z-index:13;white-space:nowrap;">▼ NA: ${nivelAgua}m</div>
-      `;
+      construtivoHTML += `<div style="position:absolute;left:0;width:180px;top:${yNA}px;border-top:1.5px dashed #005fcc;z-index:12;"></div>`;
+      construtivoHTML += `<div style="position:absolute;left:${LBL_TXT}px;top:${yNA - 11}px;background-color:white;border:1px solid #005fcc;color:#005fcc;font-size:8px;font-weight:bold;padding:1px 4px;border-radius:2px;z-index:13;white-space:nowrap;">NA: ${nivelAgua}m</div>`;
     }
 
     const nom  = data.nomenclatura_poco?.trim();
