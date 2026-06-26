@@ -164,231 +164,333 @@ export default function SoloDetailPage() {
     filtro: makeTile(1, 4,   ctx => { ctx.fillStyle = "#333"; ctx.fillRect(0, 3, 1, 1); }),
   };
 
-  // ─── gerador de HTML (idêntico ao Puppeteer) ─────────────────────────────
+  // ─── NOVO gerador de HTML — design profissional ──────────────────────────
 
   function buildProfileHTML(logoBase64: string): string {
-    const ESCALA = 45;
+    const ESCALA     = 42;   // px por metro
+    const MIN_H      = 44;   // altura mínima de cada linha
+    const PAGE_W     = 794;  // largura total da página
+    const PAD        = 18;   // padding horizontal
+    const CONTENT_W  = PAGE_W - PAD * 2; // 758px
+
+    // Colunas do perfil
+    const C_PROF = 52;   // profundidade
+    const C_PERF = 170;  // perfil geológico
+    const C_VOC  = 56;   // VOC
+    const C_DESC = CONTENT_W - C_PROF - C_PERF - C_VOC; // restante (~480px)
+
     const preFiltroTopo = parseFloat(data.pre_filtro);
     const filtroTopo    = parseFloat(data.secao_filtrante_topo);
     const filtroBase    = parseFloat(data.secao_filtrante_base);
     const nivelAgua     = parseFloat(data.nivel_agua);
     const hasWell       = !isNaN(filtroTopo) || !isNaN(preFiltroTopo);
-    const TOP_OFFSET    = hasWell ? 18 : 0;
+    const TOP_OFFSET    = hasWell ? 20 : 0;
 
-    const getY = (depth: number | string) => {
+    const profTotal = parseFloat(data.profundidade_total)
+      || (layers.length ? parseFloat(String(layers[layers.length - 1].ate)) : 10);
+
+    // Altura de cada camada
+    const rowHeights = layers.map(l => {
+      const esp = parseFloat(String(l.ate)) - parseFloat(String(l.de));
+      return Math.max(MIN_H, esp * ESCALA);
+    });
+    const profileH = TOP_OFFSET + rowHeights.reduce((s, h) => s + h, 0) + (hasWell ? 60 : 0);
+
+    // getY: posição Y absoluta dentro do overlay do perfil
+    const getY = (depth: number | string): number => {
       let y = TOP_OFFSET;
       let d = parseFloat(String(depth));
       if (isNaN(d)) return TOP_OFFSET;
-      for (const l of layers) {
-        const de  = parseFloat(String(l.de));
-        const ate = parseFloat(String(l.ate));
-        const hOrig      = (ate - de) * ESCALA;
-        const hStretched = Math.max(40, hOrig);
+      for (let i = 0; i < layers.length; i++) {
+        const de  = parseFloat(String(layers[i].de));
+        const ate = parseFloat(String(layers[i].ate));
+        const rH  = rowHeights[i];
         if (d <= de) break;
-        if (d >= ate) y += hStretched;
-        else { y += ((d - de) / (ate - de)) * hStretched; break; }
+        if (d >= ate) y += rH;
+        else { y += ((d - de) / (ate - de)) * rH; break; }
       }
       return y;
     };
 
-    const getEstiloSolo = (tipo: string) => {
-      if (!tipo) return "background-color: #f0f0f0;";
+    // Estilo de solo (cor + textura tile)
+    const soloStyle = (tipo: string): string => {
+      if (!tipo) return "background-color:#f0f0f0;";
       const t = tipo.toLowerCase().trim();
+      let bg = "#e0e0e0";
+      if (t.includes("brita") || t.includes("rach") || t.includes("concreto") || t.includes("cascalho")) bg = "#c8c8c8";
+      else if (t.includes("aterro") || t.includes("orgân") || t.includes("turfa")) bg = "#8b7355";
+      else if (t.startsWith("areia"))  bg = t.includes("argil") ? "#E6C27A" : t.includes("silt") ? "#EEDD82" : "#FCE663";
+      else if (t.startsWith("silte"))  bg = t.includes("aren") ? "#D1B280" : t.includes("argil") ? "#B88655" : "#C19A6B";
+      else if (t.startsWith("argila")) bg = t.includes("aren") ? "#CC6B58" : t.includes("silt") ? "#B86554" : "#D47A6A";
 
-      // Cor de fundo
-      let bgColor = "#e0e0e0";
-      if (t.includes("brita") || t.includes("rach") || t.includes("concreto") || t.includes("cascalho")) bgColor = "#cccccc";
-      else if (t.includes("aterro") || t.includes("orgânica") || t.includes("turfa")) bgColor = "#8b7355";
-      else if (t.startsWith("areia")) bgColor = t.includes("argil") ? "#E6C27A" : t.includes("silt") ? "#EEDD82" : "#FCE663";
-      else if (t.startsWith("silte")) bgColor = t.includes("aren") ? "#D1B280" : t.includes("argil") ? "#B88655" : "#C19A6B";
-      else if (t.startsWith("argila")) bgColor = t.includes("aren") ? "#CC6B58" : t.includes("silt") ? "#B86554" : "#D47A6A";
+      let tile = "", sz = "6px 6px";
+      if (t.includes("brita") || t.includes("rach") || t.includes("cascalho"))      { tile = TILE.brita; sz = "14px 14px"; }
+      else if (t.includes("areia") || t.includes("arenos"))                          { tile = TILE.areia; sz = "6px 6px"; }
+      else if (t.includes("argila") || t.includes("argilos"))                        { tile = TILE.argila; sz = "1px 7px"; }
+      else if (t.includes("silte") || t.includes("siltos"))                          { tile = TILE.silte; sz = "6px 6px"; }
 
-      // Textura como data URI tile (suportado pelo html2canvas)
-      let tile = "", tileSize = "6px 6px";
-      if (t.includes("brita") || t.includes("rach") || t.includes("cascalho")) {
-        tile = TILE.brita; tileSize = "14px 14px";
-      } else if (t.includes("areia") || t.includes("arenos")) {
-        tile = TILE.areia; tileSize = "6px 6px";
-      } else if (t.includes("argila") || t.includes("argilos")) {
-        tile = TILE.argila; tileSize = "1px 7px";
-      } else if (t.includes("silte") || t.includes("siltos")) {
-        tile = TILE.silte; tileSize = "6px 6px";
-      }
-
-      const texStyle = tile
-        ? ` background-image: url(${tile}); background-size: ${tileSize}; background-repeat: repeat;`
-        : "";
-      return `background-color: ${bgColor};${texStyle}`;
+      return `background-color:${bg};${tile ? `background-image:url(${tile});background-size:${sz};background-repeat:repeat;` : ""}`;
     };
 
-    const profTotal = parseFloat(data.profundidade_total) || (layers.length ? parseFloat(String(layers[layers.length - 1].ate)) : 10);
+    // ── CONSTRUTIVO DO POÇO ───────────────────────────────────────────────
+    // Dentro da coluna de 170px:
+    //   x 0–54     → zona esquerda (labels seção filtrante)
+    //   x 55–115   → tubo/casing centrado em x=85
+    //   x 116–170  → zona direita (NA, prof. total)
 
-    // Altura total do container do construtivo em px (igual à soma das linhas renderizadas)
-    const totalOverlayH = TOP_OFFSET
-      + layers.reduce((s, l) => s + Math.max(40, (parseFloat(String(l.ate)) - parseFloat(String(l.de))) * ESCALA), 0)
-      + (hasWell ? 55 : 0);
+    const CX     = 85;  // centro do tubo
+    const TW     = 16;  // tubo interno
+    const CW     = 46;  // casing / bentonita
+    const tL     = CX - TW / 2;   // 77
+    const tR     = CX + TW / 2;   // 93
+    const cL     = CX - CW / 2;   // 62
+    const txtS   = (c: string) => `position:absolute;font-size:8px;font-weight:bold;color:${c};z-index:14;white-space:nowrap;text-shadow:0 0 2px #fff,0 0 2px #fff;`;
 
-    let construtivoHTML = "";
-
-    // ── Construtivo do poço ────────────────────────────────────────────────
-    // Layout da coluna de 180px:
-    //   x 0-59   → zona esquerda (livre)
-    //   x 60-119 → tubo/casing/bentonita (centrado)
-    //   x 120-178 → zona de labels (profundidade, diâmetros, NA)
-
-    const CX    = 90;  // centro horizontal do tubo
-    const TUBE_W = 16; // largura do tubo interno
-    const CASO_W = 48; // largura do casing/bentonita
-    const tL = CX - TUBE_W / 2;   // left do tubo = 82
-    const tR = CX + TUBE_W / 2;   // right do tubo = 98
-    const cL = CX - CASO_W / 2;   // left do casing = 66
-    // zona de labels à direita
-    const LBL = 122; // x onde começa a linha tracejada → label
-    const LBL_TXT = 136; // x do texto do label
+    let cHTML = "";
 
     if (hasWell) {
       const yF = getY(profTotal);
 
-      // Bentonita (selo)
+      // Bentonita (selo de topo)
       if (!isNaN(preFiltroTopo)) {
-        const hBentonita = getY(preFiltroTopo) - TOP_OFFSET;
-        if (hBentonita > 0) {
-          construtivoHTML += `<div style="position:absolute;left:${cL}px;width:${CASO_W}px;top:${TOP_OFFSET}px;height:${hBentonita}px;background-color:#c98a51;border-left:0.5px solid #444;border-right:0.5px solid #444;z-index:4;"></div>`;
-        }
-        // Pré-filtro (pedra brita / areia grossa)
+        const hBen = getY(preFiltroTopo) - TOP_OFFSET;
+        if (hBen > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${TOP_OFFSET}px;height:${hBen}px;background-color:#c98a51;border-left:1px solid #555;border-right:1px solid #555;z-index:4;"></div>`;
+        // Pré-filtro
         const yPF = getY(preFiltroTopo);
-        const hPreFiltro = yF - yPF;
-        if (hPreFiltro > 0) {
-          construtivoHTML += `<div style="position:absolute;left:${cL}px;width:${CASO_W}px;top:${yPF}px;height:${hPreFiltro}px;background-color:#fce663;background-image:url(${TILE.areia});background-size:6px 6px;background-repeat:repeat;border-left:0.5px solid #444;border-right:0.5px solid #444;border-bottom:0.5px solid #444;z-index:4;"></div>`;
-        }
+        const hPF = yF - yPF;
+        if (hPF > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${yPF}px;height:${hPF}px;background-color:#fce663;background-image:url(${TILE.areia});background-size:6px 6px;background-repeat:repeat;border-left:1px solid #555;border-right:1px solid #555;border-bottom:1px solid #555;z-index:4;"></div>`;
       }
 
-      // Tubo — cabeça (tampão)
+      // Tampão superior + tubo liso
       if (!isNaN(filtroTopo)) {
-        construtivoHTML += `<div style="position:absolute;left:${tL - 6}px;width:${TUBE_W + 12}px;top:0;height:9px;background-color:#888;border:1.5px solid #333;z-index:6;"></div>`;
-        // Tubo liso acima da seção filtrante
-        const hLiso = getY(filtroTopo) - 9;
-        if (hLiso > 0) {
-          construtivoHTML += `<div style="position:absolute;left:${tL}px;width:${TUBE_W}px;top:9px;height:${hLiso}px;background-color:white;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
-        }
+        cHTML += `<div style="position:absolute;left:${tL - 7}px;width:${TW + 14}px;top:0;height:10px;background-color:#777;border:1.5px solid #333;z-index:6;"></div>`;
+        const hLiso = getY(filtroTopo) - 10;
+        if (hLiso > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:10px;height:${hLiso}px;background-color:#fff;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
       }
 
       if (!isNaN(filtroTopo) && !isNaN(filtroBase)) {
         const yTF = getY(filtroTopo), yBF = getY(filtroBase);
 
-        // Seção filtrante (tubo ranhurado)
-        construtivoHTML += `<div style="position:absolute;left:${tL}px;width:${TUBE_W}px;top:${yTF}px;height:${yBF - yTF}px;background-color:white;background-image:url(${TILE.filtro});background-size:1px 4px;background-repeat:repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+        // Seção filtrante ranhurada
+        cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yTF}px;height:${yBF - yTF}px;background-color:#fff;background-image:url(${TILE.filtro});background-size:1px 4px;background-repeat:repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
 
-        // Tubo liso abaixo da seção filtrante
-        const hAbaixo = yF - yBF;
-        if (hAbaixo > 0) {
-          construtivoHTML += `<div style="position:absolute;left:${tL}px;width:${TUBE_W}px;top:${yBF}px;height:${hAbaixo}px;background-color:white;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
-        }
+        // Tubo liso abaixo + tampa
+        const hAb = yF - yBF;
+        if (hAb > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yBF}px;height:${hAb}px;background-color:#fff;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+        cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yF - 5}px;height:5px;background-color:#333;z-index:6;"></div>`;
 
-        // Tampa inferior
-        construtivoHTML += `<div style="position:absolute;left:${tL}px;width:${TUBE_W}px;top:${yF - 5}px;height:5px;background-color:#333;z-index:6;"></div>`;
+        // Labels seção filtrante — ESQUERDA
+        cHTML += `<div style="position:absolute;left:0;width:${tL - 2}px;top:${yTF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
+        cHTML += `<div style="${txtS("#444")}left:2px;top:${yTF - 12}px;">Início filtro<br/>${filtroTopo}m</div>`;
+        cHTML += `<div style="position:absolute;left:0;width:${tL - 2}px;top:${yBF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
+        cHTML += `<div style="${txtS("#444")}left:2px;top:${yBF + 2}px;">Fim filtro<br/>${filtroBase}m</div>`;
 
-        const txt = (cor: string) => `position:absolute;font-size:9px;font-weight:bold;color:${cor};z-index:13;white-space:nowrap;text-shadow:0 0 3px white,0 0 3px white;`;
-
-        // ── Seção filtrante: labels no LADO ESQUERDO ──
-        // linha tracejada da esquerda até o tubo + texto
-        construtivoHTML += `<div style="position:absolute;left:0;width:${tL}px;top:${yTF}px;border-top:0.5px dashed #555;z-index:11;"></div>`;
-        construtivoHTML += `<div style="${txt("#333")}left:2px;top:${yTF - 12}px;">${filtroTopo}m</div>`;
-
-        construtivoHTML += `<div style="position:absolute;left:0;width:${tL}px;top:${yBF}px;border-top:0.5px dashed #555;z-index:11;"></div>`;
-        construtivoHTML += `<div style="${txt("#333")}left:2px;top:${yBF + 2}px;">${filtroBase}m</div>`;
-
-        // ── Profundidade total do poço: lado DIREITO ──
-        construtivoHTML += `<div style="position:absolute;left:${tR}px;width:${180 - tR}px;top:${yF}px;border-top:0.5px dashed #555;z-index:11;"></div>`;
-        construtivoHTML += `<div style="${txt("#333")}left:${tR + 4}px;top:${yF + 2}px;">${profTotal}m</div>`;
-
-        // ── Diâmetros: abaixo do poço, com rótulo claro ──
-        const dP = data.diametro_poco     || "—";
-        const dS = data.diametro_sondagem || "—";
-        construtivoHTML += `<div style="${txt("#333")}left:${cL}px;top:${yF + 10}px;">Ø Instalação: ${dP}</div>`;
-        construtivoHTML += `<div style="${txt("#555")}left:${cL}px;top:${yF + 24}px;">Ø Sondagem: ${dS}</div>`;
+        // Prof. total — DIREITA
+        cHTML += `<div style="position:absolute;left:${tR + 2}px;width:${170 - tR - 2}px;top:${yF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
+        cHTML += `<div style="${txtS("#444")}left:${tR + 4}px;top:${yF + 2}px;">${profTotal}m</div>`;
       }
     }
 
-    // ── NA: linha tracejada azul + label no LADO DIREITO ──
+    // NA — linha azul tracejada + label direita
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
-      construtivoHTML += `<div style="position:absolute;left:0;width:180px;top:${yNA}px;border-top:1.5px dashed #005fcc;z-index:12;"></div>`;
-      construtivoHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 13}px;font-size:9px;font-weight:bold;color:#005fcc;z-index:13;white-space:nowrap;text-shadow:0 0 3px white,0 0 3px white;">NA: ${nivelAgua}m</div>`;
+      cHTML += `<div style="position:absolute;left:0;width:170px;top:${yNA}px;border-top:2px dashed #1d6fd8;z-index:12;"></div>`;
+      cHTML += `<div style="${txtS("#1d6fd8")}left:${tR + 4}px;top:${yNA - 12}px;">NA: ${nivelAgua}m</div>`;
     }
 
-    const nom  = data.nomenclatura_poco?.trim();
-    const sond = data.nome_sondagem?.trim();
+    // ── LEGENDA (solos presentes) ──────────────────────────────────────────
+    const uniqueTypes = [...new Set(layers.map(l => l.tipo).filter(Boolean))];
+    const legendItems = uniqueTypes.map(tipo => {
+      const st = soloStyle(tipo);
+      return `<div style="display:flex;align-items:center;gap:6px;margin:3px 0;">
+        <div style="width:22px;height:13px;border:0.5px solid #888;flex-shrink:0;${st}"></div>
+        <span style="font-size:8.5px;color:#333;">${tipo}</span>
+      </div>`;
+    }).join("");
+
+    const hasLegend = uniqueTypes.length > 0;
+
+    // ── METADADOS ─────────────────────────────────────────────────────────
+    const nom   = data.nomenclatura_poco?.trim();
+    const sond  = data.nome_sondagem?.trim();
     const ident = (nom && sond) ? `${nom} / ${sond}` : nom || sond || "—";
 
-    return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>
-      *, *::before, *::after { box-sizing: border-box; }
-      :root { --escala: ${ESCALA}px; }
-      body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; margin: 0; padding: 20px; color: #333; background: white; }
-      .header-main { width: 100%; border: 2px solid #391e2a; border-collapse: collapse; table-layout: fixed; }
-      .header-main td { border: 1.5px solid #391e2a; padding: 6px 10px; vertical-align: middle; overflow: hidden; }
-      .logo-cell { width: 160px; text-align: center; background-color: #fff; }
-      .title-cell { background-color: #391e2a; color: white; text-align: center; }
-      .title-cell h1 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
-      .destaque { font-weight: bold; color: #391e2a; text-transform: uppercase; font-size: 9px; margin-right: 4px; }
-      .valor { font-size: 11px; }
-      .corpo-relatorio { display: flex; flex-direction: column; border: 2px solid #391e2a; border-top: none; }
-      .linha-titulos { display: flex; background-color: #80b02d; color: white; font-weight: bold; text-align: center; border-bottom: 2px solid #391e2a; }
-      .linha-titulos > div { padding: 10px 5px; border-right: 0.5px solid #391e2a; display: flex; align-items: center; justify-content: center; }
-      .linha-titulos > div:last-child { border-right: none; }
-      .linha-camada { display: flex; border-bottom: 0.5px solid #391e2a; }
-      .celula { border-right: 0.5px solid #391e2a; display: flex; align-items: center; justify-content: center; }
-      .celula:last-child { border-right: none; }
-      .cel-prof { flex-direction: column; justify-content: space-between !important; padding: 4px 8px; color: #666; font-size: 10px; text-align: center; }
-      .cel-voc { font-weight: bold; color: #80b02d; }
-      .cel-desc { flex-direction: row !important; justify-content: flex-start !important; padding: 8px 12px; text-align: left; gap: 12px; }
-      .desc-text-container { flex: 1; min-width: 0; word-break: break-word; overflow-wrap: break-word; }
-      .desc-text-container b { display: block; }
-    </style></head><body>
-      <table class="header-main">
-        <tr>
-          <td rowspan="3" class="logo-cell">${logoBase64 ? `<img src="${logoBase64}" style="max-width:140px;max-height:80px;" />` : "<b>GREENSOIL</b>"}</td>
-          <td colspan="3" class="title-cell"><h1>Perfil Técnico e Descritivo de Sondagem</h1></td>
-        </tr>
-        <tr>
-          <td style="width:25%;"><span class="destaque">Poço/Sondagem</span><br/><span class="valor">${ident}</span></td>
-          <td style="width:25%;"><span class="destaque">MÉTODO:</span><br/><span class="valor">${data.tipo_sondagem || "—"}</span></td>
-          <td style="width:50%;"><span class="destaque">COORDENADAS (UTM):</span><br/><span class="valor">X: ${data.coord_x || "—"} &nbsp;|&nbsp; Y: ${data.coord_y || "—"}<br/>Zona: ${data.utm_zona || "—"} &nbsp;|&nbsp; Cota: ${data.cota ? data.cota + " m" : "—"}</span></td>
-        </tr>
-        <tr>
-          <td><span class="destaque">DATA:</span><br/><span class="valor">${data.data || "—"}</span></td>
-          <td><span class="destaque">NÍVEL D'ÁGUA:</span><br/><span class="valor">${data.nivel_agua ? data.nivel_agua + " m" : "—"}</span></td>
-          <td><span class="destaque">PROF. FINAL:</span><br/><span class="valor">${data.profundidade_total ? data.profundidade_total + " m" : "—"}</span></td>
-        </tr>
-      </table>
-      <div class="corpo-relatorio">
-        <div class="linha-titulos">
-          <div style="width:65px;">Prof. (m)</div>
-          <div style="width:65px;">VOC (ppm)</div>
-          <div style="width:180px;">Perfil Geológico e Construtivo</div>
-          <div style="flex:1;">Descrição Litológica</div>
+    const meta = (label: string, val: string) => `
+      <div style="padding:6px 10px;border-right:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;min-width:0;">
+        <div style="font-size:7px;font-weight:700;color:#80b02d;text-transform:uppercase;letter-spacing:0.6px;">${label}</div>
+        <div style="font-size:10px;font-weight:600;color:#222;margin-top:2px;">${val || "—"}</div>
+      </div>`;
+
+    const now = new Date().toLocaleString("pt-BR");
+
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: ${PAGE_W}px; background: #fff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #222; }
+  .page { width: ${PAGE_W}px; padding: ${PAD}px; }
+
+  /* ── header ── */
+  .hdr { display: flex; border: 2px solid #391e2a; border-radius: 4px 4px 0 0; overflow: hidden; }
+  .hdr-logo { width: 130px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 10px; background: #fff; border-right: 2px solid #391e2a; }
+  .hdr-body { flex: 1; display: flex; flex-direction: column; }
+  .hdr-title { background: #391e2a; color: #fff; text-align: center; padding: 9px 12px; font-size: 13px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; border-bottom: 3px solid #80b02d; }
+  .hdr-sub { display: grid; grid-template-columns: repeat(3, 1fr); border-top: none; }
+  .hdr-cell { padding: 7px 12px; border-right: 1px solid #ddd; }
+  .hdr-cell:last-child { border-right: none; }
+  .hdr-lbl { font-size: 7.5px; font-weight: 700; color: #391e2a; text-transform: uppercase; letter-spacing: 0.5px; }
+  .hdr-val { font-size: 10.5px; font-weight: 600; margin-top: 2px; }
+
+  /* ── meta grid ── */
+  .meta { display: grid; grid-template-columns: repeat(4, 1fr); border: 2px solid #391e2a; border-top: none; border-radius: 0 0 4px 4px; margin-bottom: 10px; background: #fafafa; }
+
+  /* ── profile table ── */
+  .ptbl { border: 2px solid #391e2a; border-radius: 4px; overflow: hidden; }
+  .ptbl-head { display: flex; background: #391e2a; }
+  .ptbl-hcell { display: flex; align-items: center; justify-content: center; text-align: center; padding: 9px 4px; color: #fff; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border-right: 1px solid rgba(255,255,255,0.15); }
+  .ptbl-hcell:last-child { border-right: none; }
+  .ptbl-body { position: relative; }
+  .ptbl-row { display: flex; border-bottom: 0.5px solid #ccc; }
+  .ptbl-row:last-child { border-bottom: none; }
+
+  /* cells */
+  .c-prof { width: ${C_PROF}px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 5px 6px; border-right: 0.5px solid #ccc; font-size: 9.5px; color: #555; font-weight: 600; }
+  .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #ccc; }
+  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: 10px 14px; gap: 12px; border-right: 0.5px solid #ccc; }
+  .c-voc  { width: ${C_VOC}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #5a8a1e; }
+  .desc-swatch { width: 26px; height: 26px; flex-shrink: 0; border: 0.5px solid #888; border-radius: 3px; }
+  .desc-text { flex: 1; min-width: 0; }
+  .desc-tipo { font-size: 11.5px; font-weight: 800; color: #391e2a; text-transform: uppercase; word-break: break-word; }
+  .desc-obs  { font-size: 9px; color: #666; margin-top: 3px; word-break: break-word; }
+
+  /* ── legend ── */
+  .legend { margin-top: 10px; border: 1.5px solid #391e2a; border-radius: 4px; overflow: hidden; }
+  .legend-title { background: #391e2a; color: #fff; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 5px 10px; border-bottom: 2px solid #80b02d; }
+  .legend-body { display: flex; flex-wrap: wrap; gap: 0; padding: 8px 10px; background: #fafafa; }
+
+  /* ── footer ── */
+  .footer { margin-top: 10px; padding-top: 7px; border-top: 2px solid #80b02d; display: flex; justify-content: space-between; align-items: flex-start; }
+  .footer-l { font-size: 7px; color: #aaa; line-height: 1.6; }
+  .footer-r { font-size: 7px; color: #aaa; text-align: right; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-logo">
+      ${logoBase64 ? `<img src="${logoBase64}" style="max-width:105px;max-height:48px;object-fit:contain;" />` : `<span style="font-size:13px;font-weight:900;color:#391e2a;">GREENSOIL</span>`}
+    </div>
+    <div class="hdr-body">
+      <div class="hdr-title">Perfil Técnico e Descritivo de Sondagem</div>
+      <div class="hdr-sub">
+        <div class="hdr-cell">
+          <div class="hdr-lbl">Poço / Sondagem</div>
+          <div class="hdr-val">${ident}</div>
         </div>
-        <div style="position:relative;width:100%;">
-          <div style="position:absolute;top:0;left:130px;width:180px;height:${totalOverlayH}px;pointer-events:none;z-index:10;overflow:visible;">${construtivoHTML}</div>
-          ${hasWell ? `<div class="linha-camada" style="height:${TOP_OFFSET}px;min-height:${TOP_OFFSET}px;border-bottom:2px solid #391e2a;background-color:#fff;"><div class="celula" style="width:65px;"></div><div class="celula" style="width:65px;"></div><div class="celula" style="width:180px;"></div><div class="celula" style="flex:1;"></div></div>` : ""}
-          ${layers.map(l => {
-            const esp    = parseFloat(String(l.ate)) - parseFloat(String(l.de));
-            const rowH   = Math.max(40, esp * ESCALA); // mesmo cálculo do getY() — garante alinhamento
-            const estilo = getEstiloSolo(l.tipo);
-            return `<div class="linha-camada" style="height:${rowH}px;min-height:${rowH}px;">
-              <div class="celula cel-prof" style="width:65px;"><span>${l.de}</span><span>${l.ate}</span></div>
-              <div class="celula cel-voc" style="width:65px;">${l.leitura_voc || "—"}</div>
-              <div class="celula" style="width:180px;${estilo}"></div>
-              <div class="celula cel-desc" style="flex:1;">
-                <div style="width:28px;height:28px;min-width:28px;border:0.5px solid #333;border-radius:4px;flex-shrink:0;${estilo}"></div>
-                <div class="desc-text-container" style="margin-left:12px;"><b style="color:#391e2a;font-size:13px;">${(l.tipo || "N/A").toUpperCase()}</b>${l.coloracao ? `<div style="margin-top:2px;color:#555;">Observações: ${l.coloracao}</div>` : ""}</div>
-              </div>
-            </div>`;
-          }).join("")}
-          ${hasWell ? `<div class="linha-camada" style="height:55px;min-height:55px;background-color:#fff;border-bottom:none;"><div class="celula" style="width:65px;"></div><div class="celula" style="width:65px;"></div><div class="celula" style="width:180px;"></div><div class="celula" style="flex:1;"></div></div>` : ""}
+        <div class="hdr-cell">
+          <div class="hdr-lbl">Método de Sondagem</div>
+          <div class="hdr-val">${data.tipo_sondagem || "—"}</div>
+        </div>
+        <div class="hdr-cell" style="border-right:none;">
+          <div class="hdr-lbl">Elaborado por</div>
+          <div class="hdr-val">GreenSoil do Brasil</div>
         </div>
       </div>
-    </body></html>`;
+    </div>
+  </div>
+
+  <!-- METADATA GRID -->
+  <div class="meta">
+    ${meta("Data", data.data || "—")}
+    ${meta("Nível d'Água (NA)", data.nivel_agua ? data.nivel_agua + " m" : "—")}
+    ${meta("Profundidade Total", data.profundidade_total ? data.profundidade_total + " m" : "—")}
+    ${meta("Cota / Altitude", data.cota ? data.cota + " m" : "—")}
+    ${meta("UTM Este (X)", data.coord_x || "—")}
+    ${meta("UTM Norte (Y)", data.coord_y || "—")}
+    ${meta("Zona UTM", data.utm_zona || "—")}
+    ${meta("Ø Instalação / Sondagem", `${data.diametro_poco || "—"} / ${data.diametro_sondagem || "—"}`)}
+  </div>
+
+  <!-- PROFILE TABLE -->
+  <div class="ptbl">
+    <div class="ptbl-head">
+      <div class="ptbl-hcell" style="width:${C_PROF}px;">Prof.<br/>(m)</div>
+      <div class="ptbl-hcell" style="width:${C_PERF}px;">Perfil Geológico<br/>e Construtivo</div>
+      <div class="ptbl-hcell" style="flex:1;">Descrição Litológica</div>
+      <div class="ptbl-hcell" style="width:${C_VOC}px;">VOC<br/>(ppm)</div>
+    </div>
+
+    <div class="ptbl-body">
+      <!-- Overlay do construtivo posicionado sobre a coluna de perfil -->
+      <div style="position:absolute;top:0;left:${C_PROF}px;width:${C_PERF}px;height:${profileH}px;pointer-events:none;z-index:10;overflow:visible;">
+        ${cHTML}
+      </div>
+
+      ${hasWell ? `
+        <div class="ptbl-row" style="height:${TOP_OFFSET}px;background:#fff;border-bottom:1.5px solid #391e2a;">
+          <div class="c-prof"></div>
+          <div class="c-perf"></div>
+          <div class="c-desc"></div>
+          <div class="c-voc"></div>
+        </div>` : ""}
+
+      ${layers.map((l, i) => {
+        const rH  = rowHeights[i];
+        const st  = soloStyle(l.tipo);
+        const alt = i % 2 === 0 ? "#fff" : "#fafafa";
+        return `
+        <div class="ptbl-row" style="height:${rH}px;">
+          <div class="c-prof"><span>${l.de}</span><span>${l.ate}</span></div>
+          <div class="c-perf" style="${st}"></div>
+          <div class="c-desc" style="background:${alt};">
+            <div class="desc-swatch" style="${st}"></div>
+            <div class="desc-text">
+              <div class="desc-tipo">${(l.tipo || "N/A").toUpperCase()}</div>
+              ${l.coloracao ? `<div class="desc-obs">Obs.: ${l.coloracao}</div>` : ""}
+            </div>
+          </div>
+          <div class="c-voc" style="background:${alt};">${l.leitura_voc || "—"}</div>
+        </div>`;
+      }).join("")}
+
+      ${hasWell ? `
+        <div class="ptbl-row" style="height:60px;background:#fff;border-bottom:none;">
+          <div class="c-prof"></div>
+          <div class="c-perf"></div>
+          <div class="c-desc"></div>
+          <div class="c-voc"></div>
+        </div>` : ""}
+    </div>
+  </div>
+
+  ${hasLegend ? `
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-title">Legenda — Tipos de Solo Identificados</div>
+    <div class="legend-body">
+      ${legendItems}
+    </div>
+  </div>` : ""}
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-l">
+      GreenSoil do Brasil LTDA &nbsp;·&nbsp; CNPJ: 29.088.151/0001-25<br>
+      Documento gerado eletronicamente em ${now}
+    </div>
+    <div class="footer-r">
+      ${ident}<br>
+      Perfil Técnico de Sondagem
+    </div>
+  </div>
+
+</div>
+</body>
+</html>`;
   }
 
   // ─── gerador principal (html2canvas → jsPDF, idêntico ao Puppeteer) ─────
