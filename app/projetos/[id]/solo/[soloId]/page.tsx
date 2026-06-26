@@ -352,7 +352,7 @@ export default function SoloDetailPage() {
   .ptbl-hcell { display: flex; align-items: center; justify-content: center; text-align: center; padding: 9px 4px; color: #fff; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border-right: 1px solid rgba(255,255,255,0.15); }
   .ptbl-hcell:last-child { border-right: none; }
   .ptbl-body { position: relative; }
-  .ptbl-row { display: flex; border-bottom: 0.5px solid #ccc; }
+  .ptbl-row { display: flex; border-bottom: 1.5px solid #391e2a; }
   .ptbl-row:last-child { border-bottom: none; }
 
   /* cells */
