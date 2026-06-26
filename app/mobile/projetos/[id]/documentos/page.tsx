@@ -46,6 +46,7 @@ export default function DocumentosMobilePage() {
 
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -61,6 +62,27 @@ export default function DocumentosMobilePage() {
 
     if (data) setDocs(data);
     setLoading(false);
+  }
+
+  async function handleDownload(doc: Doc) {
+    setDownloading(doc.id);
+    try {
+      const response = await fetch(doc.file_url);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // fallback: abre no navegador
+      window.open(doc.file_url, "_blank");
+    } finally {
+      setDownloading(null);
+    }
   }
 
   if (loading) return (
@@ -87,28 +109,51 @@ export default function DocumentosMobilePage() {
         )}
 
         {docs.map((doc) => (
-          <a
-            key={doc.id}
-            href={doc.file_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm active:scale-[0.97] transition"
-          >
-            <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0">
-              <FileIcon type={doc.file_type} />
+          <div key={doc.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-4 p-4">
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0">
+                <FileIcon type={doc.file_type} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-[#391e2a] text-sm leading-snug break-words">{doc.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {formatSize(doc.file_size)} · {new Date(doc.created_at).toLocaleDateString("pt-BR")}
+                </p>
+              </div>
             </div>
 
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[#391e2a] text-sm truncate">{doc.name}</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {formatSize(doc.file_size)} · {new Date(doc.created_at).toLocaleDateString("pt-BR")}
-              </p>
+            {/* Botões de ação */}
+            <div className="flex border-t border-gray-100">
+              <a
+                href={doc.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold text-gray-500 hover:bg-gray-50 transition border-r border-gray-100"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Visualizar
+              </a>
+              <button
+                onClick={() => handleDownload(doc)}
+                disabled={downloading === doc.id}
+                className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition active:scale-95 disabled:opacity-50"
+              >
+                {downloading === doc.id ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                )}
+                {downloading === doc.id ? "Baixando..." : "Baixar arquivo"}
+              </button>
             </div>
-
-            <svg className="w-5 h-5 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-          </a>
+          </div>
         ))}
       </div>
     </MobileShell>
