@@ -262,7 +262,8 @@ export default function SoloDetailPage() {
       .cel-prof { flex-direction: column; justify-content: space-between !important; padding: 4px 8px; color: #666; font-size: 10px; text-align: center; }
       .cel-voc { font-weight: bold; color: #80b02d; }
       .cel-desc { flex-direction: row !important; justify-content: flex-start !important; padding: 8px 12px; text-align: left; gap: 12px; }
-      .desc-text-container { word-wrap: break-word; overflow-wrap: break-word; max-width: 380px; }
+      .desc-text-container { flex: 1; min-width: 0; word-break: break-word; overflow-wrap: break-word; }
+      .desc-text-container b { display: block; }
     </style></head><body>
       <table class="header-main">
         <tr>
