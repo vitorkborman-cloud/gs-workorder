@@ -5,6 +5,27 @@ import { useParams } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import AdminShell from "../../../../../components/layout/AdminShell";
 import { Button } from "../../../../../components/ui/button";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+async function generateWhiteLogoBase64(src: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width; canvas.height = img.height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      ctx.globalCompositeOperation = "source-in";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
+}
 
 type Layer = {
   de: string;
@@ -133,41 +154,313 @@ export default function SoloDetailPage() {
     return [200, 180, 140];
   }
 
-  async function gerarPDF() {
-  if (!data) return;
+  // ─── helpers de canvas ────────────────────────────────────────────────────
 
-  try {
-    console.log("Solicitando PDF para a API...");
-
-    // 1. Chama a rota do nosso servidor Next.js
-    const response = await fetch('/api/gerar-pdf', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data, layers })
-    });
-
-    if (!response.ok) throw new Error("Falha ao gerar o arquivo no servidor");
-
-    // 2. Recebe o arquivo e força o download no navegador do usuário
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    
-    // Fallback caso não tenha a nomenclatura preenchida
-    const nomeIdentificador = data.nomenclatura_poco || data.nome_sondagem || "Sondagem";
-    link.download = `Perfil_${nomeIdentificador}.pdf`;
-    
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-
-  } catch (error) {
-    console.error(error);
-    alert("Erro ao exportar PDF.");
+  function soilColor(tipo: string): string {
+    const t = tipo.toLowerCase();
+    if (t.includes("concreto"))                      return "#cccccc";
+    if (t.includes("rachão") || t.includes("rachao")) return "#888888";
+    if (t.includes("brita") || t.includes("cascalho")) return "#aaaaaa";
+    if (t.includes("aterro"))                        return "#8b7355";
+    if (t.startsWith("argila")) {
+      if (t.includes("aren"))  return "#cc6b58";
+      if (t.includes("silt"))  return "#b86554";
+      return "#d47a6a";
+    }
+    if (t.startsWith("silte")) {
+      if (t.includes("aren"))  return "#d1b280";
+      if (t.includes("argil")) return "#b88655";
+      return "#c19a6b";
+    }
+    if (t.startsWith("areia")) {
+      if (t.includes("argil")) return "#e6c27a";
+      if (t.includes("silt"))  return "#eedd82";
+      return "#fce663";
+    }
+    return "#e0e0e0";
   }
-}
+
+  function drawTexture(ctx: CanvasRenderingContext2D, tipo: string, x: number, y: number, w: number, h: number) {
+    const t = tipo.toLowerCase();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+
+    if (t.includes("areia") || t.includes("arenos")) {
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
+      for (let px = x + 3; px < x + w; px += 6)
+        for (let py = y + 3; py < y + h; py += 6) {
+          ctx.beginPath(); ctx.arc(px, py, 1, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+    if (t.includes("argila") || t.includes("argilos")) {
+      ctx.strokeStyle = "rgba(0,0,0,0.18)";
+      ctx.lineWidth = 0.7;
+      for (let py = y + 7; py < y + h; py += 7) {
+        ctx.beginPath(); ctx.moveTo(x, py); ctx.lineTo(x + w, py); ctx.stroke();
+      }
+    }
+    if (t.includes("silte") || t.includes("siltos")) {
+      ctx.strokeStyle = "rgba(0,0,0,0.14)";
+      ctx.lineWidth = 0.6;
+      for (let d = 0; d < w + h; d += 6) {
+        ctx.beginPath();
+        ctx.moveTo(x + d, y);
+        ctx.lineTo(x, y + d);
+        ctx.stroke();
+      }
+    }
+    if (t.includes("brita") || t.includes("rachão") || t.includes("concreto") || t.includes("cascalho")) {
+      ctx.strokeStyle = "rgba(0,0,0,0.28)";
+      ctx.lineWidth = 1;
+      for (let px = x + 10; px < x + w; px += 18)
+        for (let py = y + 10; py < y + h; py += 18) {
+          ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.stroke();
+        }
+    }
+    ctx.restore();
+  }
+
+  function canvasWrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lh: number) {
+    const words = text.split(" ");
+    let line = "";
+    for (const word of words) {
+      const test = line + word + " ";
+      if (ctx.measureText(test).width > maxW && line) {
+        ctx.fillText(line.trim(), x, y);
+        line = word + " ";
+        y += lh;
+      } else {
+        line = test;
+      }
+    }
+    ctx.fillText(line.trim(), x, y);
+  }
+
+  // ─── gerador principal ────────────────────────────────────────────────────
+
+  async function gerarPDF() {
+    if (!data) return;
+
+    try {
+      // Logo branca
+      let logoB64: string | null = null;
+      try { logoB64 = await generateWhiteLogoBase64("/logo.png"); } catch (_) {}
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageW  = pdf.internal.pageSize.getWidth();
+      const pageH  = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const purple: [number,number,number] = [57, 30, 42];
+      const green:  [number,number,number] = [128, 176, 45];
+      let Y = 0;
+
+      const nom  = data.nomenclatura_poco?.trim();
+      const sond = data.nome_sondagem?.trim();
+      const ident = (nom && sond) ? `${nom} / ${sond}` : nom || sond || "Sondagem";
+
+      // ── Cabeçalho ──
+      pdf.setFillColor(...purple);
+      pdf.rect(0, 0, pageW, 30, "F");
+      pdf.setFillColor(...green);
+      pdf.rect(0, 30, pageW, 1.5, "F");
+      if (logoB64) pdf.addImage(logoB64, "PNG", margin, 9, 32, 10);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(12); pdf.setFont("helvetica", "bold");
+      pdf.text("PERFIL TÉCNICO E DESCRITIVO DE SONDAGEM", pageW - margin, 13, { align: "right" });
+      pdf.setFontSize(8); pdf.setFont("helvetica", "normal");
+      pdf.text(`Poço/Sondagem: ${ident}`, pageW - margin, 20, { align: "right" });
+      pdf.text(`Data: ${data.data || "—"}   |   Método: ${data.tipo_sondagem || "—"}`, pageW - margin, 26, { align: "right" });
+      pdf.setTextColor(0, 0, 0);
+      Y = 40;
+
+      // ── Tabela de metadados ──
+      autoTable(pdf, {
+        startY: Y,
+        margin: { left: margin, right: margin },
+        head: [["Poço / Sondagem", "Coord. UTM (X / Y / Zona)", "Cota", "Prof. Total", "NA"]],
+        body: [[
+          ident,
+          `X: ${data.coord_x || "—"}  Y: ${data.coord_y || "—"}  Zona: ${data.utm_zona || "—"}`,
+          data.cota ? `${data.cota} m` : "—",
+          data.profundidade_total ? `${data.profundidade_total} m` : "—",
+          data.nivel_agua ? `${data.nivel_agua} m` : "—",
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: purple, textColor: 255, fontStyle: "bold", fontSize: 8 },
+        bodyStyles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: { 1: { cellWidth: 60 } },
+      });
+      Y = (pdf as any).lastAutoTable.finalY + 8;
+
+      // ── Desenho do perfil geológico em Canvas ──
+      const SCALE  = 45;
+      const C_PROF = 70, C_VOC = 65, C_PERF = 170, C_DESC = 330;
+      const TOTAL_W = C_PROF + C_VOC + C_PERF + C_DESC;
+      const HDR_H  = 36;
+
+      // Calcula altura total
+      let totalCanvasH = HDR_H;
+      const layerHeights = layers.map(l => {
+        const esp = parseFloat(String(l.ate)) - parseFloat(String(l.de));
+        return Math.max(50, esp * SCALE);
+      });
+      layerHeights.forEach(h => totalCanvasH += h);
+      totalCanvasH += 30; // espaço extra em baixo para construtivo
+
+      const canvas = document.createElement("canvas");
+      canvas.width  = TOTAL_W;
+      canvas.height = totalCanvasH;
+      const ctx = canvas.getContext("2d")!;
+
+      // Fundo branco
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, TOTAL_W, totalCanvasH);
+
+      // Cabeçalho das colunas
+      const cols = [
+        { x: 0,                        w: C_PROF, label: "Prof. (m)" },
+        { x: C_PROF,                   w: C_VOC,  label: "VOC (ppm)" },
+        { x: C_PROF + C_VOC,           w: C_PERF, label: "Perfil Geológico e Construtivo" },
+        { x: C_PROF + C_VOC + C_PERF, w: C_DESC, label: "Descrição Litológica" },
+      ];
+      cols.forEach(col => {
+        ctx.fillStyle   = "#80b02d";
+        ctx.fillRect(col.x, 0, col.w, HDR_H);
+        ctx.strokeStyle = "#391e2a";
+        ctx.lineWidth   = 0.8;
+        ctx.strokeRect(col.x, 0, col.w, HDR_H);
+        ctx.fillStyle   = "#ffffff";
+        ctx.font        = "bold 13px Arial";
+        ctx.textAlign   = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(col.label, col.x + col.w / 2, HDR_H / 2);
+      });
+
+      // Camadas
+      let curY = HDR_H;
+      layers.forEach((layer, i) => {
+        const rowH = layerHeights[i];
+        const profX = C_PROF + C_VOC;
+
+        // Cor + textura do solo
+        ctx.fillStyle = soilColor(layer.tipo || "");
+        ctx.fillRect(profX, curY, C_PERF, rowH);
+        drawTexture(ctx, layer.tipo || "", profX, curY, C_PERF, rowH);
+
+        // Bordas
+        ctx.strokeStyle = "#391e2a";
+        ctx.lineWidth   = 0.5;
+        ctx.strokeRect(0, curY, C_PROF, rowH);
+        ctx.strokeRect(C_PROF, curY, C_VOC, rowH);
+        ctx.strokeRect(profX, curY, C_PERF, rowH);
+        ctx.strokeRect(profX + C_PERF, curY, C_DESC, rowH);
+
+        // Profundidade
+        ctx.fillStyle    = "#444444";
+        ctx.font         = "12px Arial";
+        ctx.textAlign    = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText(String(layer.de),  C_PROF / 2, curY + 6);
+        ctx.textBaseline = "bottom";
+        ctx.fillText(String(layer.ate), C_PROF / 2, curY + rowH - 6);
+
+        // VOC
+        ctx.fillStyle    = "#5a8a1e";
+        ctx.font         = "bold 13px Arial";
+        ctx.textAlign    = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(layer.leitura_voc || "—", C_PROF + C_VOC / 2, curY + rowH / 2);
+
+        // Descrição
+        const descX = profX + C_PERF + 12;
+        ctx.fillStyle    = "#391e2a";
+        ctx.font         = "bold 13px Arial";
+        ctx.textAlign    = "left";
+        ctx.textBaseline = "top";
+        canvasWrapText(ctx, (layer.tipo || "N/A").toUpperCase(), descX, curY + 12, C_DESC - 20, 17);
+
+        if (layer.coloracao) {
+          ctx.fillStyle = "#666666";
+          ctx.font      = "11px Arial";
+          canvasWrapText(ctx, `Obs: ${layer.coloracao}`, descX, curY + 34, C_DESC - 20, 15);
+        }
+
+        curY += rowH;
+      });
+
+      // Nível d'água
+      const naVal = parseFloat(data.nivel_agua);
+      if (!isNaN(naVal)) {
+        let naY = HDR_H;
+        for (let i = 0; i < layers.length; i++) {
+          const de  = parseFloat(String(layers[i].de));
+          const ate = parseFloat(String(layers[i].ate));
+          const rH  = layerHeights[i];
+          if (naVal >= de && naVal <= ate) { naY += ((naVal - de) / (ate - de)) * rH; break; }
+          if (naVal > ate) naY += rH;
+        }
+        const profX = C_PROF + C_VOC;
+        ctx.strokeStyle = "#005fcc";
+        ctx.lineWidth   = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(profX, naY);
+        ctx.lineTo(profX + C_PERF, naY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // seta
+        ctx.fillStyle = "#005fcc";
+        ctx.beginPath();
+        ctx.moveTo(profX + 20, naY - 6);
+        ctx.lineTo(profX + 26, naY);
+        ctx.lineTo(profX + 20, naY + 6);
+        ctx.fill();
+        ctx.font      = "bold 11px Arial";
+        ctx.fillStyle = "#005fcc";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(`NA: ${naVal}m`, profX + 6, naY - 2);
+      }
+
+      // ── Incorpora o canvas no PDF ──
+      const imgData = canvas.toDataURL("image/png", 1.0);
+      const availW  = pageW - margin * 2;
+      const imgH    = availW * (canvas.height / canvas.width);
+
+      // Quebra de página se necessário
+      if (Y + imgH > pageH - 20) {
+        pdf.addPage();
+        Y = 20;
+      }
+
+      // Se o perfil for muito alto, escala para caber
+      const maxH = pageH - Y - 20;
+      const finalH = Math.min(imgH, maxH);
+      const finalW = finalH * (canvas.width / canvas.height);
+
+      pdf.addImage(imgData, "PNG", margin, Y, finalW, finalH);
+
+      // ── Rodapé em todas as páginas ──
+      const totalPg = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPg; i++) {
+        pdf.setPage(i);
+        pdf.setFillColor(245, 245, 245);
+        pdf.rect(0, pageH - 10, pageW, 10, "F");
+        pdf.setFontSize(7);
+        pdf.setTextColor(150);
+        pdf.text("GreenSoil do Brasil LTDA   |   Documento gerado eletronicamente", margin, pageH - 3.5);
+        pdf.text(`Página ${i} de ${totalPg}`, pageW - margin, pageH - 3.5, { align: "right" });
+      }
+
+      pdf.save(`Perfil_${ident.replace(/[/\\]/g, "-")}.pdf`);
+
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao exportar PDF. Verifique o console.");
+    }
+  }
 
   if (loading) return <AdminShell><p className="p-10 text-center text-gray-500">Carregando...</p></AdminShell>;
   if (!data) return <AdminShell><p className="p-10 text-center text-red-500">Perfil não encontrado.</p></AdminShell>;
