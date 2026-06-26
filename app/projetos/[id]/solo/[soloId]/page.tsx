@@ -555,8 +555,8 @@ export default function SoloDetailPage() {
         pdf.addImage(imgData, "JPEG", 0, -offsetY, imgW, imgH);
         remaining -= pageH;
         offsetY   += pageH;
-        // Só cria nova página se sobrar conteúdo significativo (mais de 15mm)
-        if (remaining > 15) pdf.addPage();
+        // Só cria nova página se sobrar conteúdo significativo (mais de 30mm)
+        if (remaining > 30) pdf.addPage();
       }
 
       const nom   = data.nomenclatura_poco?.trim();
