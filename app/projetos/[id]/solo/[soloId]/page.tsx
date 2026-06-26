@@ -261,8 +261,8 @@ export default function SoloDetailPage() {
       .celula:last-child { border-right: none; }
       .cel-prof { flex-direction: column; justify-content: space-between !important; padding: 4px 8px; color: #666; font-size: 10px; text-align: center; }
       .cel-voc { font-weight: bold; color: #80b02d; }
-      .cel-desc { flex-direction: row !important; justify-content: flex-start !important; padding: 8px 12px; text-align: left; gap: 12px; overflow: hidden; }
-      .desc-text-container { min-width: 0; flex: 1; overflow: hidden; word-wrap: break-word; overflow-wrap: break-word; }
+      .cel-desc { flex-direction: row !important; justify-content: flex-start !important; padding: 8px 12px; text-align: left; gap: 12px; }
+      .desc-text-container { word-wrap: break-word; overflow-wrap: break-word; max-width: 380px; }
     </style></head><body>
       <table class="header-main">
         <tr>
@@ -299,7 +299,7 @@ export default function SoloDetailPage() {
               <div class="celula" style="width:180px;${estilo}"></div>
               <div class="celula cel-desc" style="flex:1;">
                 <div style="width:28px;height:28px;min-width:28px;border:0.5px solid #333;border-radius:4px;${estilo}"></div>
-                <div class="desc-text-container"><b style="color:#391e2a;font-size:13px;">${(l.tipo || "N/A").toUpperCase()}</b>${l.coloracao ? `<div style="margin-top:2px;color:#555;font-size:11px;">Obs: ${l.coloracao}</div>` : ""}</div>
+                <div class="desc-text-container" style="margin-left:12px;"><b style="color:#391e2a;font-size:13px;">${(l.tipo || "N/A").toUpperCase()}</b>${l.coloracao ? `<div style="margin-top:2px;color:#555;">Observações: ${l.coloracao}</div>` : ""}</div>
               </div>
             </div>`;
           }).join("")}
