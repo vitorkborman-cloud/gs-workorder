@@ -356,9 +356,9 @@ export default function SoloDetailPage() {
   .ptbl-row:last-child { border-bottom: none; }
 
   /* cells */
-  .c-prof { width: ${C_PROF}px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 5px 6px; border-right: 0.5px solid #ccc; font-size: 9.5px; color: #555; font-weight: 600; }
-  .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #ccc; }
-  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: 10px 14px; gap: 12px; border-right: 0.5px solid #ccc; }
+  .c-prof { width: ${C_PROF}px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 5px 6px; border-right: 0.5px solid #222; font-size: 9.5px; color: #555; font-weight: 600; }
+  .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #222; }
+  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: 10px 14px; gap: 12px; border-right: 0.5px solid #222; }
   .c-voc  { width: ${C_VOC}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #5a8a1e; }
   .desc-swatch { width: 26px; height: 26px; flex-shrink: 0; border: 0.5px solid #888; border-radius: 3px; }
   .desc-text { flex: 1; min-width: 0; }
