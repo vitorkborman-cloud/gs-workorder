@@ -117,23 +117,26 @@ export default function FisicoQuimicosDesktopPage() {
 
       const drawPageHeader = (subtitle = "FÍSICO-QUÍMICOS — LEITURAS DETALHADAS") => {
         doc.setFillColor(...brandPurple);
-        doc.rect(0, 0, pageWidth, 30, "F");
+        doc.rect(0, 0, pageWidth, 34, "F");
         doc.setFillColor(...brandGreen);
-        doc.rect(0, 30, pageWidth, 1.5, "F");
+        doc.rect(0, 34, pageWidth, 2, "F");
 
         if (whiteLogoBase64) {
-          try { doc.addImage(whiteLogoBase64, "PNG", marginX, 8, 32, 10); } catch (e) {}
+          try { doc.addImage(whiteLogoBase64, "PNG", marginX, 10, 32, 10); } catch (e) {}
         }
 
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.text(subtitle, pageWidth - marginX, 14, { align: "right" });
+        doc.text(subtitle, pageWidth - marginX, 15, { align: "right" });
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
-        doc.text(`Projeto: ${projectName}   |   Campanha: ${formatDateBr(dataCampanha)}`, pageWidth - marginX, 21, { align: "right" });
+        doc.text(`Projeto: ${projectName}   |   Campanha: ${formatDateBr(dataCampanha)}`, pageWidth - marginX, 22, { align: "right" });
+        doc.setFontSize(7.5);
+        doc.setTextColor(180, 210, 120);
+        doc.text("SHEQ n° 002   |   Versão V 00", pageWidth - marginX, 29, { align: "right" });
         doc.setTextColor(0, 0, 0);
-        currentY = 42;
+        currentY = 46;
       };
 
       const drawPageFooter = (pageNum: number, totalPages: number) => {
@@ -306,11 +309,15 @@ export default function FisicoQuimicosDesktopPage() {
         resumo.addImage(logoId, { tl: { col: 0.15, row: 0.15 }, ext: { width: 140, height: 42 } } as any);
       } catch (_) {}
 
-      ["A1:G1","A2:G2","A3:G3"].forEach(r => resumo.mergeCells(r));
+      ["A1:G1","A2:G2"].forEach(r => resumo.mergeCells(r));
+      resumo.mergeCells("A3:D3");
+      resumo.mergeCells("E3:G3");
       [1,2,3].forEach(r => {
         const row = resumo.getRow(r);
         row.height = 22;
-        row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+        row.eachCell(c => {
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+        });
       });
       const rr1 = resumo.getRow(1);
       rr1.getCell(1).value = "RELATÓRIO DE PARÂMETROS FÍSICO-QUÍMICOS";
@@ -323,9 +330,13 @@ export default function FisicoQuimicosDesktopPage() {
       rr2.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
 
       const rr3 = resumo.getRow(3);
-      rr3.getCell(1).value = `Gerado em: ${new Date().toLocaleString("pt-BR")}   |   GreenSoil do Brasil LTDA`;
-      rr3.getCell(1).font = { name: "Calibri", size: 9, color: { argb: "FFAAAAAA" } };
-      rr3.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
+      rr3.getCell(1).value = "SHEQ n° 002   |   Versão V 00";
+      rr3.getCell(1).font = { name: "Calibri", size: 9, bold: true, color: { argb: "FFB4D278" } };
+      rr3.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+      rr3.getCell(5).value = `Gerado em: ${new Date().toLocaleString("pt-BR")}   |   GreenSoil do Brasil LTDA`;
+      rr3.getCell(5).font = { name: "Calibri", size: 9, color: { argb: "FFAAAAAA" } };
+      rr3.getCell(5).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+      rr3.getCell(5).alignment = { vertical: "middle", horizontal: "right" };
 
       resumo.addRow([]);
 
@@ -367,20 +378,30 @@ export default function FisicoQuimicosDesktopPage() {
       const sheet = workbook.addWorksheet("Leituras Detalhadas", { views: [{ showGridLines: false, state: "frozen", ySplit: 5 }] });
       sheet.columns = [{ width: 24 }, { width: 20 }, { width: 14 }, { width: 12 }, { width: 14 }, { width: 14 }, { width: 20 }];
 
-      ["A1:G1","A2:G2","A3:G3"].forEach(r => sheet.mergeCells(r));
+      ["A1:G1","A2:G2"].forEach(r => sheet.mergeCells(r));
+      sheet.mergeCells("A3:D3");
+      sheet.mergeCells("E3:G3");
       [1,2,3].forEach(r => {
         const row = sheet.getRow(r);
         row.height = 22;
-        row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+        row.eachCell(c => {
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+        });
       });
 
       sheet.getRow(1).getCell(1).value = "LEITURAS FÍSICO-QUÍMICAS — DETALHADAS";
       sheet.getRow(1).getCell(1).font = { name: "Calibri", size: 14, bold: true, color: { argb: "FFFFFFFF" } };
-      sheet.getRow(1).getCell(1).alignment = { vertical: "middle", horizontal: "center" };
+      sheet.getRow(1).getCell(1).alignment = { vertical: "middle", horizontal: "right" };
       sheet.getRow(2).getCell(1).value = `Projeto: ${projectName}   |   Campanha: ${formatDateBr(dataCampanha)}`;
       sheet.getRow(2).getCell(1).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF80B02D" } };
-      sheet.getRow(2).getCell(1).alignment = { vertical: "middle", horizontal: "center" };
-      sheet.getRow(3).getCell(1).value = "";
+      sheet.getRow(2).getCell(1).alignment = { vertical: "middle", horizontal: "right" };
+      sheet.getRow(3).getCell(1).value = "SHEQ n° 002   |   Versão V 00";
+      sheet.getRow(3).getCell(1).font = { name: "Calibri", size: 9, bold: true, color: { argb: "FFB4D278" } };
+      sheet.getRow(3).getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+      sheet.getRow(3).getCell(5).value = `Gerado em: ${new Date().toLocaleString("pt-BR")}   |   GreenSoil do Brasil LTDA`;
+      sheet.getRow(3).getCell(5).font = { name: "Calibri", size: 9, color: { argb: "FFAAAAAA" } };
+      sheet.getRow(3).getCell(5).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+      sheet.getRow(3).getCell(5).alignment = { vertical: "middle", horizontal: "right" };
       sheet.addRow([]);
 
       const dH = sheet.addRow(["Poço / Nomenclatura", "Código", "Horário", "NA (m)", "pH", "ORP (mV)", "OD (mg/L)"]);

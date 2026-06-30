@@ -332,8 +332,15 @@ export default function SoloDetailPage() {
   html, body { width: ${PAGE_W}px; background: #fff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #222; }
   .page { width: ${PAGE_W}px; padding: ${PAD}px; }
 
+  /* ── sheq bar ── */
+  .sheq-bar { display: flex; align-items: center; justify-content: space-between; background: #391e2a; border-radius: 4px 4px 0 0; padding: 6px 14px; border-bottom: 3px solid #80b02d; }
+  .sheq-bar-left { display: flex; align-items: center; gap: 10px; }
+  .sheq-bar-company { font-size: 9px; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
+  .sheq-bar-right { text-align: right; font-size: 8px; color: #b4d278; font-weight: 600; letter-spacing: 0.5px; }
+  .sheq-bar-right span { color: rgba(255,255,255,0.5); margin: 0 5px; }
+
   /* ── header ── */
-  .hdr { display: flex; border: 2px solid #391e2a; border-radius: 4px 4px 0 0; overflow: hidden; }
+  .hdr { display: flex; border: 2px solid #391e2a; border-top: none; overflow: hidden; }
   .hdr-logo { width: 130px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 10px; background: #fff; border-right: 2px solid #391e2a; }
   .hdr-body { flex: 1; display: flex; flex-direction: column; }
   .hdr-title { background: #391e2a; color: #fff; text-align: center; padding: 9px 12px; font-size: 13px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; border-bottom: 3px solid #80b02d; }
@@ -379,7 +386,18 @@ export default function SoloDetailPage() {
 <body>
 <div class="page">
 
-  <!-- HEADER -->
+  <!-- SHEQ HEADER BAR -->
+  <div class="sheq-bar">
+    <div class="sheq-bar-left">
+      ${logoBase64 ? `<img src="${logoBase64}" style="max-height:28px;max-width:80px;object-fit:contain;filter:brightness(0) invert(1);" />` : `<span class="sheq-bar-company">GREENSOIL</span>`}
+      <span class="sheq-bar-company">GreenSoil do Brasil LTDA</span>
+    </div>
+    <div class="sheq-bar-right">
+      SHEQ n° 003<span>|</span>Versão V 00
+    </div>
+  </div>
+
+  <!-- HEADER (informações do poço) -->
   <div class="hdr">
     <div class="hdr-logo">
       ${logoBase64 ? `<img src="${logoBase64}" style="max-width:105px;max-height:48px;object-fit:contain;" />` : `<span style="font-size:13px;font-weight:900;color:#391e2a;">GREENSOIL</span>`}

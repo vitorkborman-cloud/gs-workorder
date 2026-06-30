@@ -163,11 +163,15 @@ export default function WorkOrderPage() {
       const dateStr  = new Date(workOrder.created_at).toLocaleDateString("pt-BR");
       const now      = new Date().toLocaleString("pt-BR");
 
-      ["A1:D1", "A2:D2", "A3:D3"].forEach(r => sheet.mergeCells(r));
+      ["A1:D1", "A2:D2"].forEach(r => sheet.mergeCells(r));
+      sheet.mergeCells("A3:B3");
+      sheet.mergeCells("C3:D3");
       [1,2,3].forEach(r => {
         const row = sheet.getRow(r);
         row.height = 22;
-        row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+        row.eachCell(c => {
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+        });
       });
 
       const r1 = sheet.getRow(1);
@@ -181,9 +185,13 @@ export default function WorkOrderPage() {
       r2.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
 
       const r3 = sheet.getRow(3);
-      r3.getCell(1).value = `Gerado em: ${now}   |   GreenSoil do Brasil LTDA`;
-      r3.getCell(1).font = { name: "Calibri", size: 9, color: { argb: "FFAAAAAA" } };
-      r3.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
+      r3.getCell(1).value = "SHEQ n° 001   |   Versão V 00";
+      r3.getCell(1).font = { name: "Calibri", size: 9, bold: true, color: { argb: "FFB4D278" } };
+      r3.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+      r3.getCell(3).value = `Gerado em: ${now}   |   GreenSoil do Brasil LTDA`;
+      r3.getCell(3).font = { name: "Calibri", size: 9, color: { argb: "FFAAAAAA" } };
+      r3.getCell(3).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF391E2A" } };
+      r3.getCell(3).alignment = { vertical: "middle", horizontal: "right" };
 
       // ── Linha 4: resumo ──
       const total     = activities.length;
@@ -343,20 +351,29 @@ export default function WorkOrderPage() {
 
       function addHeaderBase(title: string = "RELATÓRIO WORK ORDER") {
         pdf.setFillColor(...brandPurple);
-        pdf.rect(0, 0, pageWidth, 28, "F");
+        pdf.rect(0, 0, pageWidth, 34, "F");
         pdf.setFillColor(...brandGreen);
-        pdf.rect(0, 28, pageWidth, 2, "F");
+        pdf.rect(0, 34, pageWidth, 2, "F");
 
         if (whiteLogoBase64) {
-          pdf.addImage(whiteLogoBase64, "PNG", margin, 9, 30, 9);
+          pdf.addImage(whiteLogoBase64, "PNG", margin, 10, 30, 9);
         }
 
         pdf.setTextColor(255, 255, 255);
-        pdf.setFontSize(14);
+        pdf.setFontSize(13);
         pdf.setFont("helvetica", "bold");
-        pdf.text(title, pageWidth - margin, 18, { align: "right" });
+        pdf.text(title, pageWidth - margin, 15, { align: "right" });
+
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(`Projeto: ${workOrder?.projects?.name ?? ""}   |   ${new Date(workOrder?.created_at ?? Date.now()).toLocaleDateString("pt-BR")}`, pageWidth - margin, 22, { align: "right" });
+
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(180, 210, 120);
+        pdf.text("SHEQ n° 001   |   Versão V 00", pageWidth - margin, 29, { align: "right" });
+
         pdf.setTextColor(0, 0, 0);
-        currentY = 45;
+        currentY = 50;
       }
 
       const checkPageBreak = (needed: number) => {
