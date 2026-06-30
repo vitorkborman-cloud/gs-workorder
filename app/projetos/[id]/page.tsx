@@ -321,11 +321,23 @@ export default function ProjetoPage() {
 
             {/* ── TELEMETRIA ── */}
             <section>
-              <SectionHeader
-                title="Telemetria"
-                subtitle="Status e leituras em tempo real dos equipamentos (HI Tecnologia)"
-                count={telemetryDevices.length}
-              />
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <SectionHeader
+                  title="Telemetria"
+                  subtitle="Status e leituras em tempo real dos equipamentos (HI Tecnologia)"
+                  count={telemetryDevices.length}
+                />
+                <button
+                  onClick={async () => {
+                    const { error } = await supabase.functions.invoke("test-push", { method: "POST" });
+                    if (error) alert("Erro ao enviar teste: " + error.message);
+                    else alert("Notificação de teste enviada! Verifique os celulares.");
+                  }}
+                  className="shrink-0 text-xs font-bold px-3 py-2 rounded-xl border border-orange-300 text-orange-600 hover:bg-orange-50 transition"
+                >
+                  Testar push
+                </button>
+              </div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {telemetryDevices.map((dev) => (
                   <div key={dev.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
