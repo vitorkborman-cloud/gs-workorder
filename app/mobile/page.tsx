@@ -86,13 +86,12 @@ export default function MobileHome() {
 
       const { endpoint, keys } = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
       await supabase.from("push_subscriptions").upsert(
-        { user_id: user.id, endpoint, p256dh: keys.p256dh, auth: keys.auth },
+        { user_id: user?.id ?? null, endpoint, p256dh: keys.p256dh, auth: keys.auth },
         { onConflict: "endpoint" }
       );
-    } catch (_) { /* silencioso: permissão negada ou browser sem suporte */ }
+    } catch (err) { console.error("Push registration failed:", err); }
   }
 
   async function checkMaintenanceNotifications() {
