@@ -39,6 +39,8 @@ function saveFavorites(ids: Set<string>) {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify([...ids]));
 }
 
+const VAPID_PUBLIC_KEY = "BHGCBVibSMQZBwrB4zgGRYEkBqQ2zDq2p7z7hP43JPaMFmuOWXCb9gyz232gSxSUZOydkP5rQAujRHDVIxbwpzs";
+
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -90,7 +92,7 @@ export default function MobileHome() {
       const existing = await reg.pushManager.getSubscription();
       const sub = existing ?? await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
 
       const { endpoint, keys } = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
@@ -174,10 +176,8 @@ export default function MobileHome() {
             if (!reg) return;
             await navigator.serviceWorker.ready;
             setPushDebug("SW pronto. Permissão: " + Notification.permission);
-            const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-            if (!vapidKey) { setPushDebug("ERRO: VAPID key não encontrada"); return; }
             setPushDebug("Inscrevendo no push...");
-            const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) })
+            const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) })
               .catch((e) => { setPushDebug("ERRO subscribe: " + e.message); return null; });
             if (!sub) return;
             const json = sub.toJSON() as any;
