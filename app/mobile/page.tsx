@@ -62,7 +62,38 @@ export default function MobileHome() {
 
   useEffect(() => {
     loadProjects();
+    registerPushSubscription();
   }, []);
+
+  async function registerPushSubscription() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+
+    try {
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+
+      let permission = Notification.permission;
+      if (permission === "default") {
+        permission = await Notification.requestPermission();
+      }
+      if (permission !== "granted") return;
+
+      const existing = await reg.pushManager.getSubscription();
+      const sub = existing ?? await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      });
+
+      const { endpoint, keys } = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase.from("push_subscriptions").upsert(
+        { user_id: user.id, endpoint, p256dh: keys.p256dh, auth: keys.auth },
+        { onConflict: "endpoint" }
+      );
+    } catch (_) { /* silencioso: permissão negada ou browser sem suporte */ }
+  }
 
   async function checkMaintenanceNotifications() {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
