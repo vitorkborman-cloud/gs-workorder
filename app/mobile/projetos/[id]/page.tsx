@@ -73,6 +73,18 @@ const modules = [
     ),
   },
   {
+    key: "telemetria",
+    label: "Telemetria",
+    description: "Status dos equipamentos em campo",
+    color: "#ea580c",
+    bg: "from-[#ea580c] to-[#c2410c]",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+  },
+  {
     key: "rdo",
     label: "Relatório Diário de Obra",
     description: "Atividades e fotos do dia",

@@ -11,6 +11,7 @@ type Perfil = { id: string; nome_sondagem: string; nomenclatura_poco: string; cr
 type RDO = { id: string; data: string; created_at: string; };
 type CampanhaFQ = { data: string; quantidade: number; };
 type ProjectDoc = { id: string; name: string; file_url: string; file_type: string; file_size: number; created_at: string; };
+type TelemetryDevice = { id: string; name: string; configuration_id: string; reference_id: string; status: string; last_reading: any; last_checked_at: string | null; };
 
 function formatDateBr(d: string) {
   if (!d) return "Sem data";
@@ -73,6 +74,8 @@ export default function ProjetoPage() {
   const [rdos, setRdos] = useState<RDO[]>([]);
   const [campanhasFQ, setCampanhasFQ] = useState<CampanhaFQ[]>([]);
   const [docs, setDocs] = useState<ProjectDoc[]>([]);
+  const [telemetryDevices, setTelemetryDevices] = useState<TelemetryDevice[]>([]);
+  const [loadingTelemetry, setLoadingTelemetry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [mobile, setMobile] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -83,23 +86,50 @@ export default function ProjetoPage() {
   }, []);
 
   async function load() {
-    const [{ data: wo }, { data: sd }, { data: rdoData }, { data: fqData }, { data: docsData }] = await Promise.all([
+    const [{ data: wo }, { data: sd }, { data: rdoData }, { data: fqData }, { data: docsData }, { data: telData }] = await Promise.all([
       supabase.from("work_orders").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
       supabase.from("soil_descriptions").select("id, nome_sondagem, nomenclatura_poco, created_at").eq("project_id", projectId).eq("finalized", true).order("created_at", { ascending: false }),
       supabase.from("rdo_reports").select("id, data, created_at").eq("project_id", projectId).eq("draft", false).order("created_at", { ascending: false }),
       supabase.from("water_samplings").select("id, data").eq("project_id", projectId).eq("finalized", true),
       supabase.from("project_documents").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
+      supabase.from("telemetry_devices").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
     ]);
 
     if (wo) setWorkOrders(wo);
     if (docsData) setDocs(docsData);
     if (sd) setPerfis(sd);
     if (rdoData) setRdos(rdoData);
+    if (telData) setTelemetryDevices(telData);
     if (fqData) {
       const grouped = fqData.reduce((acc: any, curr: any) => { acc[curr.data] = (acc[curr.data] || 0) + 1; return acc; }, {});
       setCampanhasFQ(Object.keys(grouped).map(d => ({ data: d, quantidade: grouped[d] })).sort((a, b) => b.data.localeCompare(a.data)));
     }
     setLoading(false);
+  }
+
+  async function refreshTelemetry(device: TelemetryDevice) {
+    setLoadingTelemetry(device.id);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        `telemetria?action=dados&configId=${device.configuration_id}`,
+        { method: "GET" }
+      );
+      if (error) throw error;
+
+      await supabase
+        .from("telemetry_devices")
+        .update({ status: "online", last_reading: data, last_checked_at: new Date().toISOString() })
+        .eq("id", device.id);
+    } catch (err: any) {
+      await supabase
+        .from("telemetry_devices")
+        .update({ status: "offline", last_checked_at: new Date().toISOString() })
+        .eq("id", device.id);
+      alert("Não foi possível buscar a leitura: " + (err.message || err));
+    } finally {
+      setLoadingTelemetry(null);
+      load();
+    }
   }
 
   async function createWorkOrder() {
@@ -281,6 +311,63 @@ export default function ProjetoPage() {
             </div>
           )}
         </section>
+
+        {telemetryDevices.length > 0 && (
+          <>
+            <div className="border-t border-gray-100" />
+
+            {/* ── TELEMETRIA ── */}
+            <section>
+              <SectionHeader
+                title="Telemetria"
+                subtitle="Status e leituras em tempo real dos equipamentos (HI Tecnologia)"
+                count={telemetryDevices.length}
+              />
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {telemetryDevices.map((dev) => (
+                  <div key={dev.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                        dev.status === "online" ? "bg-green-100 text-green-700" :
+                        dev.status === "offline" ? "bg-red-100 text-red-700" :
+                        "bg-gray-100 text-gray-500"
+                      }`}>
+                        {dev.status === "online" ? "● Online" : dev.status === "offline" ? "● Offline" : "— Sem dados"}
+                      </span>
+                    </div>
+                    <p className="font-bold text-[#391e2a] text-sm">{dev.name}</p>
+                    <p className="text-xs text-gray-400 mt-1">Config ID: {dev.configuration_id}</p>
+
+                    {dev.last_reading && (
+                      <pre className="mt-3 text-[10px] bg-gray-50 rounded-lg p-2 overflow-x-auto max-h-24 text-gray-600">
+                        {JSON.stringify(dev.last_reading, null, 1)}
+                      </pre>
+                    )}
+
+                    {dev.last_checked_at && (
+                      <p className="text-[10px] text-gray-300 mt-2">
+                        Última checagem: {new Date(dev.last_checked_at).toLocaleString("pt-BR")}
+                      </p>
+                    )}
+
+                    <button
+                      onClick={() => refreshTelemetry(dev)}
+                      disabled={loadingTelemetry === dev.id}
+                      className="mt-3 w-full text-xs font-bold py-2 rounded-xl bg-[#391e2a] text-white hover:bg-[#2a161f] transition disabled:opacity-50"
+                    >
+                      {loadingTelemetry === dev.id ? "Buscando..." : "Atualizar leitura"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
 
         <div className="border-t border-gray-100" />
 
