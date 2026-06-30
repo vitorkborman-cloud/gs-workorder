@@ -52,7 +52,6 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 export default function MobileHome() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [search, setSearch] = useState("");
-  const [pushDebug, setPushDebug] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -104,7 +103,6 @@ export default function MobileHome() {
       );
     } catch (err: any) {
       console.error("Push registration failed:", err);
-      setPushDebug("ERRO: " + (err?.message || String(err)));
     }
   }
 
@@ -159,40 +157,6 @@ export default function MobileHome() {
       subtitle="Selecione um projeto para continuar"
     >
       <div className="px-1 pb-6 space-y-6">
-
-        {/* DEBUG TEMPORÁRIO DE PUSH */}
-        {pushDebug && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl p-3">
-            {pushDebug}
-          </div>
-        )}
-        <button
-          onClick={async () => {
-            setPushDebug("Iniciando...");
-            if (!("serviceWorker" in navigator)) { setPushDebug("ERRO: serviceWorker não suportado"); return; }
-            if (!("PushManager" in window)) { setPushDebug("ERRO: PushManager não suportado"); return; }
-            setPushDebug("Registrando SW...");
-            const reg = await navigator.serviceWorker.register("/sw.js").catch((e) => { setPushDebug("ERRO SW: " + e.message); return null; });
-            if (!reg) return;
-            await navigator.serviceWorker.ready;
-            setPushDebug("SW pronto. Permissão: " + Notification.permission);
-            setPushDebug("Inscrevendo no push...");
-            const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) })
-              .catch((e) => { setPushDebug("ERRO subscribe: " + e.message); return null; });
-            if (!sub) return;
-            const json = sub.toJSON() as any;
-            setPushDebug("Salvando no banco...");
-            const { error } = await supabase.from("push_subscriptions").upsert(
-              { user_id: null, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth },
-              { onConflict: "endpoint" }
-            );
-            if (error) { setPushDebug("ERRO banco: " + error.message); return; }
-            setPushDebug("✅ Cadastrado com sucesso!");
-          }}
-          className="w-full text-xs font-bold py-2 rounded-xl border border-gray-200 text-gray-500"
-        >
-          Diagnosticar notificações
-        </button>
 
         {/* BUSCA COM DESIGN MODERNO */}
         <div className="relative group">
