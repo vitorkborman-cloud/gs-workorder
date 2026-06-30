@@ -114,7 +114,10 @@ export default function ProjetoPage() {
         `telemetria?action=dados&configId=${device.configuration_id}`,
         { method: "GET" }
       );
-      if (error) throw error;
+      if (error) {
+        const detail = await error.context?.json?.().catch(() => null);
+        throw new Error(detail?.error || error.message);
+      }
 
       await supabase
         .from("telemetry_devices")

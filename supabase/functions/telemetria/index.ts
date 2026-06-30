@@ -28,14 +28,10 @@ async function getToken(): Promise<string> {
     throw new Error("HITEC_API_USER ou HITEC_API_PASSWORD não configurados nos secrets da Edge Function");
   }
 
-  // Tentativa de login via Basic Auth -> retorna Bearer Token
-  const loginResp = await fetch(`${HITEC_BASE_URL}/login`, {
+  const loginResp = await fetch(`${HITEC_BASE_URL}/auth/login/`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Basic " + btoa(`${user}:${password}`),
-    },
-    body: JSON.stringify({ username: user, password }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: user, password }),
   });
 
   if (!loginResp.ok) {
@@ -44,7 +40,9 @@ async function getToken(): Promise<string> {
   }
 
   const loginData = await loginResp.json();
-  const token = loginData.token || loginData.access_token || loginData.accessToken;
+  const token =
+    loginData.token || loginData.access_token || loginData.accessToken ||
+    loginData.access || loginData.key;
 
   if (!token) {
     throw new Error(`Login OK mas token não encontrado na resposta: ${JSON.stringify(loginData)}`);

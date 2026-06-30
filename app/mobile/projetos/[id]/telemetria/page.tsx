@@ -21,6 +21,7 @@ export default function TelemetriaMobilePage() {
   const [devices, setDevices] = useState<TelemetryDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -39,17 +40,22 @@ export default function TelemetriaMobilePage() {
 
   async function refresh(dev: TelemetryDevice) {
     setRefreshing(dev.id);
+    setErrorMsg(null);
     try {
       const { data, error } = await supabase.functions.invoke(
         `telemetria?action=dados&configId=${dev.configuration_id}`,
         { method: "GET" }
       );
-      if (error) throw error;
+      if (error) {
+        const detail = await error.context?.json?.().catch(() => null);
+        throw new Error(detail?.error || error.message);
+      }
       await supabase
         .from("telemetry_devices")
         .update({ status: "online", last_reading: data, last_checked_at: new Date().toISOString() })
         .eq("id", dev.id);
     } catch (err: any) {
+      setErrorMsg(err.message || "Não foi possível buscar a leitura.");
       await supabase
         .from("telemetry_devices")
         .update({ status: "offline", last_checked_at: new Date().toISOString() })
@@ -73,6 +79,12 @@ export default function TelemetriaMobilePage() {
       backHref={`/mobile/projetos/${projectId}`}
     >
       <div className="space-y-3 pb-6">
+        {errorMsg && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl p-3">
+            {errorMsg}
+          </div>
+        )}
+
         {devices.length === 0 && (
           <div className="text-center mt-16 space-y-3 text-gray-400">
             <svg className="w-14 h-14 mx-auto opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
