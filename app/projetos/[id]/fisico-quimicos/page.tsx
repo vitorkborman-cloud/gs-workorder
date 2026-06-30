@@ -115,6 +115,16 @@ export default function FisicoQuimicosDesktopPage() {
       const brandGreen:  [number, number, number] = [128, 176, 45];
       const brandBlue:   [number, number, number] = [47, 126, 161];
 
+      const getLogoSize = (base64: string, targetH: number): Promise<[number, number]> =>
+        new Promise((res) => {
+          const img = new Image();
+          img.onload = () => res([(img.width / img.height) * targetH, targetH]);
+          img.onerror = () => res([targetH * 3.3, targetH]);
+          img.src = base64;
+        });
+
+      const [logoW, logoH] = whiteLogoBase64 ? await getLogoSize(whiteLogoBase64, 10) : [33, 10];
+
       const drawPageHeader = (subtitle = "FÍSICO-QUÍMICOS — LEITURAS DETALHADAS") => {
         doc.setFillColor(...brandPurple);
         doc.rect(0, 0, pageWidth, 34, "F");
@@ -122,7 +132,7 @@ export default function FisicoQuimicosDesktopPage() {
         doc.rect(0, 34, pageWidth, 2, "F");
 
         if (whiteLogoBase64) {
-          try { doc.addImage(whiteLogoBase64, "PNG", marginX, 10, 32, 10); } catch (e) {}
+          try { doc.addImage(whiteLogoBase64, "PNG", marginX, (34 - logoH) / 2, logoW, logoH); } catch (e) {}
         }
 
         doc.setTextColor(255, 255, 255);
@@ -158,40 +168,7 @@ export default function FisicoQuimicosDesktopPage() {
         return false;
       };
 
-      // ── Capa ──
-      doc.setFillColor(...brandPurple);
-      doc.rect(0, 0, pageWidth, pageHeight, "F");
-      doc.setFillColor(...brandGreen);
-      doc.rect(0, pageHeight - 40, pageWidth, 40, "F");
-
-      if (whiteLogoBase64) {
-        try { doc.addImage(whiteLogoBase64, "PNG", pageWidth / 2 - 35, 55, 70, 22); } catch (e) {}
-      }
-
-      doc.setTextColor(...brandGreen);
-      doc.setFontSize(22);
-      doc.setFont("helvetica", "bold");
-      doc.text("RELATÓRIO FÍSICO-QUÍMICOS", pageWidth / 2, 108, { align: "center" });
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(13);
-      doc.text(`Campanha de ${formatDateBr(dataCampanha)}`, pageWidth / 2, 120, { align: "center" });
-
-      doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.4);
-      doc.line(pageWidth / 2 - 45, 128, pageWidth / 2 + 45, 128);
-
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Projeto: ${projectName}`, pageWidth / 2, 138, { align: "center" });
-      doc.text(`${amostras.length} poços amostrados`, pageWidth / 2, 148, { align: "center" });
-
-      doc.setFontSize(9);
-      doc.setTextColor(255, 255, 255);
-      doc.text("GreenSoil do Brasil LTDA   |   CNPJ: 29.088.151/0001-25", pageWidth / 2, pageHeight - 18, { align: "center" });
-
       // ── Página de resumo ──
-      doc.addPage();
       drawPageHeader("FÍSICO-QUÍMICOS — RESUMO DA CAMPANHA");
 
       doc.setFontSize(11);

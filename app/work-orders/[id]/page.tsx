@@ -349,6 +349,17 @@ export default function WorkOrderPage() {
         });
       }
 
+      async function getLogoSize(base64: string, targetH: number): Promise<[number, number]> {
+        return new Promise((res) => {
+          const img = new Image();
+          img.onload = () => res([(img.width / img.height) * targetH, targetH]);
+          img.onerror = () => res([targetH * 3.3, targetH]);
+          img.src = base64;
+        });
+      }
+
+      const [logoW, logoH] = whiteLogoBase64 ? await getLogoSize(whiteLogoBase64, 10) : [33, 10];
+
       function addHeaderBase(title: string = "RELATÓRIO WORK ORDER") {
         pdf.setFillColor(...brandPurple);
         pdf.rect(0, 0, pageWidth, 34, "F");
@@ -356,7 +367,7 @@ export default function WorkOrderPage() {
         pdf.rect(0, 34, pageWidth, 2, "F");
 
         if (whiteLogoBase64) {
-          pdf.addImage(whiteLogoBase64, "PNG", margin, 10, 30, 9);
+          pdf.addImage(whiteLogoBase64, "PNG", margin, (34 - logoH) / 2, logoW, logoH);
         }
 
         pdf.setTextColor(255, 255, 255);
@@ -385,39 +396,7 @@ export default function WorkOrderPage() {
         return false;
       };
 
-      /* ================= 1. CAPA EXECUTIVA ================= */
-      pdf.setFillColor(...brandPurple);
-      pdf.rect(0, 0, pageWidth, pageHeight, "F");
-
-      if (whiteLogoBase64) {
-        pdf.addImage(whiteLogoBase64, "PNG", pageWidth / 2 - 35, 60, 70, 20);
-      }
-
-      pdf.setTextColor(...brandGreen);
-      pdf.setFontSize(24);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("WORK ORDER", pageWidth / 2, 110, { align: "center" });
-
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(16);
-      pdf.text(workOrder.title.toUpperCase(), pageWidth / 2, 125, { align: "center" });
-
-      pdf.setDrawColor(255, 255, 255);
-      pdf.setLineWidth(0.5);
-      pdf.line(pageWidth / 2 - 40, 135, pageWidth / 2 + 40, 135);
-
-      pdf.setFontSize(12);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(`PROJETO: ${workOrder.projects?.name ?? "Não atribuído"}`, pageWidth / 2, 150, { align: "center" });
-      pdf.text(`DATA: ${new Date(workOrder.created_at).toLocaleDateString()}`, pageWidth / 2, 160, { align: "center" });
-
-      pdf.setFontSize(10);
-      pdf.setTextColor(150, 150, 150);
-      pdf.text("GreenSoil do Brasil LTDA", pageWidth / 2, pageHeight - 30, { align: "center" });
-      pdf.text("CNPJ: 29.088.151/0001-25", pageWidth / 2, pageHeight - 24, { align: "center" });
-
-      /* ================= 2. TABELA DE RESUMO ================= */
-      pdf.addPage();
+      /* ================= 1. TABELA DE RESUMO ================= */
       addHeaderBase("RESUMO DAS ATIVIDADES");
 
       autoTable(pdf, {

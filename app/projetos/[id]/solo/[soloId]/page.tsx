@@ -389,7 +389,6 @@ export default function SoloDetailPage() {
   <!-- SHEQ HEADER BAR -->
   <div class="sheq-bar">
     <div class="sheq-bar-left">
-      ${logoBase64 ? `<img src="${logoBase64}" style="max-height:28px;max-width:80px;object-fit:contain;filter:brightness(0) invert(1);" />` : `<span class="sheq-bar-company">GREENSOIL</span>`}
       <span class="sheq-bar-company">GreenSoil do Brasil LTDA</span>
     </div>
     <div class="sheq-bar-right">

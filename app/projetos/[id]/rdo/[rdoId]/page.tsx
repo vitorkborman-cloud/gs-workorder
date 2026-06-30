@@ -166,10 +166,41 @@ export default function RdoViewPage() {
     const brandGreen: [number, number, number] = [128, 176, 45];
     const lightGray: [number, number, number] = [248, 248, 250];
 
+    const getLogoSize = (base64: string, targetH: number): Promise<[number, number]> =>
+      new Promise((res) => {
+        const img = new Image();
+        img.onload = () => res([(img.width / img.height) * targetH, targetH]);
+        img.onerror = () => res([targetH * 3.3, targetH]);
+        img.src = base64;
+      });
+    const [logoW, logoH] = whiteLogoBase64 ? await getLogoSize(whiteLogoBase64, 10) : [33, 10];
+
+    const addRdoHeader = () => {
+      doc.setFillColor(...brandPurple);
+      doc.rect(0, 0, pageWidth, 34, "F");
+      doc.setFillColor(...brandGreen);
+      doc.rect(0, 34, pageWidth, 2, "F");
+      if (whiteLogoBase64) {
+        try { doc.addImage(whiteLogoBase64, "PNG", marginX, (34 - logoH) / 2, logoW, logoH); } catch (e) {}
+      }
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 15, { align: "right" });
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Projeto: ${projectName}   |   Data: ${rdo.data}`, pageWidth - marginX, 22, { align: "right" });
+      doc.setFontSize(7.5);
+      doc.setTextColor(180, 210, 120);
+      doc.text("SHEQ n° 004   |   Versão V 00", pageWidth - marginX, 29, { align: "right" });
+      doc.setTextColor(0, 0, 0);
+    };
+
     const checkPageBreak = (needed: number) => {
       if (currentY + needed > 275) {
         doc.addPage();
-        currentY = 20;
+        addRdoHeader();
+        currentY = 50;
         return true;
       }
       return false;
@@ -187,26 +218,8 @@ export default function RdoViewPage() {
       currentY += 10;
     };
 
-    doc.setFillColor(...brandPurple);
-    doc.rect(0, 0, pageWidth, 35, "F");
-
-    if (whiteLogoBase64) {
-      try {
-        doc.addImage(whiteLogoBase64, "PNG", marginX, 12.5, 35, 10); 
-      } catch (e) {
-        console.error("Erro ao adicionar imagem branca ao PDF:", e);
-      }
-    }
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 15, { align: "right" });
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${projectName} | DATA: ${rdo.data}`, pageWidth - marginX, 22, { align: "right" });
-    doc.text(`HORÁRIO: ${rdo.inicio} às ${rdo.fim}`, pageWidth - marginX, 27, { align: "right" });
-
-    currentY = 45;
+    addRdoHeader();
+    currentY = 50;
 
     const colabTotal = rdo.envolvidos?.reduce((a: number, b: any) => a + (Number(b.colaboradores) || 0), 0) || 0;
     const cards = [
