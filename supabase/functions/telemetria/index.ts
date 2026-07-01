@@ -1,9 +1,7 @@
 // Edge Function: proxy seguro para a API REST do Portal de Telemetria (HI Tecnologia)
-// Uso: /telemetria?action=dados&configId=4271
-//      /telemetria?action=alarmes&configId=4271
-//
-// As credenciais (HITEC_API_USER / HITEC_API_PASSWORD) ficam só aqui no servidor,
-// nunca chegam ao navegador do usuário.
+// Endpoints confirmados:
+//   GET /rest/v1/connectors/{id}/  → status, is_connected, has_active_alarms, last_activity_at
+//   GET /rest/v1/alarms/?configurationId={id} → definições de alarmes do conector
 
 const HITEC_BASE_URL = "https://api.telemetria.hitecnologia.com.br/rest/v1";
 
@@ -12,26 +10,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Cache simples do token em memória da function (válido enquanto a instância estiver "quente")
 let cachedToken: string | null = null;
 let tokenExpiresAt = 0;
 
 async function getToken(): Promise<string> {
-  if (cachedToken && Date.now() < tokenExpiresAt) {
-    return cachedToken;
-  }
+  if (cachedToken && Date.now() < tokenExpiresAt) return cachedToken;
 
   const user = Deno.env.get("HITEC_API_USER");
   const password = Deno.env.get("HITEC_API_PASSWORD");
-
-  if (!user || !password) {
-    throw new Error("HITEC_API_USER ou HITEC_API_PASSWORD não configurados nos secrets da Edge Function");
-  }
+  if (!user || !password) throw new Error("HITEC_API_USER ou HITEC_API_PASSWORD não configurados");
 
   const loginResp = await fetch(`${HITEC_BASE_URL}/auth/login/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: user, password }),
+    body: JSON.stringify({ email: user, password: btoa(password) }),
   });
 
   if (!loginResp.ok) {
@@ -39,24 +31,17 @@ async function getToken(): Promise<string> {
     throw new Error(`Falha no login HI Tecnologia (status ${loginResp.status}): ${text}`);
   }
 
-  const loginData = await loginResp.json();
-  const token =
-    loginData.token || loginData.access_token || loginData.accessToken ||
-    loginData.access || loginData.key;
-
-  if (!token) {
-    throw new Error(`Login OK mas token não encontrado na resposta: ${JSON.stringify(loginData)}`);
-  }
+  const d = await loginResp.json();
+  const token = d.token || d.access_token || d.accessToken || d.access || d.key;
+  if (!token) throw new Error(`Login OK mas token não encontrado: ${JSON.stringify(d)}`);
 
   cachedToken = token;
-  tokenExpiresAt = Date.now() + 25 * 60 * 1000; // assume 30min de validade, renova com folga
+  tokenExpiresAt = Date.now() + 25 * 60 * 1000;
   return token;
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const url = new URL(req.url);
@@ -71,12 +56,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = await getToken();
+    const authH = { "Authorization": `Bearer ${token}` };
 
     let hitecUrl = "";
     if (action === "dados") {
-      hitecUrl = `${HITEC_BASE_URL}/data/${configId}/last`;
+      // Retorna status e info do conector (online/offline, alarmes ativos, última atividade)
+      hitecUrl = `${HITEC_BASE_URL}/connectors/${configId}/`;
     } else if (action === "alarmes") {
-      hitecUrl = `${HITEC_BASE_URL}/alarms?configurationId=${configId}&limit=50`;
+      // Retorna definições de alarmes associados ao conector
+      hitecUrl = `${HITEC_BASE_URL}/alarms/?configurationId=${configId}`;
     } else {
       return new Response(JSON.stringify({ error: `Ação desconhecida: ${action}` }), {
         status: 400,
@@ -84,10 +72,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const resp = await fetch(hitecUrl, {
-      headers: { "Authorization": `Bearer ${token}` },
-    });
-
+    const resp = await fetch(hitecUrl, { headers: authH });
     const data = await resp.text();
 
     if (!resp.ok) {

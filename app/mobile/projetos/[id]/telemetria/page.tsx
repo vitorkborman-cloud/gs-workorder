@@ -108,9 +108,18 @@ export default function TelemetriaMobilePage() {
             </div>
 
             {dev.last_reading && (
-              <pre className="text-[10px] bg-gray-50 rounded-lg p-2 overflow-x-auto max-h-24 text-gray-600 mb-2">
-                {JSON.stringify(dev.last_reading, null, 1)}
-              </pre>
+              <div className="mb-2 space-y-1">
+                {dev.last_reading.number_active_alarms > 0 && (
+                  <div className="text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5">
+                    ⚠️ {dev.last_reading.number_active_alarms} alarme{dev.last_reading.number_active_alarms > 1 ? "s" : ""} ativo{dev.last_reading.number_active_alarms > 1 ? "s" : ""}
+                  </div>
+                )}
+                {dev.last_reading.last_activity_at && (
+                  <p className="text-[10px] text-gray-400">
+                    Última atividade: {new Date(dev.last_reading.last_activity_at).toLocaleString("pt-BR")}
+                  </p>
+                )}
+              </div>
             )}
 
             {dev.last_checked_at && (

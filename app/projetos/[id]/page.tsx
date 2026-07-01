@@ -356,17 +356,26 @@ export default function ProjetoPage() {
                       </span>
                     </div>
                     <p className="font-bold text-[#391e2a] text-sm">{dev.name}</p>
-                    <p className="text-xs text-gray-400 mt-1">Config ID: {dev.configuration_id}</p>
 
                     {dev.last_reading && (
-                      <pre className="mt-3 text-[10px] bg-gray-50 rounded-lg p-2 overflow-x-auto max-h-24 text-gray-600">
-                        {JSON.stringify(dev.last_reading, null, 1)}
-                      </pre>
+                      <div className="mt-3 space-y-1.5">
+                        {dev.last_reading.number_active_alarms > 0 && (
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5">
+                            <span>⚠️</span>
+                            <span>{dev.last_reading.number_active_alarms} alarme{dev.last_reading.number_active_alarms > 1 ? "s" : ""} ativo{dev.last_reading.number_active_alarms > 1 ? "s" : ""}</span>
+                          </div>
+                        )}
+                        {dev.last_reading.last_activity_at && (
+                          <p className="text-[10px] text-gray-400">
+                            Última atividade: {new Date(dev.last_reading.last_activity_at).toLocaleString("pt-BR")}
+                          </p>
+                        )}
+                      </div>
                     )}
 
                     {dev.last_checked_at && (
                       <p className="text-[10px] text-gray-300 mt-2">
-                        Última checagem: {new Date(dev.last_checked_at).toLocaleString("pt-BR")}
+                        Checado: {new Date(dev.last_checked_at).toLocaleString("pt-BR")}
                       </p>
                     )}
 

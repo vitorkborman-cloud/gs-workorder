@@ -1,6 +1,6 @@
 import webpush from "npm:web-push@3.6.7";
 
-// Edge Function: verifica alarmes novos na API HI Tecnologia e envia push notifications
+// Edge Function: verifica mudanças de alarme via /connectors/ e envia push notifications
 // Chamada pelo pg_cron a cada 2 minutos via HTTP POST
 
 const HITEC_BASE_URL = "https://api.telemetria.hitecnologia.com.br/rest/v1";
@@ -30,15 +30,6 @@ async function sbGet(path: string) {
   return r.json();
 }
 
-async function sbPost(path: string, body: unknown) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    method: "POST",
-    headers: { ...sbHeaders(), "Prefer": "return=minimal,resolution=ignore-duplicates" },
-    body: JSON.stringify(body),
-  });
-  return r;
-}
-
 // ── Login HI Tecnologia ────────────────────────────────────────────────────────
 
 let cachedToken: string | null = null;
@@ -54,7 +45,7 @@ async function getHitecToken(): Promise<string | null> {
   const r = await fetch(`${HITEC_BASE_URL}/auth/login/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: user, password }),
+    body: JSON.stringify({ email: user, password: btoa(password) }),
   });
   if (!r.ok) return null;
 
@@ -77,70 +68,79 @@ Deno.serve(async (req: Request) => {
 
     const token = await getHitecToken();
     if (!token) {
-      return new Response(JSON.stringify({ skipped: "Credenciais HI Tecnologia não configuradas ainda" }), {
+      return new Response(JSON.stringify({ skipped: "Credenciais HI Tecnologia não configuradas" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // Busca todos os dispositivos cadastrados no nosso banco
     const devices: any[] = await sbGet("telemetry_devices?select=*");
     const results: any[] = [];
 
     for (const device of devices) {
-      const hitecUrl = `${HITEC_BASE_URL}/alarms?configurationId=${device.configuration_id}&limit=50`;
-      const alarmResp = await fetch(hitecUrl, {
+      // Busca status atual do conector na API HI Tecnologia
+      const connResp = await fetch(`${HITEC_BASE_URL}/connectors/${device.configuration_id}/`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
-      if (!alarmResp.ok) {
-        results.push({ device: device.name, error: `HTTP ${alarmResp.status}` });
+      if (!connResp.ok) {
+        results.push({ device: device.name, error: `HTTP ${connResp.status}` });
         continue;
       }
 
-      const alarmData = await alarmResp.json();
-      const alarms: any[] = Array.isArray(alarmData) ? alarmData : (alarmData.results || alarmData.alarms || []);
+      const conn = await connResp.json();
+      const isConnected = conn.is_connected ?? false;
+      const hasActiveAlarms = conn.has_active_alarms ?? false;
+      const numAlarms = conn.number_active_alarms ?? 0;
+      const lastActivity = conn.last_activity_at ?? null;
+      const status = isConnected ? "online" : "offline";
 
-      for (const alarm of alarms) {
-        const hitecId = String(alarm.id || alarm.alarm_id || alarm.code || JSON.stringify(alarm));
-        const description = alarm.description || alarm.mensagem || alarm.message || alarm.nome || "Alarme disparado";
-        const severity = alarm.severity || alarm.prioridade || alarm.priority || "warning";
-        const triggeredAt = alarm.triggered_at || alarm.data || alarm.timestamp || new Date().toISOString();
+      // Leitura anterior salva no banco
+      const prevReading = device.last_reading as any;
+      const prevAlarmCount = prevReading?.number_active_alarms ?? 0;
 
-        const insertResp = await sbPost("telemetry_alarms", {
-          device_id: device.id,
-          hitec_alarm_id: hitecId,
-          description,
-          severity,
-          triggered_at: triggeredAt,
-          notified: false,
+      // Atualiza status e leitura no banco
+      await fetch(`${SUPABASE_URL}/rest/v1/telemetry_devices?id=eq.${device.id}`, {
+        method: "PATCH",
+        headers: sbHeaders(),
+        body: JSON.stringify({
+          status,
+          last_checked_at: new Date().toISOString(),
+          last_reading: {
+            is_connected: isConnected,
+            has_active_alarms: hasActiveAlarms,
+            number_active_alarms: numAlarms,
+            connector_status: conn.connector_status?.name,
+            last_activity_at: lastActivity,
+          },
+        }),
+      });
+
+      // Se o número de alarmes aumentou, envia push
+      if (numAlarms > prevAlarmCount) {
+        const newCount = numAlarms - prevAlarmCount;
+        const subs: any[] = await sbGet("push_subscriptions?select=*");
+
+        const pushPayload = JSON.stringify({
+          title: `⚠️ Alarme — ${device.name}`,
+          body: `${newCount} novo${newCount > 1 ? "s" : ""} alarme${newCount > 1 ? "s" : ""} ativo${newCount > 1 ? "s" : ""} (total: ${numAlarms})`,
+          tag: `alarm-${device.id}`,
+          data: { url: "/mobile", deviceId: device.id },
         });
 
-        if (insertResp.status === 201) {
-          const subs: any[] = await sbGet("push_subscriptions?select=*");
-
-          const pushPayload = JSON.stringify({
-            title: `⚠️ Alarme — ${device.name}`,
-            body: description,
-            tag: `alarm-${hitecId}`,
-            data: { url: "/mobile", deviceId: device.id },
-          });
-
-          let pushCount = 0;
-          for (const sub of subs) {
-            try {
-              await webpush.sendNotification(
-                { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-                pushPayload
-              );
-              pushCount++;
-            } catch (_) { /* ignora falha de push individual */ }
-          }
-
-          await fetch(
-            `${SUPABASE_URL}/rest/v1/telemetry_alarms?device_id=eq.${device.id}&hitec_alarm_id=eq.${encodeURIComponent(hitecId)}`,
-            { method: "PATCH", headers: sbHeaders(), body: JSON.stringify({ notified: true }) }
-          );
-
-          results.push({ device: device.name, alarm: description, pushed: pushCount });
+        let pushCount = 0;
+        for (const sub of subs) {
+          try {
+            await webpush.sendNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+              pushPayload
+            );
+            pushCount++;
+          } catch (_) { /* ignora falha individual */ }
         }
+
+        results.push({ device: device.name, status, newAlarms: newCount, totalAlarms: numAlarms, pushed: pushCount });
+      } else {
+        results.push({ device: device.name, status, alarms: numAlarms });
       }
     }
 
