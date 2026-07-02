@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import MobileShell from "../../../../../components/layout/MobileShell";
 
@@ -18,6 +18,7 @@ export default function TelemetriaMobilePage() {
   const params = useParams();
   const projectId = params.id as string;
 
+  const router = useRouter();
   const [devices, setDevices] = useState<TelemetryDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<string | null>(null);
@@ -128,13 +129,27 @@ export default function TelemetriaMobilePage() {
               </p>
             )}
 
-            <button
-              onClick={() => refresh(dev)}
-              disabled={refreshing === dev.id}
-              className="w-full text-xs font-bold py-2.5 rounded-xl bg-[#391e2a] text-white active:scale-95 transition disabled:opacity-50"
-            >
-              {refreshing === dev.id ? "Buscando..." : "Atualizar leitura"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => refresh(dev)}
+                disabled={refreshing === dev.id}
+                className="flex-1 text-xs font-bold py-2.5 rounded-xl bg-[#391e2a] text-white active:scale-95 transition disabled:opacity-50"
+              >
+                {refreshing === dev.id ? "Buscando..." : "Atualizar leitura"}
+              </button>
+              <button
+                onClick={() => router.push(
+                  `/mobile/projetos/${projectId}/telemetria/live?configId=${dev.configuration_id}&name=${encodeURIComponent(dev.name)}`
+                )}
+                className="px-3 py-2.5 rounded-xl border border-[#391e2a] text-[#391e2a] text-xs font-bold active:scale-95 transition"
+                title="Ver ao vivo"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                    d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.893L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                </svg>
+              </button>
+            </div>
           </div>
         ))}
       </div>
