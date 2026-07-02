@@ -22,12 +22,14 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/mobile";
+  const targetUrl = event.notification.data?.url || "/mobile";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      const existing = list.find((c) => c.url.includes("/mobile"));
-      if (existing) return existing.focus();
-      return clients.openWindow(url);
+      const exact = list.find((c) => c.url.endsWith(targetUrl));
+      if (exact) return exact.focus();
+      const fallback = list.find((c) => c.url.includes("/mobile"));
+      if (fallback) return fallback.focus();
+      return clients.openWindow(targetUrl);
     })
   );
 });

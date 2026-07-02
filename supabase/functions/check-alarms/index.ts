@@ -219,7 +219,7 @@ Deno.serve(async (req: Request) => {
               pushPayload
             );
             pushCount++;
-          } catch (_) { /* ignora falha individual */ }
+          } catch (pushErr) { console.error(`Push falhou para ${sub.endpoint.slice(-20)}:`, String(pushErr)); }
         }
 
         results.push({ device: device.name, status, newAlarms: newAlarms.map((a) => a.name), pushed: pushCount });

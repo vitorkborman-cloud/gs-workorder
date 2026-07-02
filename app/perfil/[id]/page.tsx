@@ -32,8 +32,43 @@ export default function PerfilPage() {
     setData(data);
   }
 
-  function downloadPDF() {
-    window.open(`/api/perfil/${id}/pdf`, "_blank");
+  async function downloadPDF() {
+    const { default: jsPDF } = await import("jspdf");
+    await import("jspdf-autotable");
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text(data.nome_sondagem || "Perfil de Sondagem", 14, 18);
+
+    doc.setFontSize(10);
+    const meta = [
+      ["Data", data.data], ["Hora", data.hora],
+      ["Nível d'água", data.nivel_agua], ["Tipo de sondagem", data.tipo_sondagem],
+      ["Diâmetro sondagem", data.diametro_sondagem], ["Diâmetro poço", data.diametro_poco],
+      ["Pré-filtro", data.pre_filtro], ["Seção filtrante", data.secao_filtrante],
+      ["Coord X", data.coord_x], ["Coord Y", data.coord_y],
+      ["Profundidade total", data.profundidade_total],
+    ].filter(([, v]) => v);
+
+    (doc as any).autoTable({
+      startY: 26,
+      head: [["Campo", "Valor"]],
+      body: meta,
+      theme: "grid",
+      headStyles: { fillColor: [57, 30, 42] },
+    });
+
+    if (data.layers?.length) {
+      (doc as any).autoTable({
+        startY: (doc as any).lastAutoTable.finalY + 8,
+        head: [["Profundidade (m)", "Tipo de solo"]],
+        body: data.layers.map((l: Layer) => [l.profundidade, l.tipo]),
+        theme: "striped",
+        headStyles: { fillColor: [57, 30, 42] },
+      });
+    }
+
+    doc.save(`${data.nome_sondagem || "perfil"}.pdf`);
   }
 
   if (!data) return <AdminShell>Carregando...</AdminShell>;

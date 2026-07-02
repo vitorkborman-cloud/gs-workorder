@@ -94,7 +94,7 @@ export default function WorkOrderPage() {
   }
 
   async function createActivity() {
-    const description = prompt("Descrição da nova atividade:");
+    const description = prompt("Descrição da nova atividade:")?.trim();
     if (!description) return;
 
     await supabase.from("activities").insert({
