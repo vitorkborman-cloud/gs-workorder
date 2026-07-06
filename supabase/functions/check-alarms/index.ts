@@ -146,9 +146,22 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Busca todos os dispositivos cadastrados no nosso banco
+    // Busca dispositivos, subscriptions e preferências de uma vez
     const devices: any[] = await sbGet("telemetry_devices?select=*");
+    const subs: any[] = await sbGet("push_subscriptions?select=*");
     const results: any[] = [];
+
+    // Carrega preferências de todos os usuários com subscription
+    const userIds = [...new Set(subs.filter((s: any) => s.user_id).map((s: any) => s.user_id as string))];
+    const prefsByUser: Record<string, string[]> = {};
+    if (userIds.length > 0) {
+      const rows: any[] = await sbGet(
+        `notification_preferences?user_id=in.(${userIds.join(",")})&select=user_id,disabled_device_ids`
+      );
+      for (const p of rows) prefsByUser[p.user_id] = p.disabled_device_ids ?? [];
+    }
+
+    const expiredIds: string[] = [];
 
     for (const device of devices) {
       // Busca status atual do conector na API HI Tecnologia
@@ -201,7 +214,6 @@ Deno.serve(async (req: Request) => {
 
       // Envia push apenas para alarmes realmente novos
       if (newAlarms.length > 0) {
-        const subs: any[] = await sbGet("push_subscriptions?select=*");
         const body = formatAlarmDesc(newAlarms);
 
         const pushPayload = JSON.stringify({
@@ -213,19 +225,39 @@ Deno.serve(async (req: Request) => {
 
         let pushCount = 0;
         for (const sub of subs) {
+          // Respeita preferência do usuário: pula se este dispositivo estiver mudo
+          const disabled = sub.user_id ? (prefsByUser[sub.user_id] ?? []) : [];
+          if (disabled.includes(device.id)) continue;
+
           try {
             await webpush.sendNotification(
               { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
               pushPayload
             );
             pushCount++;
-          } catch (pushErr) { console.error(`Push falhou para ${sub.endpoint.slice(-20)}:`, String(pushErr)); }
+          } catch (pushErr: any) {
+            const status = pushErr?.statusCode ?? pushErr?.status;
+            if (status === 410 || status === 404) {
+              if (!expiredIds.includes(sub.id)) expiredIds.push(sub.id);
+            } else {
+              console.error(`Push falhou para ${sub.endpoint.slice(-20)}:`, String(pushErr));
+            }
+          }
         }
 
         results.push({ device: device.name, status, newAlarms: newAlarms.map((a) => a.name), pushed: pushCount });
       } else {
         results.push({ device: device.name, status, alarms: numAlarms, activeIds: currentIds });
       }
+    }
+
+    // Limpar subscriptions expiradas
+    for (const expiredId of expiredIds) {
+      await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?id=eq.${expiredId}`, {
+        method: "DELETE",
+        headers: sbHeaders(),
+      });
+      console.log(`Subscription expirada removida: ${expiredId}`);
     }
 
     return new Response(JSON.stringify({ ok: true, results }), {
