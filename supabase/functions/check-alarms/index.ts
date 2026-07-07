@@ -156,9 +156,9 @@ Deno.serve(async (req: Request) => {
     const prefsByUser: Record<string, string[]> = {};
     if (userIds.length > 0) {
       const rows: any[] = await sbGet(
-        `notification_preferences?user_id=in.(${userIds.join(",")})&select=user_id,disabled_device_ids`
+        `notification_preferences?user_id=in.(${userIds.join(",")})&select=user_id,disabled_alarm_ids`
       );
-      for (const p of rows) prefsByUser[p.user_id] = p.disabled_device_ids ?? [];
+      for (const p of rows) prefsByUser[p.user_id] = p.disabled_alarm_ids ?? [];
     }
 
     const expiredIds: string[] = [];
@@ -214,25 +214,24 @@ Deno.serve(async (req: Request) => {
 
       // Envia push apenas para alarmes realmente novos
       if (newAlarms.length > 0) {
-        const body = formatAlarmDesc(newAlarms);
-
-        const pushPayload = JSON.stringify({
-          title: `⚠️ Alarme — ${device.name}`,
-          body,
-          tag: `alarm-${device.id}`,
-          data: { url: "/mobile", deviceId: device.id },
-        });
-
         let pushCount = 0;
         for (const sub of subs) {
-          // Respeita preferência do usuário: pula se este dispositivo estiver mudo
-          const disabled = sub.user_id ? (prefsByUser[sub.user_id] ?? []) : [];
-          if (disabled.includes(device.id)) continue;
+          // Filtra alarmes que este usuário não silenciou
+          const disabledAlarms = sub.user_id ? (prefsByUser[sub.user_id] ?? []) : [];
+          const alarmsForUser = newAlarms.filter((a) => !disabledAlarms.includes(a.refId));
+          if (alarmsForUser.length === 0) continue;
+
+          const userPayload = JSON.stringify({
+            title: `⚠️ Alarme — ${device.name}`,
+            body: formatAlarmDesc(alarmsForUser),
+            tag: `alarm-${device.id}`,
+            data: { url: "/mobile", deviceId: device.id },
+          });
 
           try {
             await webpush.sendNotification(
               { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-              pushPayload
+              userPayload
             );
             pushCount++;
           } catch (pushErr: any) {
