@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import MobileShell from "../../../../../components/layout/MobileShell";
+import { useToast } from "@/components/Toast";
 
 type Amostra = {
   id: string;
@@ -17,9 +18,11 @@ export default function FisicoQuimicosListPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
+  const { showToast } = useToast();
 
   const [records, setRecords] = useState<Amostra[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     load();
@@ -38,27 +41,36 @@ export default function FisicoQuimicosListPage() {
   }
 
   async function createNew() {
-    const { data, error } = await supabase
-      .from("water_samplings")
-      .insert({
-        project_id: projectId,
-        finalized: false,
-        poco: "",
-        nomenclatura: "",
-        identificacao_codigo: "",
-        data: "",
-        hora_inicio: "",
-        na_inicial: "",
-        na_final: "",
-        fase_livre: false,
-        espessura_fl: "",
-        leituras: [],
-      })
-      .select("id")
-      .single();
+    if (creating) return;
+    setCreating(true);
+    try {
+      const { data, error } = await supabase
+        .from("water_samplings")
+        .insert({
+          project_id: projectId,
+          finalized: false,
+          poco: "",
+          nomenclatura: "",
+          identificacao_codigo: "",
+          data: "",
+          hora_inicio: "",
+          na_inicial: "",
+          na_final: "",
+          fase_livre: false,
+          espessura_fl: "",
+          leituras: [],
+        })
+        .select("id")
+        .single();
 
-    if (!error && data) {
+      if (error) throw error;
+
       router.push(`/mobile/projetos/${projectId}/fisico-quimicos/${data.id}`);
+    } catch (error: any) {
+      console.error("Erro ao criar amostragem:", error);
+      showToast(error?.message || "Erro ao criar amostragem. Tente novamente.", "error");
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -116,12 +128,13 @@ export default function FisicoQuimicosListPage() {
 
         <button
           onClick={createNew}
-          className="w-full bg-white hover:bg-gray-50 text-[#391e2a] py-4 rounded-2xl border-2 border-dashed border-gray-200 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition mt-2"
+          disabled={creating}
+          className="w-full bg-white hover:bg-gray-50 text-[#391e2a] py-4 rounded-2xl border-2 border-dashed border-gray-200 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition mt-2 disabled:opacity-50"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
           </svg>
-          Nova Amostragem
+          {creating ? "Criando..." : "Nova Amostragem"}
         </button>
       </div>
     </MobileShell>
