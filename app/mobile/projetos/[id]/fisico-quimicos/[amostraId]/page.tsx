@@ -18,7 +18,9 @@ const Icons = {
 
 type Reading = { horario: string; na: string; ph: string; orp: string; od: string; condutividade: string; };
 
-const emptyReading: Reading = { horario: "", na: "", ph: "", orp: "", od: "", condutividade: "" };
+function createEmptyReading(): Reading {
+  return { horario: "", na: "", ph: "", orp: "", od: "", condutividade: "" };
+}
 
 export default function AmostragemFormPage() {
   const params = useParams();
@@ -31,7 +33,7 @@ export default function AmostragemFormPage() {
   const [saving, setSaving] = useState(false);
   const [finalized, setFinalized] = useState(false);
 
-  const [readings, setReadings] = useState<Reading[]>([emptyReading]);
+  const [readings, setReadings] = useState<Reading[]>([createEmptyReading()]);
   const [form, setForm] = useState({
     poco: "", nomenclatura: "", identificacao_codigo: "", data: "",
     hora_inicio: "", na_inicial: "", na_final: "", fase_livre: false, espessura_fl: "",
@@ -57,6 +59,10 @@ export default function AmostragemFormPage() {
 
   function setField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateReading(index: number, key: keyof Reading, value: string) {
+    setReadings((prev) => prev.map((r, idx) => (idx === index ? { ...r, [key]: value } : r)));
   }
 
   function toPayload() {
@@ -169,18 +175,18 @@ export default function AmostragemFormPage() {
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-4 items-end">
-                    <Input label="Horário" type="time" value={reading.horario} onChange={(v: string) => { const r = [...readings]; r[i].horario = v; setReadings(r); }} disabled={finalized} />
-                    <Input label="NA (m)" type="number" value={reading.na} placeholder="0.00" onChange={(v: string) => { const r = [...readings]; r[i].na = v; setReadings(r); }} disabled={finalized} />
-                    <Input label="pH" type="number" value={reading.ph} placeholder="0.0" onChange={(v: string) => { const r = [...readings]; r[i].ph = v; setReadings(r); }} disabled={finalized} />
-                    <Input label="ORP (mV)" type="number" value={reading.orp} placeholder="0" onChange={(v: string) => { const r = [...readings]; r[i].orp = v; setReadings(r); }} disabled={finalized} />
-                    <Input label="OD (mg/L)" type="number" value={reading.od} placeholder="0.00" onChange={(v: string) => { const r = [...readings]; r[i].od = v; setReadings(r); }} disabled={finalized} />
-                    <Input label="Cond. (µS/cm)" type="number" value={reading.condutividade} placeholder="0" onChange={(v: string) => { const r = [...readings]; r[i].condutividade = v; setReadings(r); }} disabled={finalized} />
+                    <Input label="Horário" type="time" value={reading.horario} onChange={(v: string) => updateReading(i, "horario", v)} disabled={finalized} />
+                    <Input label="NA (m)" type="number" value={reading.na} placeholder="0.00" onChange={(v: string) => updateReading(i, "na", v)} disabled={finalized} />
+                    <Input label="pH" type="number" value={reading.ph} placeholder="0.0" onChange={(v: string) => updateReading(i, "ph", v)} disabled={finalized} />
+                    <Input label="ORP (mV)" type="number" value={reading.orp} placeholder="0" onChange={(v: string) => updateReading(i, "orp", v)} disabled={finalized} />
+                    <Input label="OD (mg/L)" type="number" value={reading.od} placeholder="0.00" onChange={(v: string) => updateReading(i, "od", v)} disabled={finalized} />
+                    <Input label="Cond. (µS/cm)" type="number" value={reading.condutividade} placeholder="0" onChange={(v: string) => updateReading(i, "condutividade", v)} disabled={finalized} />
                   </div>
                 </div>
               ))}
             </div>
             {!finalized && (
-              <button onClick={() => setReadings((prev) => [...prev, emptyReading])} className="w-full mt-4 bg-white text-[#391e2a] py-3.5 rounded-xl border-2 border-gray-200 border-dashed text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition">
+              <button onClick={() => setReadings((prev) => [...prev, createEmptyReading()])} className="w-full mt-4 bg-white text-[#391e2a] py-3.5 rounded-xl border-2 border-gray-200 border-dashed text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition">
                 <Icons.Plus /> Adicionar Leitura
               </button>
             )}
