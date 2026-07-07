@@ -59,13 +59,27 @@ export default function AmostragemFormPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function toPayload() {
+    return {
+      ...form,
+      data: form.data || null,
+      hora_inicio: form.hora_inicio || null,
+      na_inicial: form.na_inicial || null,
+      na_final: form.na_final || null,
+      espessura_fl: form.espessura_fl || null,
+      leituras: readings,
+    };
+  }
+
   async function salvar() {
     setSaving(true);
     try {
-      await supabase.from("water_samplings").update({ ...form, leituras: readings }).eq("id", amostraId);
+      const { error } = await supabase.from("water_samplings").update(toPayload()).eq("id", amostraId);
+      if (error) throw error;
       showToast("Rascunho salvo com sucesso!");
-    } catch {
-      showToast("Erro ao salvar.", "error");
+    } catch (error: any) {
+      console.error("Erro ao salvar rascunho:", error);
+      showToast(error?.message || "Erro ao salvar.", "error");
     } finally {
       setSaving(false);
     }
@@ -76,11 +90,13 @@ export default function AmostragemFormPage() {
     if (!confirm("Finalizar amostragem?")) return;
     setSaving(true);
     try {
-      await supabase.from("water_samplings").update({ ...form, leituras: readings, finalized: true }).eq("id", amostraId);
+      const { error } = await supabase.from("water_samplings").update({ ...toPayload(), finalized: true }).eq("id", amostraId);
+      if (error) throw error;
       showToast("Amostragem finalizada!");
       router.push(`/mobile/projetos/${projectId}/fisico-quimicos`);
-    } catch {
-      showToast("Erro ao finalizar.", "error");
+    } catch (error: any) {
+      console.error("Erro ao finalizar amostragem:", error);
+      showToast(error?.message || "Erro ao finalizar.", "error");
     } finally {
       setSaving(false);
     }

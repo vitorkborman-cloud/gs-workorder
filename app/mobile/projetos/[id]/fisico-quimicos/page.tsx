@@ -52,12 +52,12 @@ export default function FisicoQuimicosListPage() {
           poco: "",
           nomenclatura: "",
           identificacao_codigo: "",
-          data: "",
-          hora_inicio: "",
-          na_inicial: "",
-          na_final: "",
+          data: null,
+          hora_inicio: null,
+          na_inicial: null,
+          na_final: null,
           fase_livre: false,
-          espessura_fl: "",
+          espessura_fl: null,
           leituras: [],
         })
         .select("id")
