@@ -27,29 +27,47 @@ type DeviceUrls = {
   dadosUrl: string | null;
 };
 
+type ActiveAlarm = {
+  refId: string;
+  name: string;
+  level: string;
+  deviceName: string;
+  activatedAt: string | null;
+};
+
 const STAGE_MS = 10_000;
 const SLOW_REFRESH_MS = 2 * 60_000;
 const HITEC_BASE = "https://app.telemetria.hitecnologia.com.br";
 
-// O portal da HI Tecnologia não é responsivo: ele é desenhado pra uma
-// largura "natural" fixa (aprox. essas dimensões) e não reflui quando o
-// container é menor — só corta o conteúdo. Por isso o iframe é sempre
-// renderizado nesse tamanho natural e depois encolhido com transform:scale()
-// pra caber no espaço disponível, sem cortar nada. Ajuste NATURAL_WIDTH se o
-// conteúdo ainda aparecer cortado nas laterais.
-const NATURAL_WIDTH = 1920;
-const NATURAL_HEIGHT = 1080;
-
-// A tela de Alarmes é a mesma URL da tela Sistema, só que rolada mais pra
-// baixo. Como o iframe é de outro domínio, não dá pra chamar scrollTo() nele
-// — em vez disso, o iframe é renderizado bem mais alto (ALARMS_NATURAL_HEIGHT,
-// em px "naturais", antes da escala) e deslocado pra cima em
-// ALARMS_NATURAL_OFFSET, revelando a tabela de alarmes. Esses dois números
-// são um chute inicial — ajuste olhando o resultado real na tela.
-const ALARMS_NATURAL_OFFSET = 1700;
-const ALARMS_NATURAL_HEIGHT = 3600;
+// O portal da HI Tecnologia não é responsivo: cada painel é desenhado pra uma
+// largura "natural" fixa (alguns equipamentos têm 2 sistemas lado a lado, bem
+// mais largos que uma tela cheia) e não reflui quando o container é menor —
+// só corta o conteúdo. Por isso o iframe é sempre renderizado nesse tamanho
+// natural e depois encolhido com transform:scale() pra caber no espaço
+// disponível, sem cortar nada. Ajuste esses valores se o conteúdo ainda
+// aparecer cortado (aumente) ou muito pequeno pra ler (diminua).
+const NATURAL_WIDTH = 2800;
+const NATURAL_HEIGHT = 1400;
 
 const STAGE_LABELS = ["Sistema", "Dados", "Alarmes"];
+
+const LEVEL_PT: Record<string, string> = {
+  critical: "Crítico",
+  base_high: "Alto",
+  base_medium: "Médio",
+  base_low: "Baixo",
+  warning: "Aviso",
+  info: "Info",
+};
+
+const LEVEL_COLOR: Record<string, string> = {
+  critical: "bg-red-500/15 text-red-300 border-red-500/30",
+  base_high: "bg-orange-500/15 text-orange-300 border-orange-500/30",
+  base_medium: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  base_low: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
+  warning: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  info: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+};
 
 async function loadGroups(): Promise<ProjectGroup[]> {
   const { data: devices } = await supabase
@@ -93,20 +111,8 @@ function IframeGrid({ children, count }: { children: React.ReactNode; count: num
 
 // Renderiza o iframe no tamanho "natural" da página (NATURAL_WIDTH) e
 // encolhe com transform:scale() até caber na largura real do container,
-// medida via ResizeObserver. offsetY desloca o conteúdo pra cima (em px
-// naturais, antes da escala) para simular scroll dentro de um iframe
-// cross-origin, onde scrollTo() não é permitido.
-function ScaledFrame({
-  src,
-  title,
-  offsetY = 0,
-  naturalHeight = NATURAL_HEIGHT,
-}: {
-  src: string;
-  title: string;
-  offsetY?: number;
-  naturalHeight?: number;
-}) {
+// medida via ResizeObserver.
+function ScaledFrame({ src, title }: { src: string; title: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
@@ -129,8 +135,8 @@ function ScaledFrame({
         className="border-0"
         style={{
           width: NATURAL_WIDTH,
-          height: naturalHeight,
-          transform: `scale(${scale}) translateY(${-offsetY}px)`,
+          height: NATURAL_HEIGHT,
+          transform: `scale(${scale})`,
           transformOrigin: "top left",
         }}
       />
@@ -148,19 +154,43 @@ function SistemaScreen({ urls }: { urls: DeviceUrls[] }) {
   );
 }
 
-function AlarmesScreen({ urls }: { urls: DeviceUrls[] }) {
+// O layout interno da tela "Sistema" muda de equipamento pra equipamento
+// (em alguns a lista de alarmes já aparece do lado do P&ID, em outros fica
+// só numa tabela de histórico bem mais abaixo, em posições diferentes) —
+// não dá pra simular scroll de um jeito que funcione igual pra todos. Por
+// isso essa tela busca os alarmes ativos ao vivo via edge function, com o
+// mesmo filtro usado pelo cron de notificações (supabase/functions/check-alarms).
+function AlarmesScreen({ alarms, loading }: { alarms: ActiveAlarm[] | undefined; loading: boolean }) {
   return (
-    <IframeGrid count={urls.length}>
-      {urls.map(({ device, sistemaUrl }) => (
-        <ScaledFrame
-          key={device.id}
-          src={sistemaUrl}
-          title={`${device.name} — Alarmes`}
-          offsetY={ALARMS_NATURAL_OFFSET}
-          naturalHeight={ALARMS_NATURAL_HEIGHT}
-        />
-      ))}
-    </IframeGrid>
+    <div className="flex-1 min-h-0 flex flex-col">
+      {loading && !alarms ? (
+        <div className="flex-1 flex items-center justify-center text-white/40 text-xl animate-pulse">
+          Carregando alarmes...
+        </div>
+      ) : !alarms || alarms.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-green-300">
+          <span className="text-6xl">✓</span>
+          <p className="text-2xl font-bold">Nenhum alarme ativo</p>
+        </div>
+      ) : (
+        <div className="space-y-4 overflow-y-auto">
+          {alarms.map((a, i) => (
+            <div key={`${a.refId}-${i}`} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl px-8 py-6">
+              <div>
+                <p className="font-bold text-2xl text-white">{a.name || "Alarme"}</p>
+                <p className="text-white/40 text-base mt-1">{a.deviceName}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-white/40 text-sm">{formatDateTime(a.activatedAt)}</span>
+                <span className={`text-sm font-bold px-3 py-1.5 rounded-full border ${LEVEL_COLOR[a.level] ?? "bg-white/10 text-white/70 border-white/20"}`}>
+                  {LEVEL_PT[a.level] ?? a.level ?? "—"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -213,6 +243,8 @@ export default function TvModePage() {
   const [groups, setGroups] = useState<ProjectGroup[]>([]);
   const [stepIndex, setStepIndex] = useState(0);
   const [now, setNow] = useState(new Date());
+  const [alarmsByProject, setAlarmsByProject] = useState<Record<string, ActiveAlarm[]>>({});
+  const [loadingAlarms, setLoadingAlarms] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (isMobileDevice()) {
@@ -255,6 +287,49 @@ export default function TvModePage() {
     }));
   }, [current]);
 
+  // Busca os alarmes ativos só do projeto exibido no momento, só quando entra
+  // no estágio Alarmes — evita bater na API da HI Tecnologia pra todos os
+  // projetos de uma vez.
+  useEffect(() => {
+    if (!current || stage !== 2) return;
+    let cancelled = false;
+    const pid = current.project.id;
+    setLoadingAlarms((prev) => ({ ...prev, [pid]: true }));
+
+    (async () => {
+      const perDevice = await Promise.all(
+        current.devices.map(async (d) => {
+          const { data, error } = await supabase.functions.invoke(
+            `telemetria?action=alarmes&configId=${d.configuration_id}`,
+            { method: "GET" }
+          );
+          if (error || !Array.isArray(data)) return [];
+          const configIdNum = Number(d.configuration_id);
+          return data
+            .filter(
+              (a: any) =>
+                a.alarm_current_state?.state === true &&
+                a.data?.device?.connector?.id === configIdNum
+            )
+            .map((a: any) => ({
+              refId: a.reference_id ?? String(a.id),
+              name: a.name ?? "",
+              level: a.level ?? "",
+              deviceName: d.name,
+              activatedAt: a.alarm_current_state?.datetime_last_activation ?? null,
+            }));
+        })
+      );
+      if (cancelled) return;
+      setAlarmsByProject((prev) => ({ ...prev, [pid]: perDevice.flat() }));
+      setLoadingAlarms((prev) => ({ ...prev, [pid]: false }));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stage, current]);
+
   const clockLabel = useMemo(
     () => now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
     [now]
@@ -263,7 +338,7 @@ export default function TvModePage() {
   if (!ready) return null;
 
   return (
-    <div className="w-screen h-screen bg-[#0b0f14] text-white flex flex-col p-12 overflow-hidden">
+    <div className="w-screen h-screen bg-[#0b0f14] text-white flex flex-col p-4 overflow-hidden">
       {projectCount === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-2xl text-white/40 font-medium">Nenhum projeto com telemetria configurada.</p>
@@ -271,37 +346,39 @@ export default function TvModePage() {
       ) : (
         <>
           {/* Header */}
-          <div className="flex items-center justify-between mb-8 shrink-0">
-            <div>
-              <p className="text-sm font-bold text-white/40 uppercase tracking-widest mb-1">
-                Telemetria — Greensoil
-              </p>
-              <h1 className="text-5xl font-black tracking-tight">{current?.project.name}</h1>
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <div className="flex items-baseline gap-3">
+              <h1 className="text-2xl font-black tracking-tight">{current?.project.name}</h1>
+              <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
+                {STAGE_LABELS[stage]}
+              </span>
             </div>
-            <div className="text-4xl font-black text-white/70 tabular-nums">{clockLabel}</div>
+            <div className="flex items-center gap-4">
+              <p className="text-xs font-semibold text-white/40">
+                Projeto {projectIndex + 1} de {projectCount}
+              </p>
+              <div className="text-xl font-black text-white/70 tabular-nums">{clockLabel}</div>
+            </div>
           </div>
 
           {/* Conteúdo do estágio */}
           {stage === 0 && <SistemaScreen urls={urls} />}
           {stage === 1 && <DadosScreen urls={urls} />}
-          {stage === 2 && <AlarmesScreen urls={urls} />}
+          {stage === 2 && (
+            <AlarmesScreen
+              alarms={current ? alarmsByProject[current.project.id] : undefined}
+              loading={current ? !!loadingAlarms[current.project.id] : false}
+            />
+          )}
 
-          {/* Rodapé: posição + progresso */}
-          <div className="mt-8 shrink-0">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-white/40 font-semibold text-sm">
-                Projeto {projectIndex + 1} de {projectCount}
-              </p>
-              <p className="text-white/40 font-semibold text-sm">{STAGE_LABELS[stage]}</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {STAGE_LABELS.map((label, i) => (
-                <div
-                  key={label}
-                  className={`h-1.5 rounded-full transition-colors ${i === stage ? "bg-[#80b02d]" : "bg-white/10"}`}
-                />
-              ))}
-            </div>
+          {/* Rodapé: progresso do estágio */}
+          <div className="mt-3 shrink-0 grid grid-cols-3 gap-2">
+            {STAGE_LABELS.map((label, i) => (
+              <div
+                key={label}
+                className={`h-1.5 rounded-full transition-colors ${i === stage ? "bg-[#80b02d]" : "bg-white/10"}`}
+              />
+            ))}
           </div>
         </>
       )}
