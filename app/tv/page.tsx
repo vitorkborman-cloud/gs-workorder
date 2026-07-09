@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { isMobileDevice } from "@/lib/isMobile";
@@ -31,14 +31,23 @@ const STAGE_MS = 10_000;
 const SLOW_REFRESH_MS = 2 * 60_000;
 const HITEC_BASE = "https://app.telemetria.hitecnologia.com.br";
 
+// O portal da HI Tecnologia não é responsivo: ele é desenhado pra uma
+// largura "natural" fixa (aprox. essas dimensões) e não reflui quando o
+// container é menor — só corta o conteúdo. Por isso o iframe é sempre
+// renderizado nesse tamanho natural e depois encolhido com transform:scale()
+// pra caber no espaço disponível, sem cortar nada. Ajuste NATURAL_WIDTH se o
+// conteúdo ainda aparecer cortado nas laterais.
+const NATURAL_WIDTH = 1920;
+const NATURAL_HEIGHT = 1080;
+
 // A tela de Alarmes é a mesma URL da tela Sistema, só que rolada mais pra
 // baixo. Como o iframe é de outro domínio, não dá pra chamar scrollTo() nele
-// — em vez disso, o iframe é renderizado bem mais alto que o container
-// (IFRAME_TALL_HEIGHT_PX) e deslocado pra cima em ALARMS_OFFSET_PX, revelando
-// a tabela de alarmes. Esses dois números são um chute inicial — ajuste
-// olhando o resultado real na tela.
-const ALARMS_OFFSET_PX = 1700;
-const IFRAME_TALL_HEIGHT_PX = 3600;
+// — em vez disso, o iframe é renderizado bem mais alto (ALARMS_NATURAL_HEIGHT,
+// em px "naturais", antes da escala) e deslocado pra cima em
+// ALARMS_NATURAL_OFFSET, revelando a tabela de alarmes. Esses dois números
+// são um chute inicial — ajuste olhando o resultado real na tela.
+const ALARMS_NATURAL_OFFSET = 1700;
+const ALARMS_NATURAL_HEIGHT = 3600;
 
 const STAGE_LABELS = ["Sistema", "Dados", "Alarmes"];
 
@@ -82,18 +91,58 @@ function IframeGrid({ children, count }: { children: React.ReactNode; count: num
   );
 }
 
+// Renderiza o iframe no tamanho "natural" da página (NATURAL_WIDTH) e
+// encolhe com transform:scale() até caber na largura real do container,
+// medida via ResizeObserver. offsetY desloca o conteúdo pra cima (em px
+// naturais, antes da escala) para simular scroll dentro de um iframe
+// cross-origin, onde scrollTo() não é permitido.
+function ScaledFrame({
+  src,
+  title,
+  offsetY = 0,
+  naturalHeight = NATURAL_HEIGHT,
+}: {
+  src: string;
+  title: string;
+  offsetY?: number;
+  naturalHeight?: number;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => setScale(el.clientWidth / NATURAL_WIDTH);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden rounded-3xl border border-white/10 bg-white">
+      <iframe
+        src={src}
+        title={title}
+        scrolling="no"
+        className="border-0"
+        style={{
+          width: NATURAL_WIDTH,
+          height: naturalHeight,
+          transform: `scale(${scale}) translateY(${-offsetY}px)`,
+          transformOrigin: "top left",
+        }}
+      />
+    </div>
+  );
+}
+
 function SistemaScreen({ urls }: { urls: DeviceUrls[] }) {
   return (
     <IframeGrid count={urls.length}>
       {urls.map(({ device, sistemaUrl }) => (
-        <div key={device.id} className="relative h-full rounded-3xl overflow-hidden border border-white/10 bg-white">
-          <iframe
-            src={sistemaUrl}
-            title={`${device.name} — Sistema`}
-            className="w-full h-full border-0"
-            scrolling="no"
-          />
-        </div>
+        <ScaledFrame key={device.id} src={sistemaUrl} title={`${device.name} — Sistema`} />
       ))}
     </IframeGrid>
   );
@@ -103,15 +152,13 @@ function AlarmesScreen({ urls }: { urls: DeviceUrls[] }) {
   return (
     <IframeGrid count={urls.length}>
       {urls.map(({ device, sistemaUrl }) => (
-        <div key={device.id} className="relative h-full rounded-3xl overflow-hidden border border-white/10 bg-white">
-          <iframe
-            src={sistemaUrl}
-            title={`${device.name} — Alarmes`}
-            className="absolute left-0 w-full border-0"
-            style={{ top: -ALARMS_OFFSET_PX, height: IFRAME_TALL_HEIGHT_PX }}
-            scrolling="no"
-          />
-        </div>
+        <ScaledFrame
+          key={device.id}
+          src={sistemaUrl}
+          title={`${device.name} — Alarmes`}
+          offsetY={ALARMS_NATURAL_OFFSET}
+          naturalHeight={ALARMS_NATURAL_HEIGHT}
+        />
       ))}
     </IframeGrid>
   );
@@ -149,9 +196,7 @@ function DadosScreen({ urls }: { urls: DeviceUrls[] }) {
     <IframeGrid count={urls.length}>
       {urls.map(({ device, dadosUrl }) =>
         dadosUrl ? (
-          <div key={device.id} className="relative h-full rounded-3xl overflow-hidden border border-white/10 bg-white">
-            <iframe src={dadosUrl} title={`${device.name} — Dados`} className="w-full h-full border-0" scrolling="no" />
-          </div>
+          <ScaledFrame key={device.id} src={dadosUrl} title={`${device.name} — Dados`} />
         ) : (
           <DadosFallbackCard key={device.id} device={device} />
         )
