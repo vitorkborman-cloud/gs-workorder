@@ -114,12 +114,9 @@ function formatDateTime(iso: string | null) {
 
 // ─── Sub-telas ─────────────────────────────────────────────────────────────
 
-function IframeGrid({ children, count, chrome }: { children: React.ReactNode; count: number; chrome: boolean }) {
+function IframeGrid({ children, count }: { children: React.ReactNode; count: number }) {
   return (
-    <div
-      className={`flex-1 min-h-0 grid ${chrome ? "gap-6" : "gap-0"}`}
-      style={{ gridTemplateColumns: `repeat(${count}, 1fr)` }}
-    >
+    <div className="flex-1 min-h-0 grid gap-6" style={{ gridTemplateColumns: `repeat(${count}, 1fr)` }}>
       {children}
     </div>
   );
@@ -127,9 +124,8 @@ function IframeGrid({ children, count, chrome }: { children: React.ReactNode; co
 
 // Renderiza o iframe no tamanho "natural" da página (NATURAL_WIDTH) e
 // encolhe com transform:scale() até caber na largura real do container,
-// medida via ResizeObserver. Com chrome=false, remove a borda/cantos
-// arredondados pra ficar full-bleed.
-function ScaledFrame({ src, title, chrome }: { src: string; title: string; chrome: boolean }) {
+// medida via ResizeObserver.
+function ScaledFrame({ src, title }: { src: string; title: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
@@ -144,10 +140,7 @@ function ScaledFrame({ src, title, chrome }: { src: string; title: string; chrom
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative h-full w-full overflow-hidden bg-white ${chrome ? "rounded-3xl border border-white/10" : ""}`}
-    >
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden rounded-3xl border border-white/10 bg-white">
       <iframe
         src={src}
         title={title}
@@ -164,11 +157,11 @@ function ScaledFrame({ src, title, chrome }: { src: string; title: string; chrom
   );
 }
 
-function SistemaScreen({ urls, chrome }: { urls: DeviceUrls[]; chrome: boolean }) {
+function SistemaScreen({ urls }: { urls: DeviceUrls[] }) {
   return (
-    <IframeGrid count={urls.length} chrome={chrome}>
+    <IframeGrid count={urls.length}>
       {urls.map(({ device, sistemaUrl }) => (
-        <ScaledFrame key={device.id} src={sistemaUrl} title={`${device.name} — Sistema`} chrome={chrome} />
+        <ScaledFrame key={device.id} src={sistemaUrl} title={`${device.name} — Sistema`} />
       ))}
     </IframeGrid>
   );
@@ -214,9 +207,9 @@ function AlarmesScreen({ alarms, loading }: { alarms: ActiveAlarm[] | undefined;
   );
 }
 
-function DadosFallbackCard({ device, chrome }: { device: TelemetryDevice; chrome: boolean }) {
+function DadosFallbackCard({ device }: { device: TelemetryDevice }) {
   return (
-    <div className={`bg-white/5 p-8 h-full overflow-y-auto ${chrome ? "rounded-3xl border border-white/10" : ""}`}>
+    <div className="bg-white/5 rounded-3xl border border-white/10 p-8 h-full overflow-y-auto">
       <p className="font-bold text-2xl text-white mb-5">{device.name}</p>
       <p className="text-white/40 text-sm mb-5">Tela "Dados do Sistema" não configurada para este equipamento.</p>
       <div className="space-y-3 text-base">
@@ -241,14 +234,14 @@ function DadosFallbackCard({ device, chrome }: { device: TelemetryDevice; chrome
   );
 }
 
-function DadosScreen({ urls, chrome }: { urls: DeviceUrls[]; chrome: boolean }) {
+function DadosScreen({ urls }: { urls: DeviceUrls[] }) {
   return (
-    <IframeGrid count={urls.length} chrome={chrome}>
+    <IframeGrid count={urls.length}>
       {urls.map(({ device, dadosUrl }) =>
         dadosUrl ? (
-          <ScaledFrame key={device.id} src={dadosUrl} title={`${device.name} — Dados`} chrome={chrome} />
+          <ScaledFrame key={device.id} src={dadosUrl} title={`${device.name} — Dados`} />
         ) : (
-          <DadosFallbackCard key={device.id} device={device} chrome={chrome} />
+          <DadosFallbackCard key={device.id} device={device} />
         )
       )}
     </IframeGrid>
@@ -259,7 +252,6 @@ function DadosScreen({ urls, chrome }: { urls: DeviceUrls[]; chrome: boolean }) 
 
 export default function TvModePage() {
   const router = useRouter();
-  const [chrome, setChrome] = useState(true);
 
   const [ready, setReady] = useState(false);
   const [groups, setGroups] = useState<ProjectGroup[]>([]);
@@ -287,26 +279,12 @@ export default function TvModePage() {
 
   // Esconde a barra de abas/endereço do navegador (Fullscreen API real, tipo
   // apresentação do PowerPoint). Só funciona a partir de um clique do
-  // usuário — navegadores bloqueiam isso automático por segurança. Ao sair
-  // do modo tela cheia (Esc, ou o próprio navegador), o cabeçalho/rodapé
-  // desta página voltam a aparecer.
-  async function enterPresentation() {
-    try {
-      await document.documentElement.requestFullscreen();
-    } catch {
-      // Se o navegador recusar (ex.: já em fullscreen, ou sem suporte),
-      // ainda assim escondemos o chrome da própria página.
-    }
-    setChrome(false);
+  // usuário — navegadores bloqueiam isso automático por segurança. O
+  // cabeçalho/rodapé desta página continuam aparecendo normalmente; só o
+  // chrome do navegador em si é escondido.
+  function enterPresentation() {
+    document.documentElement.requestFullscreen().catch(() => {});
   }
-
-  useEffect(() => {
-    function handleFullscreenChange() {
-      if (!document.fullscreenElement) setChrome(true);
-    }
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
 
   useEffect(() => {
     const clock = setInterval(() => setNow(new Date()), 1000);
@@ -392,7 +370,7 @@ export default function TvModePage() {
   if (!ready) return null;
 
   return (
-    <div className={`w-screen h-screen bg-[#0b0f14] text-white flex flex-col overflow-hidden ${chrome ? "p-4" : ""}`}>
+    <div className="w-screen h-screen bg-[#0b0f14] text-white flex flex-col p-4 overflow-hidden">
       {projectCount === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-2xl text-white/40 font-medium">Nenhum projeto com telemetria configurada.</p>
@@ -400,33 +378,31 @@ export default function TvModePage() {
       ) : (
         <>
           {/* Header */}
-          {chrome && (
-            <div className="flex items-center justify-between mb-3 shrink-0">
-              <div className="flex items-baseline gap-3">
-                <h1 className="text-2xl font-black tracking-tight">{current?.project.name}</h1>
-                <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
-                  {STAGE_LABELS[stage]}
-                </span>
-              </div>
-              <div className="flex items-center gap-4">
-                <p className="text-xs font-semibold text-white/40">
-                  Projeto {projectIndex + 1} de {projectCount}
-                </p>
-                <div className="text-xl font-black text-white/70 tabular-nums">{clockLabel}</div>
-                <button
-                  onClick={enterPresentation}
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-white/20 text-white/60 hover:bg-white/10 hover:text-white transition"
-                  title="Entrar em tela cheia (esconde a barra do navegador)"
-                >
-                  Apresentar
-                </button>
-              </div>
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <div className="flex items-baseline gap-3">
+              <h1 className="text-2xl font-black tracking-tight">{current?.project.name}</h1>
+              <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
+                {STAGE_LABELS[stage]}
+              </span>
             </div>
-          )}
+            <div className="flex items-center gap-4">
+              <p className="text-xs font-semibold text-white/40">
+                Projeto {projectIndex + 1} de {projectCount}
+              </p>
+              <div className="text-xl font-black text-white/70 tabular-nums">{clockLabel}</div>
+              <button
+                onClick={enterPresentation}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg border border-white/20 text-white/60 hover:bg-white/10 hover:text-white transition"
+                title="Entrar em tela cheia (esconde a barra do navegador)"
+              >
+                Apresentar
+              </button>
+            </div>
+          </div>
 
           {/* Conteúdo do estágio */}
-          {stage === 0 && <SistemaScreen urls={urls} chrome={chrome} />}
-          {stage === 1 && <DadosScreen urls={urls} chrome={chrome} />}
+          {stage === 0 && <SistemaScreen urls={urls} />}
+          {stage === 1 && <DadosScreen urls={urls} />}
           {stage === 2 && (
             <AlarmesScreen
               alarms={current ? alarmsByProject[current.project.id] : undefined}
@@ -435,16 +411,14 @@ export default function TvModePage() {
           )}
 
           {/* Rodapé: progresso do estágio */}
-          {chrome && (
-            <div className="mt-3 shrink-0 grid grid-cols-3 gap-2">
-              {STAGE_LABELS.map((label, i) => (
-                <div
-                  key={label}
-                  className={`h-1.5 rounded-full transition-colors ${i === stage ? "bg-[#80b02d]" : "bg-white/10"}`}
-                />
-              ))}
-            </div>
-          )}
+          <div className="mt-3 shrink-0 grid grid-cols-3 gap-2">
+            {STAGE_LABELS.map((label, i) => (
+              <div
+                key={label}
+                className={`h-1.5 rounded-full transition-colors ${i === stage ? "bg-[#80b02d]" : "bg-white/10"}`}
+              />
+            ))}
+          </div>
         </>
       )}
     </div>
