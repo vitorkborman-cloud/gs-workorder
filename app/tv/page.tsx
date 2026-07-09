@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { isMobileDevice } from "@/lib/isMobile";
 
@@ -257,10 +257,9 @@ function DadosScreen({ urls, chrome }: { urls: DeviceUrls[]; chrome: boolean }) 
 
 // ─── Página ──────────────────────────────────────────────────────────────
 
-function TvModeContent() {
+export default function TvModePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const chrome = searchParams.get("fullscreen") !== "1";
+  const [chrome, setChrome] = useState(true);
 
   const [ready, setReady] = useState(false);
   const [groups, setGroups] = useState<ProjectGroup[]>([]);
@@ -285,6 +284,29 @@ function TvModeContent() {
     const tick = setInterval(() => setStepIndex((i) => i + 1), STAGE_MS);
     return () => clearInterval(tick);
   }, [ready]);
+
+  // Esconde a barra de abas/endereço do navegador (Fullscreen API real, tipo
+  // apresentação do PowerPoint). Só funciona a partir de um clique do
+  // usuário — navegadores bloqueiam isso automático por segurança. Ao sair
+  // do modo tela cheia (Esc, ou o próprio navegador), o cabeçalho/rodapé
+  // desta página voltam a aparecer.
+  async function enterPresentation() {
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // Se o navegador recusar (ex.: já em fullscreen, ou sem suporte),
+      // ainda assim escondemos o chrome da própria página.
+    }
+    setChrome(false);
+  }
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      if (!document.fullscreenElement) setChrome(true);
+    }
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     const clock = setInterval(() => setNow(new Date()), 1000);
@@ -391,6 +413,13 @@ function TvModeContent() {
                   Projeto {projectIndex + 1} de {projectCount}
                 </p>
                 <div className="text-xl font-black text-white/70 tabular-nums">{clockLabel}</div>
+                <button
+                  onClick={enterPresentation}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-white/20 text-white/60 hover:bg-white/10 hover:text-white transition"
+                  title="Entrar em tela cheia (esconde a barra do navegador)"
+                >
+                  Apresentar
+                </button>
               </div>
             </div>
           )}
@@ -419,13 +448,5 @@ function TvModeContent() {
         </>
       )}
     </div>
-  );
-}
-
-export default function TvModePage() {
-  return (
-    <Suspense fallback={null}>
-      <TvModeContent />
-    </Suspense>
   );
 }
