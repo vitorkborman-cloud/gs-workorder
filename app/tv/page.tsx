@@ -36,7 +36,7 @@ type ActiveAlarm = {
   activatedAt: string | null;
 };
 
-const STAGE_MS = 10_000;
+const STAGE_MS = 15_000;
 const SLOW_REFRESH_MS = 2 * 60_000;
 const HITEC_BASE = "https://app.telemetria.hitecnologia.com.br";
 
