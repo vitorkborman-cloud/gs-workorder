@@ -567,31 +567,40 @@ export default function SoloDetailPage() {
 
       document.body.removeChild(iframe);
 
-      // 5. Monta o PDF A4, distribuindo em páginas apenas nos pontos seguros de corte
-      const pdf      = new jsPDF("p", "mm", "a4");
-      const pageW    = pdf.internal.pageSize.getWidth();
-      const pageH    = pdf.internal.pageSize.getHeight();
-      const imgData  = canvas.toDataURL("image/jpeg", 0.97);
-      const imgW     = pageW;
-      const imgH     = (canvas.height / canvas.width) * imgW;
+      // 5. Monta o PDF A4, recortando um pedaço de canvas por página nos pontos seguros de corte
+      const pdf    = new jsPDF("p", "mm", "a4");
+      const pageW  = pdf.internal.pageSize.getWidth();
+      const pageH  = pdf.internal.pageSize.getHeight();
+      const imgW   = pageW;
 
-      const mmPerPx    = imgH / contentH;
-      const safeBreaksMm = safeBreaksPx.map((px) => px * mmPerPx);
+      const mmPerCanvasPx   = imgW / canvas.width; // escala uniforme (largura e altura)
+      const pageHCanvasPx   = pageH / mmPerCanvasPx;
+      const safeBreaksCanvasPx = safeBreaksPx.map((px) => px * (canvas.height / contentH));
 
-      let offsetY = 0;
-      while (offsetY < imgH - 0.5) {
-        const idealEnd  = offsetY + pageH;
-        const candidates = safeBreaksMm.filter((y) => y > offsetY + 0.5 && y <= idealEnd);
+      let offsetPx = 0;
+      while (offsetPx < canvas.height - 0.5) {
+        const idealEnd  = offsetPx + pageHCanvasPx;
+        const candidates = safeBreaksCanvasPx.filter((y) => y > offsetPx + 0.5 && y <= idealEnd);
         let cut = candidates.length ? candidates[candidates.length - 1] : undefined;
         if (cut === undefined) {
           // Nenhum ponto seguro cabe numa página inteira (linha mais alta que a página) — usa o próximo mesmo assim
-          const next = safeBreaksMm.find((y) => y > offsetY + 0.5);
-          cut = next !== undefined ? Math.min(next, imgH) : imgH;
+          const next = safeBreaksCanvasPx.find((y) => y > offsetPx + 0.5);
+          cut = next !== undefined ? Math.min(next, canvas.height) : canvas.height;
         }
 
-        pdf.addImage(imgData, "JPEG", 0, -offsetY, imgW, imgH);
-        offsetY = cut;
-        if (offsetY < imgH - 0.5) pdf.addPage();
+        const sliceHeightPx = Math.max(1, Math.round(cut - offsetPx));
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width  = canvas.width;
+        pageCanvas.height = sliceHeightPx;
+        const ctx = pageCanvas.getContext("2d")!;
+        ctx.drawImage(canvas, 0, Math.round(offsetPx), canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+
+        const sliceData   = pageCanvas.toDataURL("image/jpeg", 0.97);
+        const sliceHeightMm = sliceHeightPx * mmPerCanvasPx;
+        pdf.addImage(sliceData, "JPEG", 0, 0, imgW, sliceHeightMm);
+
+        offsetPx = cut;
+        if (offsetPx < canvas.height - 0.5) pdf.addPage();
       }
 
       const nom   = data.nomenclatura_poco?.trim();
