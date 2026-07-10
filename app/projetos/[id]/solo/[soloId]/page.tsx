@@ -542,6 +542,16 @@ export default function SoloDetailPage() {
       iframe.style.height = contentH + "px";
       await new Promise(r => setTimeout(r, 200));
 
+      // Pontos seguros de corte: topo de cada linha de camada, da legenda e do rodapé.
+      // Evita que a quebra de página caia no meio de uma linha ou da legenda.
+      const bodyTop = iframeDoc.body.getBoundingClientRect().top;
+      const safeBreaksPx = Array.from(new Set([
+        0,
+        ...Array.from(iframeDoc.querySelectorAll(".ptbl-row, .legend, .footer"))
+          .map((el) => el.getBoundingClientRect().top - bodyTop),
+        contentH,
+      ])).sort((a, b) => a - b);
+
       // 4. Captura com html2canvas em alta resolução (scale 3 ≈ 300dpi)
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(iframeDoc.body, {
@@ -557,7 +567,7 @@ export default function SoloDetailPage() {
 
       document.body.removeChild(iframe);
 
-      // 5. Monta o PDF A4, distribuindo em páginas se necessário
+      // 5. Monta o PDF A4, distribuindo em páginas apenas nos pontos seguros de corte
       const pdf      = new jsPDF("p", "mm", "a4");
       const pageW    = pdf.internal.pageSize.getWidth();
       const pageH    = pdf.internal.pageSize.getHeight();
@@ -565,15 +575,23 @@ export default function SoloDetailPage() {
       const imgW     = pageW;
       const imgH     = (canvas.height / canvas.width) * imgW;
 
-      let remaining = imgH;
-      let offsetY   = 0;
+      const mmPerPx    = imgH / contentH;
+      const safeBreaksMm = safeBreaksPx.map((px) => px * mmPerPx);
 
-      while (remaining > 0) {
+      let offsetY = 0;
+      while (offsetY < imgH - 0.5) {
+        const idealEnd  = offsetY + pageH;
+        const candidates = safeBreaksMm.filter((y) => y > offsetY + 0.5 && y <= idealEnd);
+        let cut = candidates.length ? candidates[candidates.length - 1] : undefined;
+        if (cut === undefined) {
+          // Nenhum ponto seguro cabe numa página inteira (linha mais alta que a página) — usa o próximo mesmo assim
+          const next = safeBreaksMm.find((y) => y > offsetY + 0.5);
+          cut = next !== undefined ? Math.min(next, imgH) : imgH;
+        }
+
         pdf.addImage(imgData, "JPEG", 0, -offsetY, imgW, imgH);
-        remaining -= pageH;
-        offsetY   += pageH;
-        // Só cria nova página se sobrar conteúdo significativo (mais de 30mm)
-        if (remaining > 30) pdf.addPage();
+        offsetY = cut;
+        if (offsetY < imgH - 0.5) pdf.addPage();
       }
 
       const nom   = data.nomenclatura_poco?.trim();
