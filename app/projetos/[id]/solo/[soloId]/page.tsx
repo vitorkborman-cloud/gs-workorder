@@ -166,9 +166,9 @@ export default function SoloDetailPage() {
 
   // ─── NOVO gerador de HTML — design profissional ──────────────────────────
 
-  function buildProfileHTML(logoBase64: string): string {
-    const ESCALA     = 42;   // px por metro
-    const MIN_H      = 44;   // altura mínima de cada linha
+  function buildProfileHTML(logoBase64: string, rowScale: number = 1): string {
+    const ESCALA     = 42 * rowScale;                 // px por metro (encolhe p/ caber em 1 página)
+    const MIN_H      = Math.max(22, 44 * rowScale);   // altura mínima de cada linha
     const PAGE_W     = 794;  // largura total da página
     const PAD        = 18;   // padding horizontal
     const CONTENT_W  = PAGE_W - PAD * 2; // 758px
@@ -179,12 +179,29 @@ export default function SoloDetailPage() {
     const C_VOC  = 56;   // VOC
     const C_DESC = CONTENT_W - C_PROF - C_PERF - C_VOC; // restante (~480px)
 
+    // Conteúdo interno de cada linha (fonte, swatch, padding) encolhe junto com a altura da linha.
+    // Os pisos abaixo foram calibrados para caber dentro do piso de MIN_H (22px):
+    // swatch(14) + 2×PAD_DESC_V(2) = 18px ≤ 22px, com folga para borda/line-height.
+    const rSize = (base: number, min: number) => Math.max(min, base * rowScale);
+    const F_PROF      = rSize(9.5, 7);
+    const F_VOC       = rSize(10, 7);
+    const F_TIPO      = rSize(11.5, 7.5);
+    const F_OBS       = rSize(9, 6.5);
+    const F_OVERLAY   = rSize(8, 6);
+    const SWATCH      = rSize(26, 14);
+    const PAD_DESC_V  = rSize(10, 2);
+    const PAD_DESC_H  = rSize(14, 6);
+    const GAP_DESC    = rSize(12, 4);
+    const PAD_PROF_V  = rSize(5, 2);
+    const PAD_PROF_H  = rSize(6, 3);
+
     const preFiltroTopo = parseFloat(data.pre_filtro);
     const filtroTopo    = parseFloat(data.secao_filtrante_topo);
     const filtroBase    = parseFloat(data.secao_filtrante_base);
     const nivelAgua     = parseFloat(data.nivel_agua);
     const hasWell       = !isNaN(filtroTopo) || !isNaN(preFiltroTopo);
-    const TOP_OFFSET    = hasWell ? 20 : 0;
+    const TOP_OFFSET    = hasWell ? Math.max(10, 20 * rowScale) : 0;
+    const BOTTOM_ROW_H  = Math.max(20, 60 * rowScale);
 
     const profTotal = parseFloat(data.profundidade_total)
       || (layers.length ? parseFloat(String(layers[layers.length - 1].ate)) : 10);
@@ -194,7 +211,7 @@ export default function SoloDetailPage() {
       const esp = parseFloat(String(l.ate)) - parseFloat(String(l.de));
       return Math.max(MIN_H, esp * ESCALA);
     });
-    const profileH = TOP_OFFSET + rowHeights.reduce((s, h) => s + h, 0) + (hasWell ? 60 : 0);
+    const profileH = TOP_OFFSET + rowHeights.reduce((s, h) => s + h, 0) + (hasWell ? BOTTOM_ROW_H : 0);
 
     // getY: posição Y absoluta dentro do overlay do perfil
     const getY = (depth: number | string): number => {
@@ -244,7 +261,7 @@ export default function SoloDetailPage() {
     const tL     = CX - TW / 2;   // 77
     const tR     = CX + TW / 2;   // 93
     const cL     = CX - CW / 2;   // 62
-    const txtS   = (c: string) => `position:absolute;font-size:8px;font-weight:bold;color:${c};z-index:14;white-space:nowrap;text-shadow:0 0 2px #fff,0 0 2px #fff;`;
+    const txtS   = (c: string) => `position:absolute;font-size:${F_OVERLAY}px;font-weight:bold;color:${c};z-index:14;white-space:nowrap;text-shadow:0 0 2px #fff,0 0 2px #fff;`;
 
     let cHTML = "";
 
@@ -359,18 +376,18 @@ export default function SoloDetailPage() {
   .ptbl-hcell { display: flex; align-items: center; justify-content: center; text-align: center; padding: 9px 4px; color: #fff; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border-right: 1px solid rgba(255,255,255,0.15); }
   .ptbl-hcell:last-child { border-right: none; }
   .ptbl-body { position: relative; }
-  .ptbl-row { display: flex; border-bottom: 1.5px solid #391e2a; }
+  .ptbl-row { display: flex; border-bottom: 1.5px solid #391e2a; overflow: hidden; }
   .ptbl-row:last-child { border-bottom: none; }
 
   /* cells */
-  .c-prof { width: ${C_PROF}px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 5px 6px; border-right: 0.5px solid #222; font-size: 9.5px; color: #555; font-weight: 600; }
+  .c-prof { width: ${C_PROF}px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: ${PAD_PROF_V}px ${PAD_PROF_H}px; border-right: 0.5px solid #222; font-size: ${F_PROF}px; color: #555; font-weight: 600; }
   .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #222; }
-  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: 10px 14px; gap: 12px; border-right: 0.5px solid #222; }
-  .c-voc  { width: ${C_VOC}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #5a8a1e; }
-  .desc-swatch { width: 26px; height: 26px; flex-shrink: 0; border: 0.5px solid #888; border-radius: 3px; }
+  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: ${PAD_DESC_V}px ${PAD_DESC_H}px; gap: ${GAP_DESC}px; border-right: 0.5px solid #222; }
+  .c-voc  { width: ${C_VOC}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: ${F_VOC}px; font-weight: 700; color: #5a8a1e; }
+  .desc-swatch { width: ${SWATCH}px; height: ${SWATCH}px; flex-shrink: 0; border: 0.5px solid #888; border-radius: 3px; }
   .desc-text { flex: 1; min-width: 0; }
-  .desc-tipo { font-size: 11.5px; font-weight: 800; color: #391e2a; text-transform: uppercase; word-break: break-word; }
-  .desc-obs  { font-size: 9px; color: #666; margin-top: 3px; word-break: break-word; }
+  .desc-tipo { font-size: ${F_TIPO}px; font-weight: 800; color: #391e2a; text-transform: uppercase; word-break: break-word; }
+  .desc-obs  { font-size: ${F_OBS}px; color: #666; margin-top: 3px; word-break: break-word; }
 
   /* ── legend ── */
   .legend { margin-top: 10px; border: 1.5px solid #391e2a; border-radius: 4px; overflow: hidden; }
@@ -475,7 +492,7 @@ export default function SoloDetailPage() {
       }).join("")}
 
       ${hasWell ? `
-        <div class="ptbl-row" style="height:60px;background:#fff;border-bottom:none;">
+        <div class="ptbl-row" style="height:${BOTTOM_ROW_H}px;background:#fff;border-bottom:none;">
           <div class="c-prof"></div>
           <div class="c-perf"></div>
           <div class="c-desc"></div>
@@ -512,6 +529,57 @@ export default function SoloDetailPage() {
 
   // ─── gerador principal (html2canvas → jsPDF, idêntico ao Puppeteer) ─────
 
+  // Renderiza o HTML do perfil num iframe oculto, mede o conteúdo e captura com html2canvas.
+  async function renderProfileToCanvas(html: string) {
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;top:-99999px;left:-99999px;width:794px;height:2000px;border:none;visibility:hidden;";
+    document.body.appendChild(iframe);
+
+    await new Promise<void>((resolve) => {
+      iframe.onload = () => resolve();
+      iframe.srcdoc = html;
+    });
+
+    // Aguarda imagens e fontes carregarem
+    await new Promise(r => setTimeout(r, 800));
+
+    // Ajusta altura do iframe ao conteúdo real
+    const iframeDoc = iframe.contentDocument!;
+    const contentH = iframeDoc.documentElement.scrollHeight;
+    iframe.style.height = contentH + "px";
+    await new Promise(r => setTimeout(r, 200));
+
+    const ptblBody  = iframeDoc.querySelector(".ptbl-body");
+    const ptblBodyH = ptblBody ? ptblBody.getBoundingClientRect().height : 0;
+
+    // Pontos seguros de corte: topo de cada linha de camada, da legenda e do rodapé.
+    // Evita que uma eventual quebra de página caia no meio de uma linha ou da legenda.
+    const bodyTop = iframeDoc.body.getBoundingClientRect().top;
+    const safeBreaksPx = Array.from(new Set([
+      0,
+      ...Array.from(iframeDoc.querySelectorAll(".ptbl-row, .legend, .footer"))
+        .map((el) => el.getBoundingClientRect().top - bodyTop),
+      contentH,
+    ])).sort((a, b) => a - b);
+
+    // Captura com html2canvas em alta resolução (scale 3 ≈ 300dpi)
+    const html2canvas = (await import("html2canvas")).default;
+    const canvas = await html2canvas(iframeDoc.body, {
+      scale: 3,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      windowWidth: 794,
+      scrollX: 0,
+      scrollY: 0,
+    });
+
+    document.body.removeChild(iframe);
+
+    return { canvas, contentH, ptblBodyH, safeBreaksPx };
+  }
+
   async function gerarPDF() {
     if (!data) return;
 
@@ -520,59 +588,31 @@ export default function SoloDetailPage() {
       let logoB64 = "";
       try { logoB64 = await fetchLogoBase64("/logo.png"); } catch (_) {}
 
-      // 2. Gera o HTML idêntico ao que o Puppeteer usava
-      const html = buildProfileHTML(logoB64);
+      const pdf   = new jsPDF("p", "mm", "a4");
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW  = pageW;
 
-      // 3. Renderiza o HTML completo num iframe oculto (mantém CSS intacto)
-      const iframe = document.createElement("iframe");
-      iframe.style.cssText = "position:fixed;top:-99999px;left:-99999px;width:794px;height:2000px;border:none;visibility:hidden;";
-      document.body.appendChild(iframe);
+      // Altura máxima de conteúdo (em px, na largura de referência de 794px) que cabe numa única página A4
+      const maxContentPx = (pageH / pageW) * 794 - 4;
 
-      await new Promise<void>((resolve) => {
-        iframe.onload = () => resolve();
-        iframe.srcdoc = html;
-      });
+      // 2. Gera o HTML e renderiza com a escala normal
+      let html   = buildProfileHTML(logoB64);
+      let render = await renderProfileToCanvas(html);
 
-      // Aguarda imagens e fontes carregarem
-      await new Promise(r => setTimeout(r, 800));
+      // 3. Se não couber numa página só, recalcula a escala das camadas para encolher e caber tudo
+      if (render.contentH > maxContentPx && render.ptblBodyH > 0) {
+        const fixedH  = render.contentH - render.ptblBodyH;
+        const targetH = Math.max(40, maxContentPx - fixedH);
+        const factor  = Math.min(1, Math.max(0.15, targetH / render.ptblBodyH));
+        html   = buildProfileHTML(logoB64, factor);
+        render = await renderProfileToCanvas(html);
+      }
 
-      // Ajusta altura do iframe ao conteúdo real
-      const iframeDoc = iframe.contentDocument!;
-      const contentH = iframeDoc.documentElement.scrollHeight;
-      iframe.style.height = contentH + "px";
-      await new Promise(r => setTimeout(r, 200));
+      const { canvas, contentH, safeBreaksPx } = render;
 
-      // Pontos seguros de corte: topo de cada linha de camada, da legenda e do rodapé.
-      // Evita que a quebra de página caia no meio de uma linha ou da legenda.
-      const bodyTop = iframeDoc.body.getBoundingClientRect().top;
-      const safeBreaksPx = Array.from(new Set([
-        0,
-        ...Array.from(iframeDoc.querySelectorAll(".ptbl-row, .legend, .footer"))
-          .map((el) => el.getBoundingClientRect().top - bodyTop),
-        contentH,
-      ])).sort((a, b) => a - b);
-
-      // 4. Captura com html2canvas em alta resolução (scale 3 ≈ 300dpi)
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(iframeDoc.body, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-        logging: false,
-        windowWidth: 794,
-        scrollX: 0,
-        scrollY: 0,
-      });
-
-      document.body.removeChild(iframe);
-
-      // 5. Monta o PDF A4, recortando um pedaço de canvas por página nos pontos seguros de corte
-      const pdf    = new jsPDF("p", "mm", "a4");
-      const pageW  = pdf.internal.pageSize.getWidth();
-      const pageH  = pdf.internal.pageSize.getHeight();
-      const imgW   = pageW;
-
+      // 4. Monta o PDF A4 (normalmente 1 página só; recorta em mais páginas apenas se, mesmo
+      //    encolhido, ainda não couber — sempre nos pontos seguros de corte)
       const mmPerCanvasPx   = imgW / canvas.width; // escala uniforme (largura e altura)
       const pageHCanvasPx   = pageH / mmPerCanvasPx;
       const safeBreaksCanvasPx = safeBreaksPx.map((px) => px * (canvas.height / contentH));
