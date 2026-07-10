@@ -485,9 +485,19 @@ export default function SoloDetailPage() {
         const rH  = rowHeights[i];
         const st  = soloStyle(l.tipo);
         const alt = i % 2 === 0 ? "#fff" : "#fafafa";
+        // O "até" desta camada normalmente é igual ao "de" da próxima (camadas contínuas) —
+        // mostrar os dois duplicaria o mesmo número em toda fronteira. Só repete o "até"
+        // quando é a última camada ou quando há uma descontinuidade real entre elas.
+        const isLast  = i === layers.length - 1;
+        const ateNum  = parseFloat(String(l.ate));
+        const nextDe  = !isLast ? parseFloat(String(layers[i + 1].de)) : NaN;
+        const showAte = isLast || isNaN(nextDe) || Math.abs(nextDe - ateNum) > 0.001;
         return `
         <div class="ptbl-row" style="height:${rH}px;">
-          <div class="c-prof"><span class="c-prof-top">${fmt2(l.de)}</span><span class="c-prof-bottom">${fmt2(l.ate)}</span></div>
+          <div class="c-prof">
+            <span class="c-prof-top">${fmt2(l.de)}</span>
+            ${showAte ? `<span class="c-prof-bottom">${fmt2(l.ate)}</span>` : ""}
+          </div>
           <div class="c-perf" style="${st}"></div>
           <div class="c-desc" style="background:${alt};">
             <div class="desc-swatch" style="${st}"></div>
