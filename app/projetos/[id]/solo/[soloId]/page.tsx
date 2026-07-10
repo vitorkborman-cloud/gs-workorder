@@ -192,7 +192,7 @@ export default function SoloDetailPage() {
     const PAD_DESC_V  = rSize(10, 2);
     const PAD_DESC_H  = rSize(14, 6);
     const GAP_DESC    = rSize(12, 4);
-    const PAD_PROF_V  = rSize(5, 2);
+    const PAD_PROF_V  = rSize(6, 4);
     const PAD_PROF_H  = rSize(6, 3);
 
     const preFiltroTopo = parseFloat(data.pre_filtro);
@@ -318,16 +318,19 @@ export default function SoloDetailPage() {
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
       cHTML += `<div style="position:absolute;left:0;width:170px;top:${yNA}px;border-top:2px dashed #1d6fd8;z-index:12;"></div>`;
-      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 16}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:3px;width:62px;height:22px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#1d6fd8;z-index:14;">NA: ${fmt2(nivelAgua)}m</div>`;
+      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 16}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:3px;width:62px;height:22px;line-height:19px;text-align:center;font-size:8px;font-weight:800;color:#1d6fd8;z-index:14;">NA: ${fmt2(nivelAgua)}m</div>`;
     }
 
     // ── LEGENDA (solos presentes) ──────────────────────────────────────────
     const uniqueTypes = [...new Set(layers.map(l => l.tipo).filter(Boolean))];
+    // Centralização vertical via line-height + vertical-align (nao flexbox): o html2canvas usado
+    // para gerar a imagem do PDF tem suporte limitado a align-items, entao esse metodo classico
+    // e mais confiavel.
     const legendItems = uniqueTypes.map(tipo => {
       const st = soloStyle(tipo);
-      return `<div style="display:flex;align-items:center;gap:7px;padding:6px 8px;background:white;border-radius:3px;border:0.5px solid #e0e0e0;">
-        <div style="width:26px;height:16px;border:0.5px solid #888;flex-shrink:0;border-radius:2px;${st}"></div>
-        <span style="font-size:9px;line-height:1;font-weight:600;color:#333;white-space:nowrap;">${tipo}</span>
+      return `<div style="line-height:24px;padding:0 8px;background:white;border-radius:3px;border:0.5px solid #e0e0e0;white-space:nowrap;">
+        <span style="display:inline-block;vertical-align:middle;width:26px;height:16px;border:0.5px solid #888;border-radius:2px;${st}"></span>
+        <span style="display:inline-block;vertical-align:middle;margin-left:7px;font-size:9px;line-height:1;font-weight:600;color:#333;">${tipo}</span>
       </div>`;
     }).join("");
 
@@ -400,7 +403,7 @@ export default function SoloDetailPage() {
 
   /* ── legend ── */
   .legend { margin-top: 10px; border: 1.5px solid #391e2a; border-radius: 4px; overflow: hidden; }
-  .legend-title { display: flex; align-items: center; background: #391e2a; color: #fff; font-size: 8px; line-height: 1; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 7px 10px; border-bottom: 2px solid #80b02d; }
+  .legend-title { line-height: 24px; background: #391e2a; color: #fff; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 0 10px; border-bottom: 2px solid #80b02d; }
   .legend-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 10px; background: #f5f5f5; }
 
   /* ── footer ── */
