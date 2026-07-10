@@ -323,14 +323,16 @@ export default function SoloDetailPage() {
 
     // ── LEGENDA (solos presentes) ──────────────────────────────────────────
     const uniqueTypes = [...new Set(layers.map(l => l.tipo).filter(Boolean))];
-    // Centralização vertical via line-height + vertical-align (nao flexbox): o html2canvas usado
-    // para gerar a imagem do PDF tem suporte limitado a align-items, entao esse metodo classico
-    // e mais confiavel.
+    // Centralização vertical via position:absolute (nao flex, nao vertical-align): medido
+    // pixel a pixel na imagem real gerada pelo html2canvas — o swatch (16px) centraliza em
+    // top:4px numa linha de 24px, e o texto (9px/600) precisa de top:-2px para compensar
+    // um deslocamento sistematico que o html2canvas produz ao posicionar essa fonte/tamanho
+    // dentro de uma line-height maior que o texto.
     const legendItems = uniqueTypes.map(tipo => {
       const st = soloStyle(tipo);
-      return `<div style="line-height:24px;padding:0 8px;background:white;border-radius:3px;border:0.5px solid #e0e0e0;white-space:nowrap;">
-        <span style="display:inline-block;vertical-align:middle;width:26px;height:16px;border:0.5px solid #888;border-radius:2px;${st}"></span>
-        <span style="display:inline-block;vertical-align:middle;margin-left:7px;font-size:9px;line-height:1;font-weight:600;color:#333;">${tipo}</span>
+      return `<div style="position:relative;height:24px;background:white;border-radius:3px;border:0.5px solid #e0e0e0;white-space:nowrap;">
+        <span style="position:absolute;left:8px;top:4px;width:26px;height:16px;border:0.5px solid #888;border-radius:2px;${st}"></span>
+        <span style="position:absolute;left:41px;right:8px;top:-2px;line-height:24px;font-size:9px;font-weight:600;color:#333;">${tipo}</span>
       </div>`;
     }).join("");
 
