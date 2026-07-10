@@ -168,7 +168,7 @@ export default function SoloDetailPage() {
 
   function buildProfileHTML(logoBase64: string, rowScale: number = 1): string {
     const ESCALA     = 42 * rowScale;                 // px por metro (encolhe p/ caber em 1 página)
-    const MIN_H      = Math.max(22, 44 * rowScale);   // altura mínima de cada linha
+    const MIN_H      = Math.max(26, 44 * rowScale);   // altura mínima de cada linha
     const PAGE_W     = 794;  // largura total da página
     const PAD        = 18;   // padding horizontal
     const CONTENT_W  = PAGE_W - PAD * 2; // 758px
@@ -319,9 +319,9 @@ export default function SoloDetailPage() {
     const uniqueTypes = [...new Set(layers.map(l => l.tipo).filter(Boolean))];
     const legendItems = uniqueTypes.map(tipo => {
       const st = soloStyle(tipo);
-      return `<div style="display:flex;align-items:center;gap:7px;padding:4px 8px;background:white;border-radius:3px;border:0.5px solid #e0e0e0;">
+      return `<div style="display:flex;align-items:center;gap:7px;padding:6px 8px;background:white;border-radius:3px;border:0.5px solid #e0e0e0;">
         <div style="width:26px;height:16px;border:0.5px solid #888;flex-shrink:0;border-radius:2px;${st}"></div>
-        <span style="font-size:9px;font-weight:600;color:#333;white-space:nowrap;">${tipo}</span>
+        <span style="font-size:9px;line-height:1;font-weight:600;color:#333;white-space:nowrap;">${tipo}</span>
       </div>`;
     }).join("");
 
@@ -380,7 +380,7 @@ export default function SoloDetailPage() {
   .ptbl-row:last-child { border-bottom: none; }
 
   /* cells */
-  .c-prof { width: ${C_PROF}px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: ${PAD_PROF_V}px ${PAD_PROF_H}px; border-right: 0.5px solid #222; font-size: ${F_PROF}px; color: #555; font-weight: 600; }
+  .c-prof { width: ${C_PROF}px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: ${PAD_PROF_V}px ${PAD_PROF_H}px; border-right: 0.5px solid #222; font-size: ${F_PROF}px; color: #555; font-weight: 600; line-height: 1; }
   .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #222; }
   .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: ${PAD_DESC_V}px ${PAD_DESC_H}px; gap: ${GAP_DESC}px; border-right: 0.5px solid #222; }
   .c-voc  { width: ${C_VOC}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: ${F_VOC}px; font-weight: 700; color: #5a8a1e; }
@@ -391,7 +391,7 @@ export default function SoloDetailPage() {
 
   /* ── legend ── */
   .legend { margin-top: 10px; border: 1.5px solid #391e2a; border-radius: 4px; overflow: hidden; }
-  .legend-title { background: #391e2a; color: #fff; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 5px 10px; border-bottom: 2px solid #80b02d; }
+  .legend-title { display: flex; align-items: center; background: #391e2a; color: #fff; font-size: 8px; line-height: 1; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 7px 10px; border-bottom: 2px solid #80b02d; }
   .legend-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 10px; background: #f5f5f5; }
 
   /* ── footer ── */
@@ -617,30 +617,40 @@ export default function SoloDetailPage() {
       const pageHCanvasPx   = pageH / mmPerCanvasPx;
       const safeBreaksCanvasPx = safeBreaksPx.map((px) => px * (canvas.height / contentH));
 
-      let offsetPx = 0;
-      while (offsetPx < canvas.height - 0.5) {
-        const idealEnd  = offsetPx + pageHCanvasPx;
-        const candidates = safeBreaksCanvasPx.filter((y) => y > offsetPx + 0.5 && y <= idealEnd);
-        let cut = candidates.length ? candidates[candidates.length - 1] : undefined;
-        if (cut === undefined) {
-          // Nenhum ponto seguro cabe numa página inteira (linha mais alta que a página) — usa o próximo mesmo assim
-          const next = safeBreaksCanvasPx.find((y) => y > offsetPx + 0.5);
-          cut = next !== undefined ? Math.min(next, canvas.height) : canvas.height;
+      // Tolerância: pequenas diferenças de medição entre a etapa de medir e a de capturar a
+      // imagem podem deixar uns poucos pixels de sobra (ex.: o padding inferior da página).
+      // Isso não é conteúdo de verdade, então nunca deve abrir uma 2ª página quase em branco por causa disso.
+      const toleranceCanvasPx = 40 * (canvas.height / contentH);
+
+      if (canvas.height <= pageHCanvasPx + toleranceCanvasPx) {
+        const sliceData = canvas.toDataURL("image/jpeg", 0.97);
+        pdf.addImage(sliceData, "JPEG", 0, 0, imgW, canvas.height * mmPerCanvasPx);
+      } else {
+        let offsetPx = 0;
+        while (offsetPx < canvas.height - 0.5) {
+          const idealEnd  = offsetPx + pageHCanvasPx;
+          const candidates = safeBreaksCanvasPx.filter((y) => y > offsetPx + 0.5 && y <= idealEnd);
+          let cut = candidates.length ? candidates[candidates.length - 1] : undefined;
+          if (cut === undefined) {
+            // Nenhum ponto seguro cabe numa página inteira (linha mais alta que a página) — usa o próximo mesmo assim
+            const next = safeBreaksCanvasPx.find((y) => y > offsetPx + 0.5);
+            cut = next !== undefined ? Math.min(next, canvas.height) : canvas.height;
+          }
+
+          const sliceHeightPx = Math.max(1, Math.round(cut - offsetPx));
+          const pageCanvas = document.createElement("canvas");
+          pageCanvas.width  = canvas.width;
+          pageCanvas.height = sliceHeightPx;
+          const ctx = pageCanvas.getContext("2d")!;
+          ctx.drawImage(canvas, 0, Math.round(offsetPx), canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+
+          const sliceData   = pageCanvas.toDataURL("image/jpeg", 0.97);
+          const sliceHeightMm = sliceHeightPx * mmPerCanvasPx;
+          pdf.addImage(sliceData, "JPEG", 0, 0, imgW, sliceHeightMm);
+
+          offsetPx = cut;
+          if (offsetPx < canvas.height - 0.5) pdf.addPage();
         }
-
-        const sliceHeightPx = Math.max(1, Math.round(cut - offsetPx));
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width  = canvas.width;
-        pageCanvas.height = sliceHeightPx;
-        const ctx = pageCanvas.getContext("2d")!;
-        ctx.drawImage(canvas, 0, Math.round(offsetPx), canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-
-        const sliceData   = pageCanvas.toDataURL("image/jpeg", 0.97);
-        const sliceHeightMm = sliceHeightPx * mmPerCanvasPx;
-        pdf.addImage(sliceData, "JPEG", 0, 0, imgW, sliceHeightMm);
-
-        offsetPx = cut;
-        if (offsetPx < canvas.height - 0.5) pdf.addPage();
       }
 
       const nom   = data.nomenclatura_poco?.trim();
