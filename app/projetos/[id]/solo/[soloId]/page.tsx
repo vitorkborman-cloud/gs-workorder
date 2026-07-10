@@ -229,6 +229,12 @@ export default function SoloDetailPage() {
       return y;
     };
 
+    // Formata profundidades/metragens sempre com 2 casas decimais (ex.: "8" → "8.00")
+    const fmt2 = (v: string | number | null | undefined): string => {
+      const n = parseFloat(String(v));
+      return isNaN(n) ? String(v ?? "—") : n.toFixed(2);
+    };
+
     // Estilo de solo (cor + textura tile)
     const soloStyle = (tipo: string): string => {
       if (!tipo) return "background-color:#f0f0f0;";
@@ -298,13 +304,13 @@ export default function SoloDetailPage() {
 
         // Labels seção filtrante — ESQUERDA
         cHTML += `<div style="position:absolute;left:0;width:${tL - 2}px;top:${yTF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
-        cHTML += `<div style="${txtS("#444")}left:2px;top:${yTF - 12}px;">Início filtro<br/>${filtroTopo}m</div>`;
+        cHTML += `<div style="${txtS("#444")}left:2px;top:${yTF - 12}px;">Início filtro<br/>${fmt2(filtroTopo)}m</div>`;
         cHTML += `<div style="position:absolute;left:0;width:${tL - 2}px;top:${yBF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
-        cHTML += `<div style="${txtS("#444")}left:2px;top:${yBF + 2}px;">Fim filtro<br/>${filtroBase}m</div>`;
+        cHTML += `<div style="${txtS("#444")}left:2px;top:${yBF + 2}px;">Fim filtro<br/>${fmt2(filtroBase)}m</div>`;
 
         // Prof. total — DIREITA
         cHTML += `<div style="position:absolute;left:${tR + 2}px;width:${170 - tR - 2}px;top:${yF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
-        cHTML += `<div style="${txtS("#444")}left:${tR + 4}px;top:${yF + 2}px;">${profTotal}m</div>`;
+        cHTML += `<div style="${txtS("#444")}left:${tR + 4}px;top:${yF + 2}px;">${fmt2(profTotal)}m</div>`;
       }
     }
 
@@ -312,7 +318,7 @@ export default function SoloDetailPage() {
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
       cHTML += `<div style="position:absolute;left:0;width:170px;top:${yNA}px;border-top:2px dashed #1d6fd8;z-index:12;"></div>`;
-      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 16}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:3px;width:62px;height:22px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#1d6fd8;z-index:14;">NA: ${nivelAgua}m</div>`;
+      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 16}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:3px;width:62px;height:22px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#1d6fd8;z-index:14;">NA: ${fmt2(nivelAgua)}m</div>`;
     }
 
     // ── LEGENDA (solos presentes) ──────────────────────────────────────────
@@ -380,7 +386,10 @@ export default function SoloDetailPage() {
   .ptbl-row:last-child { border-bottom: none; }
 
   /* cells */
-  .c-prof { width: ${C_PROF}px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: ${PAD_PROF_V}px ${PAD_PROF_H}px; border-right: 0.5px solid #222; font-size: ${F_PROF}px; color: #555; font-weight: 600; line-height: 1; }
+  .c-prof { position: relative; width: ${C_PROF}px; flex-shrink: 0; border-right: 0.5px solid #222; font-size: ${F_PROF}px; color: #555; font-weight: 600; line-height: 1; }
+  .c-prof-top, .c-prof-bottom { position: absolute; left: 0; right: 0; text-align: center; }
+  .c-prof-top { top: ${PAD_PROF_V}px; }
+  .c-prof-bottom { bottom: ${PAD_PROF_V}px; }
   .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #222; }
   .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: ${PAD_DESC_V}px ${PAD_DESC_H}px; gap: ${GAP_DESC}px; border-right: 0.5px solid #222; }
   .c-voc  { width: ${C_VOC}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: ${F_VOC}px; font-weight: 700; color: #5a8a1e; }
@@ -440,9 +449,9 @@ export default function SoloDetailPage() {
   <!-- METADATA GRID -->
   <div class="meta">
     ${meta("Data", data.data || "—")}
-    ${meta("Nível d'Água (NA)", data.nivel_agua ? data.nivel_agua + " m" : "—")}
-    ${meta("Profundidade Total", data.profundidade_total ? data.profundidade_total + " m" : "—")}
-    ${meta("Cota / Altitude", data.cota ? data.cota + " m" : "—")}
+    ${meta("Nível d'Água (NA)", data.nivel_agua ? fmt2(data.nivel_agua) + " m" : "—")}
+    ${meta("Profundidade Total", data.profundidade_total ? fmt2(data.profundidade_total) + " m" : "—")}
+    ${meta("Cota / Altitude", data.cota ? fmt2(data.cota) + " m" : "—")}
     ${meta("UTM Este (X)", data.coord_x || "—")}
     ${meta("UTM Norte (Y)", data.coord_y || "—")}
     ${meta("Zona UTM", data.utm_zona || "—")}
@@ -478,7 +487,7 @@ export default function SoloDetailPage() {
         const alt = i % 2 === 0 ? "#fff" : "#fafafa";
         return `
         <div class="ptbl-row" style="height:${rH}px;">
-          <div class="c-prof"><span>${l.de}</span><span>${l.ate}</span></div>
+          <div class="c-prof"><span class="c-prof-top">${fmt2(l.de)}</span><span class="c-prof-bottom">${fmt2(l.ate)}</span></div>
           <div class="c-perf" style="${st}"></div>
           <div class="c-desc" style="background:${alt};">
             <div class="desc-swatch" style="${st}"></div>
