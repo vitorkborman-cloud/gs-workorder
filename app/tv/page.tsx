@@ -36,7 +36,15 @@ type ActiveAlarm = {
   activatedAt: string | null;
 };
 
-const STAGE_MS = 15_000;
+// Tempo que o slide fica na tela DEPOIS de terminar de carregar (iframes do
+// portal / alarmes). Antes era um tempo fixo por slide, o que fazia o slide
+// trocar bem na hora em que o portal (que às vezes demora) finalmente
+// terminava de carregar. Agora espera carregar 100% e só depois conta esse tempo.
+const HOLD_MS = 7_000;
+// Segurança: se o portal nunca terminar de carregar (erro, timeout, etc.),
+// avança mesmo assim depois desse tempo pra não travar o Modo TV no mesmo
+// slide pra sempre.
+const MAX_WAIT_MS = 30_000;
 const SLOW_REFRESH_MS = 2 * 60_000;
 const HITEC_BASE = "https://app.telemetria.hitecnologia.com.br";
 
@@ -125,7 +133,7 @@ function IframeGrid({ children, count }: { children: React.ReactNode; count: num
 // Renderiza o iframe no tamanho "natural" da página (NATURAL_WIDTH) e
 // encolhe com transform:scale() até caber na largura real do container,
 // medida via ResizeObserver.
-function ScaledFrame({ src, title }: { src: string; title: string }) {
+function ScaledFrame({ src, title, onLoad }: { src: string; title: string; onLoad?: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
@@ -146,6 +154,7 @@ function ScaledFrame({ src, title }: { src: string; title: string }) {
         title={title}
         scrolling="no"
         className="border-0"
+        onLoad={onLoad}
         style={{
           width: NATURAL_WIDTH,
           height: NATURAL_HEIGHT,
@@ -157,11 +166,11 @@ function ScaledFrame({ src, title }: { src: string; title: string }) {
   );
 }
 
-function SistemaScreen({ urls }: { urls: DeviceUrls[] }) {
+function SistemaScreen({ urls, onFrameLoad }: { urls: DeviceUrls[]; onFrameLoad: (deviceId: string) => void }) {
   return (
     <IframeGrid count={urls.length}>
       {urls.map(({ device, sistemaUrl }) => (
-        <ScaledFrame key={device.id} src={sistemaUrl} title={`${device.name} — Sistema`} />
+        <ScaledFrame key={device.id} src={sistemaUrl} title={`${device.name} — Sistema`} onLoad={() => onFrameLoad(device.id)} />
       ))}
     </IframeGrid>
   );
@@ -234,12 +243,12 @@ function DadosFallbackCard({ device }: { device: TelemetryDevice }) {
   );
 }
 
-function DadosScreen({ urls }: { urls: DeviceUrls[] }) {
+function DadosScreen({ urls, onFrameLoad }: { urls: DeviceUrls[]; onFrameLoad: (deviceId: string) => void }) {
   return (
     <IframeGrid count={urls.length}>
       {urls.map(({ device, dadosUrl }) =>
         dadosUrl ? (
-          <ScaledFrame key={device.id} src={dadosUrl} title={`${device.name} — Dados`} />
+          <ScaledFrame key={device.id} src={dadosUrl} title={`${device.name} — Dados`} onLoad={() => onFrameLoad(device.id)} />
         ) : (
           <DadosFallbackCard key={device.id} device={device} />
         )
@@ -259,6 +268,8 @@ export default function TvModePage() {
   const [now, setNow] = useState(new Date());
   const [alarmsByProject, setAlarmsByProject] = useState<Record<string, ActiveAlarm[]>>({});
   const [loadingAlarms, setLoadingAlarms] = useState<Record<string, boolean>>({});
+  const [loadedFrames, setLoadedFrames] = useState<Set<string>>(new Set());
+  const [alarmsReadyStep, setAlarmsReadyStep] = useState<number | null>(null);
 
   useEffect(() => {
     if (isMobileDevice()) {
@@ -270,12 +281,6 @@ export default function TvModePage() {
     const slow = setInterval(() => loadGroups().then(setGroups), SLOW_REFRESH_MS);
     return () => clearInterval(slow);
   }, [router]);
-
-  useEffect(() => {
-    if (!ready) return;
-    const tick = setInterval(() => setStepIndex((i) => i + 1), STAGE_MS);
-    return () => clearInterval(tick);
-  }, [ready]);
 
   // Esconde a barra de abas/endereço do navegador (Fullscreen API real, tipo
   // apresentação do PowerPoint). Só funciona a partir de um clique do
@@ -319,6 +324,53 @@ export default function TvModePage() {
     }));
   }, [current]);
 
+  // IDs dos iframes que o estágio atual precisa esperar carregar. No estágio
+  // Dados, equipamentos sem dadosUrl mostram um card de fallback (sem
+  // iframe), então não entram nessa lista — não há o que esperar por eles.
+  const expectedFrameIds = useMemo(() => {
+    if (stage === 0) return urls.map((u) => u.device.id);
+    if (stage === 1) return urls.filter((u) => u.dadosUrl).map((u) => u.device.id);
+    return []; // estágio Alarmes não tem iframe
+  }, [stage, urls]);
+
+  // Chave composta (slide + equipamento): o mesmo equipamento aparece em mais
+  // de um estágio (Sistema, Dados), com o mesmo device.id — sem isso, trocar
+  // de estágio dentro do mesmo projeto reaproveitaria o "carregado" do
+  // estágio anterior e pularia a espera do iframe novo.
+  function markFrameLoaded(deviceId: string) {
+    const key = `${stepIndex}:${deviceId}`;
+    setLoadedFrames((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  }
+
+  // Zera o controle de "carregado" a cada slide novo (higiene de memória —
+  // a corretude já vem da chave composta acima, isso só evita o Set crescer
+  // sem limite numa sessão de TV rodando por horas).
+  useEffect(() => {
+    setLoadedFrames(new Set());
+  }, [stepIndex]);
+
+  const framesReady = expectedFrameIds.every((id) => loadedFrames.has(`${stepIndex}:${id}`));
+  // Compara com o stepIndex atual (não só "loading === false"): sem isso, um
+  // valor de loadingAlarms de uma visita anterior a esse projeto pareceria
+  // "pronto" antes da busca de agora sequer começar.
+  const alarmsReady = stage !== 2 || alarmsReadyStep === stepIndex;
+  const stageReady = framesReady && alarmsReady;
+
+  // Avança pro próximo slide HOLD_MS depois de tudo terminar de carregar.
+  useEffect(() => {
+    if (!ready || !stageReady) return;
+    const t = setTimeout(() => setStepIndex((i) => i + 1), HOLD_MS);
+    return () => clearTimeout(t);
+  }, [ready, stageReady, stepIndex]);
+
+  // Segurança: se o carregamento nunca terminar, avança mesmo assim depois
+  // de MAX_WAIT_MS pra não travar o Modo TV no mesmo slide pra sempre.
+  useEffect(() => {
+    if (!ready) return;
+    const t = setTimeout(() => setStepIndex((i) => i + 1), MAX_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [ready, stepIndex]);
+
   // Busca os alarmes ativos só do projeto exibido no momento, só quando entra
   // no estágio Alarmes — evita bater na API da HI Tecnologia pra todos os
   // projetos de uma vez.
@@ -355,12 +407,16 @@ export default function TvModePage() {
       if (cancelled) return;
       setAlarmsByProject((prev) => ({ ...prev, [pid]: perDevice.flat() }));
       setLoadingAlarms((prev) => ({ ...prev, [pid]: false }));
+      setAlarmsReadyStep(stepIndex);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [stage, current]);
+    // stepIndex entra nas deps pra garantir que refaz a busca a cada visita ao
+    // estágio Alarmes, mesmo no caso raro de um projeto customizado (ver
+    // CUSTOM_STAGES) que só tenha o estágio Alarmes e nunca mude de "stage".
+  }, [stage, current, stepIndex]);
 
   const clockLabel = useMemo(
     () => now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
@@ -384,6 +440,9 @@ export default function TvModePage() {
               <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
                 {STAGE_LABELS[stage]}
               </span>
+              {!stageReady && (
+                <span className="text-xs font-semibold text-[#80b02d] animate-pulse">Carregando...</span>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <p className="text-xs font-semibold text-white/40">
@@ -401,8 +460,8 @@ export default function TvModePage() {
           </div>
 
           {/* Conteúdo do estágio */}
-          {stage === 0 && <SistemaScreen urls={urls} />}
-          {stage === 1 && <DadosScreen urls={urls} />}
+          {stage === 0 && <SistemaScreen urls={urls} onFrameLoad={markFrameLoaded} />}
+          {stage === 1 && <DadosScreen urls={urls} onFrameLoad={markFrameLoaded} />}
           {stage === 2 && (
             <AlarmesScreen
               alarms={current ? alarmsByProject[current.project.id] : undefined}
