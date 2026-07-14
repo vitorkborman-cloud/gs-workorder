@@ -490,8 +490,7 @@ export default function SoloDetailPage() {
     ${meta("Profundidade Total", data.profundidade_total ? fmt2(data.profundidade_total) + " m" : "—")}
     ${meta("Seção Filtrante", (!isNaN(filtroTopo) && !isNaN(filtroBase)) ? `${fmt2(filtroTopo)} a ${fmt2(filtroBase)} m` : "—")}
     ${meta("Cota / Altitude", data.cota ? fmt2(data.cota) + " m" : "—")}
-    ${meta("UTM Este (X)", data.coord_x || "—")}
-    ${meta("UTM Norte (Y)", data.coord_y || "—")}
+    ${meta("Coordenadas UTM (X / Y)", (data.coord_x || data.coord_y) ? `${data.coord_x || "—"} / ${data.coord_y || "—"}` : "—")}
     ${meta("Zona UTM", data.utm_zona || "—")}
     ${meta("Ø Instalação / Sondagem", `${data.diametro_poco || "—"} / ${data.diametro_sondagem || "—"}`)}
   </div>
@@ -605,9 +604,20 @@ export default function SoloDetailPage() {
     // Aguarda imagens e fontes carregarem
     await new Promise(r => setTimeout(r, 800));
 
-    // Ajusta altura do iframe ao conteúdo real
+    // Ajusta altura do iframe ao conteúdo real.
+    // IMPORTANTE: nao usar documentElement.scrollHeight aqui — por definicao
+    // scrollHeight nunca fica MENOR que a altura do proprio iframe (2000px,
+    // setada acima), entao sempre que o conteudo real fosse mais baixo que
+    // isso (quase sempre), ele reportava 2000px de conteudo por engano. Isso
+    // inflava artificialmente o "espaco fixo" calculado (cabecalho+legenda+
+    // rodape), forcando um encolhimento das camadas muito maior do que o
+    // necessario (ate o piso minimo, deixando tudo com a mesma altura) e
+    // ocasionalmente gerando uma 2a pagina desnecessaria. getBoundingClientRect
+    // do próprio ".page" mede a altura real do conteudo, independente do
+    // tamanho do iframe.
     const iframeDoc = iframe.contentDocument!;
-    const contentH = iframeDoc.documentElement.scrollHeight;
+    const pageEl = iframeDoc.querySelector(".page") as HTMLElement | null;
+    const contentH = pageEl ? pageEl.getBoundingClientRect().height : iframeDoc.documentElement.scrollHeight;
     iframe.style.height = contentH + "px";
     await new Promise(r => setTimeout(r, 200));
 
