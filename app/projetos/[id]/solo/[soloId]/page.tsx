@@ -168,12 +168,13 @@ export default function SoloDetailPage() {
 
   function buildProfileHTML(logoBase64: string, rowScale: number = 1): string {
     const ESCALA     = 42 * rowScale;                 // px por metro (encolhe p/ caber em 1 página)
-    // Piso bem baixo (proporcional, não fixo): as camadas precisam refletir
-    // de verdade a espessura real — uma de 20cm não pode ocupar a mesma altura
-    // que uma de 5m. Isso só existe pra nunca ter uma linha de altura zero;
-    // camadas finas demais pra caber o texto todo simplesmente escondem a
-    // linha de observação (ver "showObs" mais abaixo).
-    const MIN_H      = Math.max(4, 8 * rowScale);
+    // Piso ABSOLUTO (não encolhe com rowScale): garante que toda camada,
+    // por mais fina que seja, ainda mostra o tipo de solo legível. Camadas
+    // grossas continuam proporcionalmente maiores — só o piso é fixo, não
+    // a escala inteira. Se mesmo assim não couber numa página, o código de
+    // paginação (mais abaixo) parte pra 2 páginas em vez de espremer até
+    // ficar ilegível.
+    const MIN_H      = 20;
     const PAGE_W     = 794;  // largura total da página
     const PAD        = 18;   // padding horizontal
     const CONTENT_W  = PAGE_W - PAD * 2; // 758px
@@ -190,9 +191,8 @@ export default function SoloDetailPage() {
     const F_VOC       = rSize(10, 7);
     const F_TIPO      = rSize(11.5, 7.5);
     const F_OBS       = rSize(9, 6.5);
-    const F_OVERLAY   = rSize(8, 6);
     const SWATCH      = rSize(26, 12);
-    const PAD_DESC_V  = rSize(10, 1);
+    const PAD_DESC_V  = rSize(10, 3);
     const PAD_DESC_H  = rSize(14, 6);
     const GAP_DESC    = rSize(12, 4);
     const PAD_PROF_V  = rSize(6, 2);
@@ -206,7 +206,10 @@ export default function SoloDetailPage() {
     // Um pouco mais alto que o necessário só pro tubo, pra sobrar espaço pro
     // ícone do sensor/cabeçote desenhado no topo do poço.
     const TOP_OFFSET    = hasWell ? Math.max(20, 40 * rowScale) : 0;
-    const BOTTOM_ROW_H  = Math.max(20, 60 * rowScale);
+    // Menor que antes: já não precisa reservar espaço pra etiqueta de texto
+    // "Fim filtro" (removida — ver seção do NA/filtro abaixo), só a ponta
+    // arredondada do tubo.
+    const BOTTOM_ROW_H  = Math.max(14, 24 * rowScale);
 
     const profTotal = parseFloat(data.profundidade_total)
       || (layers.length ? parseFloat(String(layers[layers.length - 1].ate)) : 10);
@@ -278,11 +281,6 @@ export default function SoloDetailPage() {
     const tL     = CX - TW / 2;   // 77
     const tR     = CX + TW / 2;   // 93
     const cL     = CX - CW / 2;   // 62
-    // Selo/etiqueta com fundo branco e sombra leve (mesmo estilo do badge do
-    // NA), em vez de texto flutuante com contorno — visual mais moderno e
-    // mais legível sobre qualquer camada de solo por baixo.
-    const badge = (left: number, top: number, lines: string[], color: string, width = 56) =>
-      `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;background-color:#fff;border:1.2px solid ${color};border-radius:4px;padding:2px 3px;line-height:1.25;font-size:${F_OVERLAY}px;font-weight:700;color:${color};text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.18);z-index:14;">${lines.join("<br/>")}</div>`;
     // Sombreamento lateral (mais escuro nas bordas, brilho no meio) por cima
     // do tubo/casing, pra dar aparência cilíndrica/3D em vez de chapada.
     const cylShade = "linear-gradient(90deg, rgba(0,0,0,0.22), rgba(255,255,255,0.4) 45%, rgba(0,0,0,0.16))";
@@ -340,27 +338,19 @@ export default function SoloDetailPage() {
         const hAb = yF - yBF;
         if (hAb > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yBF}px;height:${hAb}px;background-color:#fff;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
         cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yF - 7}px;height:7px;background-color:#333;border-radius:0 0 50% 50%;z-index:6;"></div>`;
-
-        // Labels seção filtrante — ESQUERDA (badge sempre ABAIXO da própria
-        // linha, nunca acima — evita colidir com o conteúdo da camada anterior)
-        cHTML += `<div style="position:absolute;left:0;width:${tL - 2}px;top:${yTF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
-        cHTML += badge(2, yTF + 2, ["Início", `${fmt2(filtroTopo)}m`], "#555");
-        cHTML += `<div style="position:absolute;left:0;width:${tL - 2}px;top:${yBF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
-        cHTML += badge(2, yBF + 2, ["Fim", `${fmt2(filtroBase)}m`], "#555");
-
-        // Prof. total — DIREITA
-        cHTML += `<div style="position:absolute;left:${tR + 2}px;width:${170 - tR - 2}px;top:${yF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
-        cHTML += badge(tR + 4, yF + 2, [`Total: ${fmt2(profTotal)}m`], "#555", 62);
       }
+      // As profundidades de início/fim do filtro e a profundidade total já
+      // aparecem na tabela de cabeçalho (campo "Seção Filtrante" e "Profundidade
+      // Total") — aqui fica só a representação visual, sem números flutuando
+      // por cima do desenho.
     }
 
-    // NA — linha azul tracejada + triângulo (símbolo padrão de nível d'água)
-    // + label com fundo branco para legibilidade
+    // NA — linha azul tracejada + triângulo (símbolo padrão de nível d'água).
+    // O valor numérico já aparece na tabela de cabeçalho ("Nível d'Água").
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
       cHTML += `<div style="position:absolute;left:0;width:170px;top:${yNA}px;border-top:2px dashed #1d6fd8;z-index:12;"></div>`;
       cHTML += `<div style="position:absolute;left:${CX - 6}px;top:${yNA - 8}px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #1d6fd8;z-index:13;"></div>`;
-      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 16}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:4px;width:62px;height:22px;line-height:19px;text-align:center;font-size:8px;font-weight:800;color:#1d6fd8;box-shadow:0 1px 3px rgba(0,0,0,0.18);z-index:14;">NA: ${fmt2(nivelAgua)}m</div>`;
     }
 
     // ── LEGENDA (solos presentes) ──────────────────────────────────────────
@@ -498,6 +488,7 @@ export default function SoloDetailPage() {
     ${meta("Data", data.data || "—")}
     ${meta("Nível d'Água (NA)", data.nivel_agua ? fmt2(data.nivel_agua) + " m" : "—")}
     ${meta("Profundidade Total", data.profundidade_total ? fmt2(data.profundidade_total) + " m" : "—")}
+    ${meta("Seção Filtrante", (!isNaN(filtroTopo) && !isNaN(filtroBase)) ? `${fmt2(filtroTopo)} a ${fmt2(filtroBase)} m` : "—")}
     ${meta("Cota / Altitude", data.cota ? fmt2(data.cota) + " m" : "—")}
     ${meta("UTM Este (X)", data.coord_x || "—")}
     ${meta("UTM Norte (Y)", data.coord_y || "—")}
