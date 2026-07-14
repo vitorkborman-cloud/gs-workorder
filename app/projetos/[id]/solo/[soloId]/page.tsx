@@ -168,7 +168,12 @@ export default function SoloDetailPage() {
 
   function buildProfileHTML(logoBase64: string, rowScale: number = 1): string {
     const ESCALA     = 42 * rowScale;                 // px por metro (encolhe p/ caber em 1 página)
-    const MIN_H      = Math.max(26, 44 * rowScale);   // altura mínima de cada linha
+    // Piso bem baixo (proporcional, não fixo): as camadas precisam refletir
+    // de verdade a espessura real — uma de 20cm não pode ocupar a mesma altura
+    // que uma de 5m. Isso só existe pra nunca ter uma linha de altura zero;
+    // camadas finas demais pra caber o texto todo simplesmente escondem a
+    // linha de observação (ver "showObs" mais abaixo).
+    const MIN_H      = Math.max(4, 8 * rowScale);
     const PAGE_W     = 794;  // largura total da página
     const PAD        = 18;   // padding horizontal
     const CONTENT_W  = PAGE_W - PAD * 2; // 758px
@@ -180,19 +185,17 @@ export default function SoloDetailPage() {
     const C_DESC = CONTENT_W - C_PROF - C_PERF - C_VOC; // restante (~480px)
 
     // Conteúdo interno de cada linha (fonte, swatch, padding) encolhe junto com a altura da linha.
-    // Os pisos abaixo foram calibrados para caber dentro do piso de MIN_H (22px):
-    // swatch(14) + 2×PAD_DESC_V(2) = 18px ≤ 22px, com folga para borda/line-height.
     const rSize = (base: number, min: number) => Math.max(min, base * rowScale);
     const F_PROF      = rSize(9.5, 7);
     const F_VOC       = rSize(10, 7);
     const F_TIPO      = rSize(11.5, 7.5);
     const F_OBS       = rSize(9, 6.5);
     const F_OVERLAY   = rSize(8, 6);
-    const SWATCH      = rSize(26, 14);
-    const PAD_DESC_V  = rSize(10, 2);
+    const SWATCH      = rSize(26, 12);
+    const PAD_DESC_V  = rSize(10, 1);
     const PAD_DESC_H  = rSize(14, 6);
     const GAP_DESC    = rSize(12, 4);
-    const PAD_PROF_V  = rSize(6, 4);
+    const PAD_PROF_V  = rSize(6, 2);
     const PAD_PROF_H  = rSize(6, 3);
 
     const preFiltroTopo = parseFloat(data.pre_filtro);
@@ -275,7 +278,11 @@ export default function SoloDetailPage() {
     const tL     = CX - TW / 2;   // 77
     const tR     = CX + TW / 2;   // 93
     const cL     = CX - CW / 2;   // 62
-    const txtS   = (c: string) => `position:absolute;font-size:${F_OVERLAY}px;font-weight:bold;color:${c};z-index:14;white-space:nowrap;text-shadow:0 0 2px #fff,0 0 2px #fff;`;
+    // Selo/etiqueta com fundo branco e sombra leve (mesmo estilo do badge do
+    // NA), em vez de texto flutuante com contorno — visual mais moderno e
+    // mais legível sobre qualquer camada de solo por baixo.
+    const badge = (left: number, top: number, lines: string[], color: string, width = 56) =>
+      `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;background-color:#fff;border:1.2px solid ${color};border-radius:4px;padding:2px 3px;line-height:1.25;font-size:${F_OVERLAY}px;font-weight:700;color:${color};text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.18);z-index:14;">${lines.join("<br/>")}</div>`;
     // Sombreamento lateral (mais escuro nas bordas, brilho no meio) por cima
     // do tubo/casing, pra dar aparência cilíndrica/3D em vez de chapada.
     const cylShade = "linear-gradient(90deg, rgba(0,0,0,0.22), rgba(255,255,255,0.4) 45%, rgba(0,0,0,0.16))";
@@ -334,15 +341,16 @@ export default function SoloDetailPage() {
         if (hAb > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yBF}px;height:${hAb}px;background-color:#fff;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
         cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yF - 7}px;height:7px;background-color:#333;border-radius:0 0 50% 50%;z-index:6;"></div>`;
 
-        // Labels seção filtrante — ESQUERDA
+        // Labels seção filtrante — ESQUERDA (badge sempre ABAIXO da própria
+        // linha, nunca acima — evita colidir com o conteúdo da camada anterior)
         cHTML += `<div style="position:absolute;left:0;width:${tL - 2}px;top:${yTF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
-        cHTML += `<div style="${txtS("#444")}left:2px;top:${yTF - 12}px;">Início filtro<br/>${fmt2(filtroTopo)}m</div>`;
+        cHTML += badge(2, yTF + 2, ["Início", `${fmt2(filtroTopo)}m`], "#555");
         cHTML += `<div style="position:absolute;left:0;width:${tL - 2}px;top:${yBF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
-        cHTML += `<div style="${txtS("#444")}left:2px;top:${yBF + 2}px;">Fim filtro<br/>${fmt2(filtroBase)}m</div>`;
+        cHTML += badge(2, yBF + 2, ["Fim", `${fmt2(filtroBase)}m`], "#555");
 
         // Prof. total — DIREITA
         cHTML += `<div style="position:absolute;left:${tR + 2}px;width:${170 - tR - 2}px;top:${yF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
-        cHTML += `<div style="${txtS("#444")}left:${tR + 4}px;top:${yF + 2}px;">${fmt2(profTotal)}m</div>`;
+        cHTML += badge(tR + 4, yF + 2, [`Total: ${fmt2(profTotal)}m`], "#555", 62);
       }
     }
 
@@ -352,7 +360,7 @@ export default function SoloDetailPage() {
       const yNA = getY(nivelAgua);
       cHTML += `<div style="position:absolute;left:0;width:170px;top:${yNA}px;border-top:2px dashed #1d6fd8;z-index:12;"></div>`;
       cHTML += `<div style="position:absolute;left:${CX - 6}px;top:${yNA - 8}px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #1d6fd8;z-index:13;"></div>`;
-      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 16}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:3px;width:62px;height:22px;line-height:19px;text-align:center;font-size:8px;font-weight:800;color:#1d6fd8;z-index:14;">NA: ${fmt2(nivelAgua)}m</div>`;
+      cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 16}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:4px;width:62px;height:22px;line-height:19px;text-align:center;font-size:8px;font-weight:800;color:#1d6fd8;box-shadow:0 1px 3px rgba(0,0,0,0.18);z-index:14;">NA: ${fmt2(nivelAgua)}m</div>`;
     }
 
     // ── LEGENDA (solos presentes) ──────────────────────────────────────────
@@ -531,6 +539,11 @@ export default function SoloDetailPage() {
         const ateNum  = parseFloat(String(l.ate));
         const nextDe  = !isLast ? parseFloat(String(layers[i + 1].de)) : NaN;
         const showAte = isLast || isNaN(nextDe) || Math.abs(nextDe - ateNum) > 0.001;
+        // Camadas finas (proporcionais à espessura real) não têm altura pra
+        // caber o tipo + a observação — nesse caso mostra só o tipo, em vez
+        // de cortar a segunda linha ao meio.
+        const twoLineThreshold = PAD_DESC_V * 2 + F_TIPO * 1.3 + F_OBS * 1.3;
+        const showObs = !!l.coloracao && rH >= twoLineThreshold;
         return `
         <div class="ptbl-row" style="height:${rH}px;">
           <div class="c-prof">
@@ -542,7 +555,7 @@ export default function SoloDetailPage() {
             <div class="desc-swatch" style="${st}"></div>
             <div class="desc-text">
               <div class="desc-tipo">${(l.tipo || "N/A").toUpperCase()}</div>
-              ${l.coloracao ? `<div class="desc-obs">Obs.: ${l.coloracao}</div>` : ""}
+              ${showObs ? `<div class="desc-obs">Obs.: ${l.coloracao}</div>` : ""}
             </div>
           </div>
           <div class="c-voc" style="background:${alt};">${l.leitura_voc || "—"}</div>
