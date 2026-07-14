@@ -200,7 +200,9 @@ export default function SoloDetailPage() {
     const filtroBase    = parseFloat(data.secao_filtrante_base);
     const nivelAgua     = parseFloat(data.nivel_agua);
     const hasWell       = !isNaN(filtroTopo) || !isNaN(preFiltroTopo);
-    const TOP_OFFSET    = hasWell ? Math.max(10, 20 * rowScale) : 0;
+    // Um pouco mais alto que o necessário só pro tubo, pra sobrar espaço pro
+    // ícone do sensor/cabeçote desenhado no topo do poço.
+    const TOP_OFFSET    = hasWell ? Math.max(20, 40 * rowScale) : 0;
     const BOTTOM_ROW_H  = Math.max(20, 60 * rowScale);
 
     const profTotal = parseFloat(data.profundidade_total)
@@ -252,7 +254,13 @@ export default function SoloDetailPage() {
       else if (t.includes("argila") || t.includes("argilos"))                        { tile = TILE.argila; sz = "1px 7px"; }
       else if (t.includes("silte") || t.includes("siltos"))                          { tile = TILE.silte; sz = "6px 6px"; }
 
-      return `background-color:${bg};${tile ? `background-image:url(${tile});background-size:${sz};background-repeat:repeat;` : ""}`;
+      // Sheen suave (mais claro em cima, mais escuro embaixo) por cima da
+      // textura, pra dar um acabamento mais "material" e menos chapado.
+      const sheen = "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(0,0,0,0.08))";
+      if (tile) {
+        return `background-color:${bg};background-image:${sheen}, url(${tile});background-size:100% 100%, ${sz};background-repeat:no-repeat, repeat;`;
+      }
+      return `background-color:${bg};background-image:${sheen};background-size:100% 100%;background-repeat:no-repeat;`;
     };
 
     // ── CONSTRUTIVO DO POÇO ───────────────────────────────────────────────
@@ -268,39 +276,63 @@ export default function SoloDetailPage() {
     const tR     = CX + TW / 2;   // 93
     const cL     = CX - CW / 2;   // 62
     const txtS   = (c: string) => `position:absolute;font-size:${F_OVERLAY}px;font-weight:bold;color:${c};z-index:14;white-space:nowrap;text-shadow:0 0 2px #fff,0 0 2px #fff;`;
+    // Sombreamento lateral (mais escuro nas bordas, brilho no meio) por cima
+    // do tubo/casing, pra dar aparência cilíndrica/3D em vez de chapada.
+    const cylShade = "linear-gradient(90deg, rgba(0,0,0,0.22), rgba(255,255,255,0.4) 45%, rgba(0,0,0,0.16))";
 
     let cHTML = "";
 
     if (hasWell) {
       const yF = getY(profTotal);
 
+      // Ícone do sensor/cabeçote de telemetria no topo do poço, com "ondas"
+      // de sinal sem fio dos dois lados (janela de overflow:hidden recortando
+      // metade de um círculo — mais simples e confiável no html2canvas do
+      // que tentar desenhar o arco com bordas parciais). Fica empilhado ACIMA
+      // do tampão superior (não sobreposto): tampaoY/tampaoH abaixo usam
+      // capBottom como referência.
+      const capW = rSize(24, 14), capH = rSize(13, 8);
+      const capX = CX - capW / 2;
+      const capY = 2;
+      const capBottom = capY + capH;
+      const waveCY = capY + capH / 2;
+      cHTML += `<div style="position:absolute;left:${capX}px;top:${capY}px;width:${capW}px;height:${capH}px;background:linear-gradient(180deg,#93a1ad,#5c6772);border:1px solid #3d4650;border-radius:${capH / 2}px;z-index:8;"></div>`;
+      [rSize(9, 6), rSize(15, 10)].forEach((r, i) => {
+        const op = 0.55 - i * 0.15;
+        cHTML += `<div style="position:absolute;left:${capX + capW - 3}px;top:${waveCY - r}px;width:${r}px;height:${r * 2}px;overflow:hidden;z-index:7;"><div style="position:absolute;left:-${r}px;top:0;width:${r * 2}px;height:${r * 2}px;border:2px solid rgba(70,130,175,${op});border-radius:50%;"></div></div>`;
+        cHTML += `<div style="position:absolute;left:${capX - r + 3}px;top:${waveCY - r}px;width:${r}px;height:${r * 2}px;overflow:hidden;z-index:7;"><div style="position:absolute;left:0;top:0;width:${r * 2}px;height:${r * 2}px;border:2px solid rgba(70,130,175,${op});border-radius:50%;"></div></div>`;
+      });
+      const tampaoY = capBottom + 2;
+      const tampaoH = 10;
+
       // Bentonita (selo de topo)
       if (!isNaN(preFiltroTopo)) {
         const hBen = getY(preFiltroTopo) - TOP_OFFSET;
-        if (hBen > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${TOP_OFFSET}px;height:${hBen}px;background-color:#c98a51;border-left:1px solid #555;border-right:1px solid #555;z-index:4;"></div>`;
+        if (hBen > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${TOP_OFFSET}px;height:${hBen}px;background-color:#c98a51;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border-left:1px solid #555;border-right:1px solid #555;border-radius:4px 4px 0 0;z-index:4;"></div>`;
         // Pré-filtro
         const yPF = getY(preFiltroTopo);
         const hPF = yF - yPF;
-        if (hPF > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${yPF}px;height:${hPF}px;background-color:#fce663;background-image:url(${TILE.areia});background-size:6px 6px;background-repeat:repeat;border-left:1px solid #555;border-right:1px solid #555;border-bottom:1px solid #555;z-index:4;"></div>`;
+        if (hPF > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${yPF}px;height:${hPF}px;background-color:#fce663;background-image:${cylShade}, url(${TILE.areia});background-size:100% 100%, 6px 6px;background-repeat:no-repeat, repeat;border-left:1px solid #555;border-right:1px solid #555;border-bottom:1px solid #555;z-index:4;"></div>`;
       }
 
-      // Tampão superior + tubo liso
+      // Tampão superior (logo abaixo do ícone do sensor) + tubo liso
       if (!isNaN(filtroTopo)) {
-        cHTML += `<div style="position:absolute;left:${tL - 7}px;width:${TW + 14}px;top:0;height:10px;background-color:#777;border:1.5px solid #333;z-index:6;"></div>`;
-        const hLiso = getY(filtroTopo) - 10;
-        if (hLiso > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:10px;height:${hLiso}px;background-color:#fff;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+        cHTML += `<div style="position:absolute;left:${tL - 7}px;width:${TW + 14}px;top:${tampaoY}px;height:${tampaoH}px;background-color:#777;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border:1.5px solid #333;border-radius:3px 3px 0 0;z-index:6;"></div>`;
+        const tuboTopoY = tampaoY + tampaoH;
+        const hLiso = getY(filtroTopo) - tuboTopoY;
+        if (hLiso > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${tuboTopoY}px;height:${hLiso}px;background-color:#fff;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
       }
 
       if (!isNaN(filtroTopo) && !isNaN(filtroBase)) {
         const yTF = getY(filtroTopo), yBF = getY(filtroBase);
 
         // Seção filtrante ranhurada
-        cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yTF}px;height:${yBF - yTF}px;background-color:#fff;background-image:url(${TILE.filtro});background-size:1px 4px;background-repeat:repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+        cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yTF}px;height:${yBF - yTF}px;background-color:#fff;background-image:${cylShade}, url(${TILE.filtro});background-size:100% 100%, 1px 4px;background-repeat:no-repeat, repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
 
-        // Tubo liso abaixo + tampa
+        // Tubo liso abaixo + tampa (ponta arredondada, tipo cônica)
         const hAb = yF - yBF;
-        if (hAb > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yBF}px;height:${hAb}px;background-color:#fff;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
-        cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yF - 5}px;height:5px;background-color:#333;z-index:6;"></div>`;
+        if (hAb > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yBF}px;height:${hAb}px;background-color:#fff;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+        cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yF - 7}px;height:7px;background-color:#333;border-radius:0 0 50% 50%;z-index:6;"></div>`;
 
         // Labels seção filtrante — ESQUERDA
         cHTML += `<div style="position:absolute;left:0;width:${tL - 2}px;top:${yTF}px;border-top:0.5px dashed #666;z-index:11;"></div>`;
@@ -314,10 +346,12 @@ export default function SoloDetailPage() {
       }
     }
 
-    // NA — linha azul tracejada + label com fundo branco para legibilidade
+    // NA — linha azul tracejada + triângulo (símbolo padrão de nível d'água)
+    // + label com fundo branco para legibilidade
     if (!isNaN(nivelAgua)) {
       const yNA = getY(nivelAgua);
       cHTML += `<div style="position:absolute;left:0;width:170px;top:${yNA}px;border-top:2px dashed #1d6fd8;z-index:12;"></div>`;
+      cHTML += `<div style="position:absolute;left:${CX - 6}px;top:${yNA - 8}px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #1d6fd8;z-index:13;"></div>`;
       cHTML += `<div style="position:absolute;left:${tR + 4}px;top:${yNA - 16}px;background-color:white;border:1.5px solid #1d6fd8;border-radius:3px;width:62px;height:22px;line-height:19px;text-align:center;font-size:8px;font-weight:800;color:#1d6fd8;z-index:14;">NA: ${fmt2(nivelAgua)}m</div>`;
     }
 
