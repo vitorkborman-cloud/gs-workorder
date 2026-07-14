@@ -168,13 +168,6 @@ export default function SoloDetailPage() {
 
   function buildProfileHTML(logoBase64: string, rowScale: number = 1): string {
     const ESCALA     = 42 * rowScale;                 // px por metro (encolhe p/ caber em 1 página)
-    // Piso ABSOLUTO (não encolhe com rowScale): garante que toda camada,
-    // por mais fina que seja, ainda mostra o tipo de solo legível. Camadas
-    // grossas continuam proporcionalmente maiores — só o piso é fixo, não
-    // a escala inteira. Se mesmo assim não couber numa página, o código de
-    // paginação (mais abaixo) parte pra 2 páginas em vez de espremer até
-    // ficar ilegível.
-    const MIN_H      = 20;
     const PAGE_W     = 794;  // largura total da página
     const PAD        = 18;   // padding horizontal
     const CONTENT_W  = PAGE_W - PAD * 2; // 758px
@@ -191,11 +184,17 @@ export default function SoloDetailPage() {
     const F_VOC       = rSize(10, 7);
     const F_TIPO      = rSize(11.5, 7.5);
     const F_OBS       = rSize(9, 6.5);
-    const SWATCH      = rSize(26, 12);
-    const PAD_DESC_V  = rSize(10, 3);
+    const SWATCH      = rSize(20, 12);
+    const PAD_DESC_V  = rSize(5, 2);
     const PAD_DESC_H  = rSize(14, 6);
     const GAP_DESC    = rSize(12, 4);
     const PAD_PROF_V  = rSize(6, 2);
+    // Piso da altura de linha: DERIVADO do tamanho real do swatch/padding
+    // (que encolhem com rowScale), nunca um valor fixo à parte — assim o
+    // conteúdo NUNCA fica maior que a própria linha, em qualquer escala.
+    // Antes o piso era um número fixo (20) independente do swatch (26 em
+    // escala normal), e o swatch ficava cortado numa camada fina.
+    const MIN_H      = SWATCH + PAD_DESC_V * 2;
     const PAD_PROF_H  = rSize(6, 3);
 
     const preFiltroTopo = parseFloat(data.pre_filtro);
@@ -290,23 +289,14 @@ export default function SoloDetailPage() {
     if (hasWell) {
       const yF = getY(profTotal);
 
-      // Ícone do sensor/cabeçote de telemetria no topo do poço, com "ondas"
-      // de sinal sem fio dos dois lados (janela de overflow:hidden recortando
-      // metade de um círculo — mais simples e confiável no html2canvas do
-      // que tentar desenhar o arco com bordas parciais). Fica empilhado ACIMA
-      // do tampão superior (não sobreposto): tampaoY/tampaoH abaixo usam
-      // capBottom como referência.
+      // Ícone do cabeçote do poço no topo (sem as ondas de sinal — removidas
+      // por pedido). Fica empilhado ACIMA do tampão superior (não sobreposto):
+      // tampaoY/tampaoH abaixo usam capBottom como referência.
       const capW = rSize(24, 14), capH = rSize(13, 8);
       const capX = CX - capW / 2;
       const capY = 2;
       const capBottom = capY + capH;
-      const waveCY = capY + capH / 2;
       cHTML += `<div style="position:absolute;left:${capX}px;top:${capY}px;width:${capW}px;height:${capH}px;background:linear-gradient(180deg,#93a1ad,#5c6772);border:1px solid #3d4650;border-radius:${capH / 2}px;z-index:8;"></div>`;
-      [rSize(9, 6), rSize(15, 10)].forEach((r, i) => {
-        const op = 0.55 - i * 0.15;
-        cHTML += `<div style="position:absolute;left:${capX + capW - 3}px;top:${waveCY - r}px;width:${r}px;height:${r * 2}px;overflow:hidden;z-index:7;"><div style="position:absolute;left:-${r}px;top:0;width:${r * 2}px;height:${r * 2}px;border:2px solid rgba(70,130,175,${op});border-radius:50%;"></div></div>`;
-        cHTML += `<div style="position:absolute;left:${capX - r + 3}px;top:${waveCY - r}px;width:${r}px;height:${r * 2}px;overflow:hidden;z-index:7;"><div style="position:absolute;left:0;top:0;width:${r * 2}px;height:${r * 2}px;border:2px solid rgba(70,130,175,${op});border-radius:50%;"></div></div>`;
-      });
       const tampaoY = capBottom + 2;
       const tampaoH = 10;
 
