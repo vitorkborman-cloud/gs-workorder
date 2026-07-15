@@ -36,16 +36,14 @@ type ActiveAlarm = {
   activatedAt: string | null;
 };
 
-// Tempo fixo de cada slide na tela. Diferente por tipo: os slides do portal
-// da HI Tecnologia (Sistema, Dados) ficam mais tempo porque o painel demora
-// a carregar visualmente; o de Alarmes é só uma lista simples, mais rápido.
+// Tempo fixo de cada slide na tela (igual pra todos: Sistema, Dados e o
+// resumo de alarmes no fim do ciclo).
 // (Já tentamos esperar o iframe "carregar 100%" via evento onLoad em vez de
 // tempo fixo, mas esse evento dispara assim que o HTML inicial chega — o
 // dashboard em si (JS de outro domínio) ainda demora bem mais pra desenhar
 // os dados, e não dá pra enxergar isso de fora por causa de CORS. Por isso
-// voltamos pro tempo fixo.)
-const HI_STAGE_MS = 20_000;
-const ALARMES_STAGE_MS = 10_000;
+// usamos tempo fixo.)
+const STAGE_MS = 30_000;
 const SLOW_REFRESH_MS = 2 * 60_000;
 const HITEC_BASE = "https://app.telemetria.hitecnologia.com.br";
 
@@ -59,10 +57,10 @@ const HITEC_BASE = "https://app.telemetria.hitecnologia.com.br";
 const NATURAL_WIDTH = 2800;
 const NATURAL_HEIGHT = 1400;
 
-const STAGE_LABELS = ["Sistema", "Dados", "Alarmes"];
+const STAGE_LABELS = ["Sistema", "Dados"];
 
-// Alguns equipamentos não precisam passar por todos os 3 estágios (ex.: a
-// tela "Sistema" já traz os alarmes embutidos, sem precisar de um estágio
+// Alguns equipamentos não precisam passar por todos os estágios (ex.: a tela
+// "Sistema" já traz os alarmes embutidos, sem precisar de um estágio
 // separado). Chave = reference_id do equipamento na HI Tecnologia. Valor =
 // quais índices de STAGE_LABELS mostrar, na ordem. Sem entrada aqui = todos.
 const CUSTOM_STAGES: Record<string, number[]> = {
@@ -73,7 +71,7 @@ function stagesForProject(group: ProjectGroup): number[] {
   for (const d of group.devices) {
     if (CUSTOM_STAGES[d.reference_id]) return CUSTOM_STAGES[d.reference_id];
   }
-  return [0, 1, 2];
+  return [0, 1];
 }
 
 const LEVEL_PT: Record<string, string> = {
@@ -93,6 +91,13 @@ const LEVEL_COLOR: Record<string, string> = {
   warning: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   info: "bg-sky-500/15 text-sky-300 border-sky-500/30",
 };
+
+// Um "step" do ciclo do Modo TV é ou uma tela de projeto (Sistema/Dados) ou,
+// uma vez por ciclo completo, o resumo compilado de alarmes de todos os
+// projetos.
+type Step =
+  | { kind: "project"; projectIndex: number; stage: number }
+  | { kind: "alarmsSummary" };
 
 async function loadGroups(): Promise<ProjectGroup[]> {
   const { data: devices } = await supabase
@@ -114,6 +119,30 @@ async function loadGroups(): Promise<ProjectGroup[]> {
   return (projects ?? [])
     .filter((p) => byProject.has(p.id))
     .map((p) => ({ project: p, devices: byProject.get(p.id)! }));
+}
+
+// Busca os alarmes ativos de UM equipamento (mesmo filtro usado pelo cron de
+// notificações em supabase/functions/check-alarms).
+async function fetchDeviceAlarms(d: TelemetryDevice): Promise<ActiveAlarm[]> {
+  const { data, error } = await supabase.functions.invoke(
+    `telemetria?action=alarmes&configId=${d.configuration_id}`,
+    { method: "GET" }
+  );
+  if (error || !Array.isArray(data)) return [];
+  const configIdNum = Number(d.configuration_id);
+  return data
+    .filter(
+      (a: any) =>
+        a.alarm_current_state?.state === true &&
+        a.data?.device?.connector?.id === configIdNum
+    )
+    .map((a: any) => ({
+      refId: a.reference_id ?? String(a.id),
+      name: a.name ?? "",
+      level: a.level ?? "",
+      deviceName: d.name,
+      activatedAt: a.alarm_current_state?.datetime_last_activation ?? null,
+    }));
 }
 
 function formatDateTime(iso: string | null) {
@@ -176,46 +205,6 @@ function SistemaScreen({ urls }: { urls: DeviceUrls[] }) {
   );
 }
 
-// O layout interno da tela "Sistema" muda de equipamento pra equipamento
-// (em alguns a lista de alarmes já aparece do lado do P&ID, em outros fica
-// só numa tabela de histórico bem mais abaixo, em posições diferentes) —
-// não dá pra simular scroll de um jeito que funcione igual pra todos. Por
-// isso essa tela busca os alarmes ativos ao vivo via edge function, com o
-// mesmo filtro usado pelo cron de notificações (supabase/functions/check-alarms).
-function AlarmesScreen({ alarms, loading }: { alarms: ActiveAlarm[] | undefined; loading: boolean }) {
-  return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      {loading && !alarms ? (
-        <div className="flex-1 flex items-center justify-center text-white/40 text-xl animate-pulse">
-          Carregando alarmes...
-        </div>
-      ) : !alarms || alarms.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-green-300">
-          <span className="text-6xl">✓</span>
-          <p className="text-2xl font-bold">Nenhum alarme ativo</p>
-        </div>
-      ) : (
-        <div className="space-y-4 overflow-y-auto">
-          {alarms.map((a, i) => (
-            <div key={`${a.refId}-${i}`} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl px-8 py-6">
-              <div>
-                <p className="font-bold text-2xl text-white">{a.name || "Alarme"}</p>
-                <p className="text-white/40 text-base mt-1">{a.deviceName}</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-white/40 text-sm">{formatDateTime(a.activatedAt)}</span>
-                <span className={`text-sm font-bold px-3 py-1.5 rounded-full border ${LEVEL_COLOR[a.level] ?? "bg-white/10 text-white/70 border-white/20"}`}>
-                  {LEVEL_PT[a.level] ?? a.level ?? "—"}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function DadosFallbackCard({ device }: { device: TelemetryDevice }) {
   return (
     <div className="bg-white/5 rounded-3xl border border-white/10 p-8 h-full overflow-y-auto">
@@ -257,6 +246,61 @@ function DadosScreen({ urls }: { urls: DeviceUrls[] }) {
   );
 }
 
+// Slide único, no fim do ciclo, com o compilado de alarmes de TODOS os
+// projetos — um cartão por equipamento, "referencia, Projeto:" seguido da
+// lista de alarmes ativos ou "Sem alarmes".
+function AlarmsSummaryScreen({
+  groups,
+  allAlarms,
+  loading,
+}: {
+  groups: ProjectGroup[];
+  allAlarms: Record<string, ActiveAlarm[]>;
+  loading: boolean;
+}) {
+  const entries = groups.flatMap((g) => g.devices.map((d) => ({ device: d, project: g.project })));
+  const hasAnyData = Object.keys(allAlarms).length > 0;
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      {loading && !hasAnyData ? (
+        <div className="h-full flex items-center justify-center text-white/40 text-xl animate-pulse">
+          Carregando alarmes de todos os projetos...
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-5">
+          {entries.map(({ device, project }) => {
+            const alarms = allAlarms[device.id] ?? [];
+            return (
+              <div key={device.id} className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                <p className="text-sm font-bold text-white/50 mb-3 uppercase tracking-wide">
+                  {device.reference_id}, {project.name}:
+                </p>
+                {alarms.length === 0 ? (
+                  <p className="text-green-300 font-semibold flex items-center gap-2 text-lg">
+                    <span>✓</span> Sem alarmes
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {alarms.map((a, i) => (
+                      <li key={i} className="flex items-center justify-between gap-3">
+                        <span className="text-white font-semibold">{a.name || "Alarme"}</span>
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${LEVEL_COLOR[a.level] ?? "bg-white/10 text-white/70 border-white/20"}`}>
+                          {LEVEL_PT[a.level] ?? a.level ?? "—"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Página ──────────────────────────────────────────────────────────────
 
 export default function TvModePage() {
@@ -266,8 +310,8 @@ export default function TvModePage() {
   const [groups, setGroups] = useState<ProjectGroup[]>([]);
   const [stepIndex, setStepIndex] = useState(0);
   const [now, setNow] = useState(new Date());
-  const [alarmsByProject, setAlarmsByProject] = useState<Record<string, ActiveAlarm[]>>({});
-  const [loadingAlarms, setLoadingAlarms] = useState<Record<string, boolean>>({});
+  const [allAlarms, setAllAlarms] = useState<Record<string, ActiveAlarm[]>>({});
+  const [loadingAllAlarms, setLoadingAllAlarms] = useState(false);
 
   useEffect(() => {
     if (isMobileDevice()) {
@@ -294,28 +338,29 @@ export default function TvModePage() {
     return () => clearInterval(clock);
   }, []);
 
-  // Alguns projetos mostram menos de 3 estágios (CUSTOM_STAGES) — a
-  // sequência exibida é a "achatada" de todos os (projeto, estágio) pra
-  // percorrer, não um simples projectIndex*3 + stage.
-  const steps = useMemo(
-    () => groups.flatMap((g, projectIndex) => stagesForProject(g).map((stage) => ({ projectIndex, stage }))),
-    [groups]
-  );
+  // Sequência do ciclo: uma tela por (projeto, estágio), e no final um único
+  // slide extra com o resumo compilado de alarmes de todos os projetos.
+  const steps: Step[] = useMemo(() => {
+    const projectSteps: Step[] = groups.flatMap((g, projectIndex) =>
+      stagesForProject(g).map((stage) => ({ kind: "project" as const, projectIndex, stage }))
+    );
+    if (projectSteps.length === 0) return [];
+    return [...projectSteps, { kind: "alarmsSummary" as const }];
+  }, [groups]);
 
   const projectCount = groups.length;
   const activeStep = steps.length ? steps[stepIndex % steps.length] : null;
-  const projectIndex = activeStep?.projectIndex ?? 0;
-  const stage = activeStep?.stage ?? 0; // 0 = Sistema, 1 = Dados, 2 = Alarmes
+  const isAlarmsSummary = activeStep?.kind === "alarmsSummary";
+  const projectIndex = activeStep?.kind === "project" ? activeStep.projectIndex : 0;
+  const stage = activeStep?.kind === "project" ? activeStep.stage : 0; // 0 = Sistema, 1 = Dados
   const current = groups[projectIndex];
 
-  // Avança pro próximo slide num tempo fixo, diferente por tipo de estágio
-  // (Alarmes é mais rápido que Sistema/Dados, que dependem do portal da HI).
+  // Avança pro próximo slide num tempo fixo, igual pra todos os tipos de slide.
   useEffect(() => {
-    if (!ready) return;
-    const duration = stage === 2 ? ALARMES_STAGE_MS : HI_STAGE_MS;
-    const t = setTimeout(() => setStepIndex((i) => i + 1), duration);
+    if (!ready || !steps.length) return;
+    const t = setTimeout(() => setStepIndex((i) => i + 1), STAGE_MS);
     return () => clearTimeout(t);
-  }, [ready, stepIndex, stage]);
+  }, [ready, stepIndex, steps.length]);
 
   // Recalculado só quando o projeto muda (não a cada tick do relógio), pra
   // não ficar recarregando os iframes a cada segundo.
@@ -331,48 +376,27 @@ export default function TvModePage() {
     }));
   }, [current]);
 
-  // Busca os alarmes ativos só do projeto exibido no momento, só quando entra
-  // no estágio Alarmes — evita bater na API da HI Tecnologia pra todos os
-  // projetos de uma vez.
+  // Busca os alarmes ativos de TODOS os projetos de uma vez, só quando entra
+  // no slide de resumo (não a cada segundo, e não nos outros slides).
   useEffect(() => {
-    if (!current || stage !== 2) return;
+    if (!isAlarmsSummary || groups.length === 0) return;
     let cancelled = false;
-    const pid = current.project.id;
-    setLoadingAlarms((prev) => ({ ...prev, [pid]: true }));
+    setLoadingAllAlarms(true);
 
     (async () => {
+      const allDevices = groups.flatMap((g) => g.devices);
       const perDevice = await Promise.all(
-        current.devices.map(async (d) => {
-          const { data, error } = await supabase.functions.invoke(
-            `telemetria?action=alarmes&configId=${d.configuration_id}`,
-            { method: "GET" }
-          );
-          if (error || !Array.isArray(data)) return [];
-          const configIdNum = Number(d.configuration_id);
-          return data
-            .filter(
-              (a: any) =>
-                a.alarm_current_state?.state === true &&
-                a.data?.device?.connector?.id === configIdNum
-            )
-            .map((a: any) => ({
-              refId: a.reference_id ?? String(a.id),
-              name: a.name ?? "",
-              level: a.level ?? "",
-              deviceName: d.name,
-              activatedAt: a.alarm_current_state?.datetime_last_activation ?? null,
-            }));
-        })
+        allDevices.map(async (d) => [d.id, await fetchDeviceAlarms(d)] as const)
       );
       if (cancelled) return;
-      setAlarmsByProject((prev) => ({ ...prev, [pid]: perDevice.flat() }));
-      setLoadingAlarms((prev) => ({ ...prev, [pid]: false }));
+      setAllAlarms(Object.fromEntries(perDevice));
+      setLoadingAllAlarms(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [stage, current]);
+  }, [isAlarmsSummary, groups]);
 
   const clockLabel = useMemo(
     () => now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
@@ -392,14 +416,18 @@ export default function TvModePage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-3 shrink-0">
             <div className="flex items-baseline gap-3">
-              <h1 className="text-2xl font-black tracking-tight">{current?.project.name}</h1>
-              <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
-                {STAGE_LABELS[stage]}
-              </span>
+              <h1 className="text-2xl font-black tracking-tight">
+                {isAlarmsSummary ? "Resumo de Alarmes" : current?.project.name}
+              </h1>
+              {!isAlarmsSummary && (
+                <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
+                  {STAGE_LABELS[stage]}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <p className="text-xs font-semibold text-white/40">
-                Projeto {projectIndex + 1} de {projectCount}
+                {isAlarmsSummary ? "Todos os projetos" : `Projeto ${projectIndex + 1} de ${projectCount}`}
               </p>
               <div className="text-xl font-black text-white/70 tabular-nums">{clockLabel}</div>
               <button
@@ -413,23 +441,25 @@ export default function TvModePage() {
           </div>
 
           {/* Conteúdo do estágio */}
-          {stage === 0 && <SistemaScreen urls={urls} />}
-          {stage === 1 && <DadosScreen urls={urls} />}
-          {stage === 2 && (
-            <AlarmesScreen
-              alarms={current ? alarmsByProject[current.project.id] : undefined}
-              loading={current ? !!loadingAlarms[current.project.id] : false}
-            />
+          {!isAlarmsSummary && stage === 0 && <SistemaScreen urls={urls} />}
+          {!isAlarmsSummary && stage === 1 && <DadosScreen urls={urls} />}
+          {isAlarmsSummary && (
+            <AlarmsSummaryScreen groups={groups} allAlarms={allAlarms} loading={loadingAllAlarms} />
           )}
 
-          {/* Rodapé: progresso do estágio */}
-          <div className="mt-3 shrink-0 grid grid-cols-3 gap-2">
-            {STAGE_LABELS.map((label, i) => (
-              <div
-                key={label}
-                className={`h-1.5 rounded-full transition-colors ${i === stage ? "bg-[#80b02d]" : "bg-white/10"}`}
-              />
-            ))}
+          {/* Rodapé: progresso do estágio (2 pontos p/ Sistema/Dados) ou uma
+              barra única destacada no slide de resumo de alarmes */}
+          <div className="mt-3 shrink-0 grid grid-cols-2 gap-2">
+            {isAlarmsSummary ? (
+              <div className="col-span-2 h-1.5 rounded-full bg-[#80b02d]" />
+            ) : (
+              STAGE_LABELS.map((label, i) => (
+                <div
+                  key={label}
+                  className={`h-1.5 rounded-full transition-colors ${i === stage ? "bg-[#80b02d]" : "bg-white/10"}`}
+                />
+              ))
+            )}
           </div>
         </>
       )}
