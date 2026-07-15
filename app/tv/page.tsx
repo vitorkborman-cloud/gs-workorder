@@ -274,7 +274,7 @@ function AlarmsSummaryScreen({
             return (
               <div key={device.id} className="bg-white/5 border border-white/10 rounded-2xl p-6">
                 <p className="text-sm font-bold text-white/50 mb-3 uppercase tracking-wide">
-                  {device.reference_id}, {project.name}:
+                  {project.name}:
                 </p>
                 {alarms.length === 0 ? (
                   <p className="text-green-300 font-semibold flex items-center gap-2 text-lg">
