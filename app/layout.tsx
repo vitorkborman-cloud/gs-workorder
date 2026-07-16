@@ -1,11 +1,28 @@
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Script from "next/script";
 import { ToastProvider } from "../components/Toast";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "GS Work Order",
   description: "Sistema de gestão de atividades",
   manifest: "/manifest.json",
+  // Tags específicas da Apple: sem elas o iOS usa uma captura de tela como
+  // ícone ao "Adicionar à Tela de Início" e abre o app dentro do Safari em
+  // vez de em tela cheia (padrão da Apple, o manifest.json genérico não
+  // é suficiente sozinho).
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "GS Work Order",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
+};
+
+export const viewport: Viewport = {
   themeColor: "#391e2a",
 };
 
