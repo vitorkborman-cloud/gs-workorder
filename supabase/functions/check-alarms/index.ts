@@ -77,9 +77,17 @@ interface ActiveAlarm {
   level: string;
   connectorName: string;
   activatedAt: string | null;
+  state: boolean;
 }
 
-async function fetchActiveAlarms(configId: string, token: string): Promise<ActiveAlarm[]> {
+interface AlarmEvent extends ActiveAlarm {
+  historyId: string;
+}
+
+// Busca TODOS os alarmes cadastrados no conector (ativos ou não). É importante
+// não filtrar só os ativos: um alarme pode ativar e voltar ao normal entre duas
+// checagens (2 min) e ainda assim precisa ser detectado e notificado.
+async function fetchAllAlarms(configId: string, token: string): Promise<ActiveAlarm[]> {
   try {
     const r = await fetch(`${HITEC_BASE_URL}/alarms/?configurationId=${configId}`, {
       headers: { "Authorization": `Bearer ${token}` },
@@ -91,20 +99,69 @@ async function fetchActiveAlarms(configId: string, token: string): Promise<Activ
 
     const configIdNum = Number(configId);
     return alarms
-      .filter((a) =>
-        a.alarm_current_state?.state === true &&
-        a.data?.device?.connector?.id === configIdNum
-      )
+      .filter((a) => a.data?.device?.connector?.id === configIdNum)
       .map((a) => ({
         refId: a.reference_id ?? String(a.id),
         name: a.name ?? "",
         level: a.level ?? "",
         connectorName: a.data?.device?.connector?.name ?? "",
         activatedAt: a.alarm_current_state?.datetime_last_activation ?? null,
+        state: a.alarm_current_state?.state === true,
       }));
   } catch {
     return [];
   }
+}
+
+// Registra no histórico os eventos de alarme (device + refId + activated_at).
+// A constraint UNIQUE da tabela garante que só volta na resposta (return=representation)
+// o que for genuinamente novo — isso substitui a antiga comparação em memória contra
+// o último snapshot, que perdia alarmes que já tivessem voltado ao normal.
+async function insertNewAlarmEvents(deviceId: string, alarms: ActiveAlarm[]): Promise<AlarmEvent[]> {
+  const rows = alarms
+    .filter((a) => a.activatedAt)
+    .map((a) => ({
+      device_id: deviceId,
+      alarm_ref_id: a.refId,
+      alarm_name: a.name,
+      level: a.level,
+      activated_at: a.activatedAt,
+    }));
+  if (rows.length === 0) return [];
+
+  const r = await fetch(
+    `${SUPABASE_URL}/rest/v1/alarm_history?on_conflict=device_id,alarm_ref_id,activated_at`,
+    {
+      method: "POST",
+      headers: { ...sbHeaders(), "Prefer": "resolution=ignore-duplicates,return=representation" },
+      body: JSON.stringify(rows),
+    }
+  );
+  if (!r.ok) return [];
+
+  const inserted: any[] = await r.json();
+  const historyIdByRefId = new Map(inserted.map((row: any) => [row.alarm_ref_id as string, row.id as string]));
+  return alarms
+    .filter((a) => historyIdByRefId.has(a.refId))
+    .map((a) => ({ ...a, historyId: historyIdByRefId.get(a.refId)! }));
+}
+
+async function markNotified(historyIds: string[]) {
+  if (historyIds.length === 0) return;
+  await fetch(`${SUPABASE_URL}/rest/v1/alarm_history?id=in.(${historyIds.join(",")})`, {
+    method: "PATCH",
+    headers: sbHeaders(),
+    body: JSON.stringify({ notified: true }),
+  });
+}
+
+// Alarmes muito antigos (ex: backlog na primeira execução após o deploy desta
+// tabela) são registrados no histórico mas não disparam push — só notificamos
+// ativações recentes de fato.
+const NOTIFY_WINDOW_MS = 15 * 60 * 1000;
+function isRecentActivation(iso: string | null): boolean {
+  if (!iso) return false;
+  return Date.now() - new Date(iso).getTime() < NOTIFY_WINDOW_MS;
 }
 
 function formatTime(iso: string | null): string {
@@ -180,19 +237,16 @@ Deno.serve(async (req: Request) => {
       const lastActivity = conn.last_activity_at ?? null;
       const status = isConnected ? "online" : "offline";
 
-      // Leitura anterior salva no banco
-      const prevReading = device.last_reading as any;
-      const prevActiveIds: string[] = prevReading?.active_alarm_ids ?? [];
-
-      // Busca alarmes ativos agora (quando há pelo menos 1)
-      const currentActive: ActiveAlarm[] = numAlarms > 0
-        ? await fetchActiveAlarms(device.configuration_id, token)
-        : [];
-
+      // Busca TODOS os alarmes do conector (ativos ou não) — necessário para não
+      // perder alarmes que ativaram e voltaram ao normal entre duas checagens.
+      const allAlarms: ActiveAlarm[] = await fetchAllAlarms(device.configuration_id, token);
+      const currentActive = allAlarms.filter((a) => a.state);
       const currentIds = currentActive.map((a) => a.refId);
 
-      // Alarmes que não estavam na lista anterior
-      const newAlarms = currentActive.filter((a) => !prevActiveIds.includes(a.refId));
+      // Registra no histórico; a tabela devolve só os eventos genuinamente novos.
+      const newEvents = await insertNewAlarmEvents(device.id, allAlarms);
+      // Eventos antigos (backlog) ficam só no histórico, sem gerar notificação.
+      const newAlarms = newEvents.filter((a) => isRecentActivation(a.activatedAt));
 
       // Atualiza status, leitura e IDs de alarmes no banco
       await fetch(`${SUPABASE_URL}/rest/v1/telemetry_devices?id=eq.${device.id}`, {
@@ -244,9 +298,17 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        results.push({ device: device.name, status, newAlarms: newAlarms.map((a) => a.name), pushed: pushCount });
+        if (pushCount > 0) await markNotified(newAlarms.map((a) => a.historyId));
+
+        results.push({
+          device: device.name,
+          status,
+          newAlarms: newAlarms.map((a) => a.name),
+          pushed: pushCount,
+          loggedOnly: newEvents.length - newAlarms.length,
+        });
       } else {
-        results.push({ device: device.name, status, alarms: numAlarms, activeIds: currentIds });
+        results.push({ device: device.name, status, alarms: numAlarms, activeIds: currentIds, loggedOnly: newEvents.length });
       }
     }
 

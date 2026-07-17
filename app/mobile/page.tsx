@@ -52,6 +52,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 export default function MobileHome() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [search, setSearch] = useState("");
+  const [notifWarning, setNotifWarning] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -76,7 +77,12 @@ export default function MobileHome() {
   }, []);
 
   async function registerPushSubscription() {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setNotifWarning(
+        "Seu navegador não suporta notificações push. No iPhone, adicione o app à Tela de Início (Compartilhar → Adicionar à Tela de Início) para poder ativá-las."
+      );
+      return;
+    }
 
     try {
       const reg = await navigator.serviceWorker.register("/sw.js");
@@ -86,7 +92,12 @@ export default function MobileHome() {
       if (permission === "default") {
         permission = await Notification.requestPermission();
       }
-      if (permission !== "granted") return;
+      if (permission !== "granted") {
+        setNotifWarning(
+          "As notificações estão desativadas neste dispositivo. Você não receberá avisos de alarme. Ative nas configurações de notificação do navegador/celular."
+        );
+        return;
+      }
 
       const existing = await reg.pushManager.getSubscription();
       const sub = existing ?? await reg.pushManager.subscribe({
@@ -101,8 +112,10 @@ export default function MobileHome() {
         { user_id: user?.id ?? null, endpoint, p256dh: keys.p256dh, auth: keys.auth },
         { onConflict: "endpoint" }
       );
+      setNotifWarning(null);
     } catch (err: any) {
       console.error("Push registration failed:", err);
+      setNotifWarning("Não foi possível ativar as notificações de alarme neste dispositivo. Tente novamente mais tarde.");
     }
   }
 
@@ -169,6 +182,22 @@ export default function MobileHome() {
       }
     >
       <div className="px-1 pb-6 space-y-6">
+
+        {/* AVISO: NOTIFICAÇÕES DE ALARME DESATIVADAS */}
+        {notifWarning && (
+          <button
+            onClick={() => router.push("/mobile/configuracoes")}
+            className="w-full text-left flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 active:scale-[0.98] transition-transform"
+          >
+            <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-amber-800">Notificações de alarme desativadas</p>
+              <p className="text-xs text-amber-700 mt-0.5">{notifWarning}</p>
+            </div>
+          </button>
+        )}
 
         {/* BUSCA COM DESIGN MODERNO */}
         <div className="relative group">
