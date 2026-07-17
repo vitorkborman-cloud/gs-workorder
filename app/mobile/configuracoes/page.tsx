@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import MobileShell from "../../../components/layout/MobileShell";
 
@@ -21,8 +21,14 @@ export default function ConfiguracoesPage() {
   const [disabledIds, setDisabledIds] = useState<Set<string>>(new Set());
   const [userId, setUserId]           = useState<string | null>(null);
   const [loading, setLoading]         = useState(true);
-  const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState<string | null>(null);
+
+  // Fonte da verdade síncrona para o toggle: refs não sofrem o atraso de
+  // batching do useState, então cliques rápidos em switches diferentes nunca
+  // leem um snapshot desatualizado (o que causava o upsert sobrescrever e
+  // "reativar" silenciosamente um alarme já desativado).
+  const disabledIdsRef = useRef<Set<string>>(new Set());
+  const saveQueueRef    = useRef<Promise<any>>(Promise.resolve());
 
   useEffect(() => { load(); }, []);
 
@@ -79,7 +85,11 @@ export default function ConfiguracoesPage() {
           .select("disabled_alarm_ids")
           .eq("user_id", user.id)
           .single();
-        if (prefs?.disabled_alarm_ids) setDisabledIds(new Set(prefs.disabled_alarm_ids));
+        if (prefs?.disabled_alarm_ids) {
+          const loaded = new Set(prefs.disabled_alarm_ids as string[]);
+          disabledIdsRef.current = loaded;
+          setDisabledIds(loaded);
+        }
       }
     } catch {
       setError("Erro ao carregar configurações.");
@@ -89,16 +99,24 @@ export default function ConfiguracoesPage() {
   }
 
   async function toggle(refId: string) {
-    if (!userId || saving) return;
-    setSaving(true);
-    const next = new Set(disabledIds);
+    if (!userId) return;
+
+    const next = new Set(disabledIdsRef.current);
     if (next.has(refId)) next.delete(refId); else next.add(refId);
+    disabledIdsRef.current = next;
     setDisabledIds(next);
-    await supabase.from("notification_preferences").upsert(
-      { user_id: userId, disabled_alarm_ids: [...next], updated_at: new Date().toISOString() },
-      { onConflict: "user_id" }
+
+    const payload = [...next];
+    // Encadeia no final da fila atual para garantir ordem de chegada no
+    // servidor, mesmo que o usuário desative vários alarmes em sequência
+    // rápida — cada upsert já carrega o estado acumulado até aquele clique.
+    saveQueueRef.current = saveQueueRef.current.then(() =>
+      supabase.from("notification_preferences").upsert(
+        { user_id: userId, disabled_alarm_ids: payload, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      )
     );
-    setSaving(false);
+    await saveQueueRef.current;
   }
 
   if (loading) {
@@ -162,7 +180,6 @@ export default function ConfiguracoesPage() {
 
                     <button
                       onClick={() => toggle(alarm.refId)}
-                      disabled={saving}
                       aria-label={enabled ? "Desativar" : "Ativar"}
                       className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ${
                         enabled ? "bg-[#80b02d]" : "bg-gray-200"
