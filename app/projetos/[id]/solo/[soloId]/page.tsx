@@ -147,18 +147,16 @@ export default function SoloDetailPage() {
 
   // ─── gera um tile de textura como data URI (suportado pelo html2canvas) ──
 
-  function makeTile(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void): string {
+  function makeTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void): string {
     const c = document.createElement("canvas");
-    c.width = w; c.height = h;
+    c.width = Math.max(1, Math.round(w));
+    c.height = Math.max(1, Math.round(h));
     const ctx = c.getContext("2d")!;
     draw(ctx);
     return c.toDataURL("image/png");
   }
 
-  // PRNG determinístico (mesma semente sempre gera o mesmo tile) — usado pra
-  // espalhar pontos/traços em posições e tamanhos levemente irregulares, em
-  // vez da grade perfeita de antes (que ficava com cara de trama impressa,
-  // "uniforme demais" pra representar um material natural).
+  // PRNG determinístico (mesma semente sempre gera o mesmo resultado).
   function mulberry32(seed: number) {
     return function () {
       seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
@@ -168,72 +166,94 @@ export default function SoloDetailPage() {
     };
   }
 
-  // Pré-gera os tiles uma vez. Cada canvas é maior que o tamanho final em
-  // CSS (2x) pra permitir vários pontos/traços aleatórios por tile com boa
-  // definição, e depois é escalado (background-size) no soloStyle().
-  const TILE = {
-    // Areia: pontos espalhados (raio e opacidade variando) — grão natural.
-    areia: makeTile(16, 16, ctx => {
-      const rnd = mulberry32(11);
-      for (let i = 0; i < 7; i++) {
-        const x = rnd() * 16, y = rnd() * 16, r = 0.7 + rnd() * 1;
-        ctx.fillStyle = `rgba(0,0,0,${0.22 + rnd() * 0.2})`;
+  function hashStr(s: string): number {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return h;
+  }
+
+  // Texturas "espalhadas" (pontos/traços soltos): cada uma é gerada sob
+  // medida pro tamanho EXATO do elemento (coluna do perfil, swatch, pré-filtro
+  // etc.) e as marcas são sorteadas em toda a área w×h — não numa unidade
+  // pequena que se repete. Uma textura pequena repetida (mesmo com posições
+  // aleatórias dentro do próprio tile) sempre denuncia a costura quando
+  // ampliada; gerando por área real, os pontos ficam de fato espalhados sem
+  // padrão, como na referência trazida pelo usuário.
+  function texAreia(w: number, h: number, seed: number): string {
+    return makeTexture(w, h, ctx => {
+      const rnd = mulberry32(seed);
+      const count = Math.max(5, Math.round((w * h) / 30));
+      for (let i = 0; i < count; i++) {
+        const x = rnd() * w, y = rnd() * h, r = 0.6 + rnd() * 1;
+        ctx.fillStyle = `rgba(0,0,0,${0.2 + rnd() * 0.22})`;
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       }
-    }),
-    // Argila: traços horizontais finos, comprimento/posição irregulares —
-    // símbolo clássico de argila sem repetição mecânica perceptível.
-    argila: makeTile(20, 14, ctx => {
-      const rnd = mulberry32(23);
+    });
+  }
+
+  function texArgila(w: number, h: number, seed: number): string {
+    return makeTexture(w, h, ctx => {
+      const rnd = mulberry32(seed);
+      const count = Math.max(4, Math.round((w * h) / 55));
       ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 0.9;
-      for (let i = 0; i < 4; i++) {
-        const y = 2 + i * 3.5 + (rnd() - 0.5) * 1.6;
-        const x0 = rnd() * 5, len = 7 + rnd() * 7;
-        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + len, y); ctx.stroke();
+      for (let i = 0; i < count; i++) {
+        const x = rnd() * w, y = rnd() * h, len = 4 + rnd() * 7;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(Math.min(w, x + len), y); ctx.stroke();
       }
-    }),
-    // Silte: traços diagonais curtos, staggered — hachura sem virar grade.
-    silte: makeTile(16, 16, ctx => {
-      const rnd = mulberry32(37);
-      ctx.strokeStyle = "rgba(0,0,0,0.24)"; ctx.lineWidth = 0.8;
-      for (let i = 0; i < 6; i++) {
-        const x = rnd() * 16, y = rnd() * 16, len = 2.5 + rnd() * 2;
+    });
+  }
+
+  function texSilte(w: number, h: number, seed: number): string {
+    return makeTexture(w, h, ctx => {
+      const rnd = mulberry32(seed);
+      const count = Math.max(5, Math.round((w * h) / 40));
+      ctx.strokeStyle = "rgba(0,0,0,0.26)"; ctx.lineWidth = 0.8;
+      for (let i = 0; i < count; i++) {
+        const x = rnd() * w, y = rnd() * h, len = 2.5 + rnd() * 2.5;
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y - len); ctx.stroke();
       }
-    }),
-    // Brita/cascalho: círculos de raio variável espalhados — pedregulho de
-    // fato, não uma trama de bolinhas idênticas.
-    brita: makeTile(24, 24, ctx => {
-      const rnd = mulberry32(53);
-      for (let i = 0; i < 5; i++) {
-        const x = 4 + rnd() * 16, y = 4 + rnd() * 16, r = 2 + rnd() * 2.6;
-        ctx.strokeStyle = `rgba(80,80,80,${0.32 + rnd() * 0.2})`; ctx.lineWidth = 1;
+    });
+  }
+
+  function texBrita(w: number, h: number, seed: number): string {
+    return makeTexture(w, h, ctx => {
+      const rnd = mulberry32(seed);
+      const count = Math.max(3, Math.round((w * h) / 130));
+      for (let i = 0; i < count; i++) {
+        const r = 2 + rnd() * 2.4;
+        const x = w <= r * 2 ? w / 2 : r + rnd() * (w - r * 2);
+        const y = h <= r * 2 ? h / 2 : r + rnd() * (h - r * 2);
+        ctx.strokeStyle = `rgba(80,80,80,${0.3 + rnd() * 0.22})`; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
       }
-    }),
-    // Aterro/preenchimento: hachura cruzada diagonal (símbolo clássico de
-    // material de aterro). Antes esse tipo não tinha textura nenhuma — a
-    // camada inteira (geralmente a de topo, bem comum) ficava um bloco
-    // chapado, o principal motivo do perfil parecer "uniforme".
-    aterro: makeTile(12, 12, ctx => {
-      ctx.strokeStyle = "rgba(70,40,15,0.4)"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(12, 0); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(12, 12); ctx.stroke();
-    }),
-    // Orgânica/turfa: fragmentos fibrosos espalhados em ângulos aleatórios —
-    // textura, não uma cor sólida chapada.
-    organica: makeTile(18, 18, ctx => {
-      const rnd = mulberry32(71);
+    });
+  }
+
+  function texOrganica(w: number, h: number, seed: number): string {
+    return makeTexture(w, h, ctx => {
+      const rnd = mulberry32(seed);
+      const count = Math.max(4, Math.round((w * h) / 45));
       ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 0.8;
-      for (let i = 0; i < 6; i++) {
-        const x = rnd() * 18, y = rnd() * 18, len = 3 + rnd() * 3, ang = rnd() * Math.PI;
+      for (let i = 0; i < count; i++) {
+        const x = rnd() * w, y = rnd() * h, len = 3 + rnd() * 3, ang = rnd() * Math.PI;
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
         ctx.stroke();
       }
+    });
+  }
+
+  // Aterro/preenchimento (hachura cruzada) e a ranhura do filtro são
+  // símbolos geométricos regulares por convenção (não "espalhados" como os
+  // materiais acima), então continuam como um tile pequeno que repete.
+  const TILE = {
+    aterro: makeTexture(12, 12, ctx => {
+      ctx.strokeStyle = "rgba(70,40,15,0.4)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(12, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(12, 12); ctx.stroke();
     }),
-    filtro: makeTile(1, 4,   ctx => { ctx.fillStyle = "#333"; ctx.fillRect(0, 3, 1, 1); }),
+    filtro: makeTexture(1, 4, ctx => { ctx.fillStyle = "#333"; ctx.fillRect(0, 3, 1, 1); }),
   };
 
   // ─── NOVO gerador de HTML — design profissional ──────────────────────────
@@ -314,8 +334,11 @@ export default function SoloDetailPage() {
       return isNaN(n) ? String(v ?? "—") : n.toFixed(2);
     };
 
-    // Estilo de solo (cor + textura tile)
-    const soloStyle = (tipo: string): string => {
+    // Estilo de solo (cor + textura). w/h = tamanho exato do elemento que vai
+    // receber a textura (coluna do perfil, swatch da descrição, legenda...);
+    // seed varia por linha pra duas camadas do mesmo tipo não saírem com o
+    // padrão espalhado idêntico.
+    const soloStyle = (tipo: string, w: number, h: number, seed: number = 0): string => {
       if (!tipo) return "background-color:#f0f0f0;";
       const t = tipo.toLowerCase().trim();
       let bg = "#e0e0e0";
@@ -325,19 +348,21 @@ export default function SoloDetailPage() {
       else if (t.startsWith("silte"))  bg = t.includes("aren") ? "#D1B280" : t.includes("argil") ? "#B88655" : "#C19A6B";
       else if (t.startsWith("argila")) bg = t.includes("aren") ? "#CC6B58" : t.includes("silt") ? "#B86554" : "#D47A6A";
 
-      let tile = "", sz = "8px 8px";
-      if (t.includes("brita") || t.includes("rach") || t.includes("cascalho"))      { tile = TILE.brita; sz = "16px 16px"; }
-      else if (t.includes("aterro"))                                                 { tile = TILE.aterro; sz = "10px 10px"; }
-      else if (t.includes("orgân") || t.includes("organica") || t.includes("turfa")) { tile = TILE.organica; sz = "9px 9px"; }
-      else if (t.includes("areia") || t.includes("arenos"))                          { tile = TILE.areia; sz = "8px 8px"; }
-      else if (t.includes("argila") || t.includes("argilos"))                        { tile = TILE.argila; sz = "10px 7px"; }
-      else if (t.includes("silte") || t.includes("siltos"))                          { tile = TILE.silte; sz = "8px 8px"; }
-
-      // Sheen suave (mais claro em cima, mais escuro embaixo) por cima da
-      // textura, pra dar um acabamento mais "material" e menos chapado.
+      const seedBase = hashStr(t) + seed * 97;
       const sheen = "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(0,0,0,0.08))";
-      if (tile) {
-        return `background-color:${bg};background-image:${sheen}, url(${tile});background-size:100% 100%, ${sz};background-repeat:no-repeat, repeat;`;
+
+      let scattered = "";
+      if (t.includes("brita") || t.includes("rach") || t.includes("cascalho"))      scattered = texBrita(w, h, seedBase);
+      else if (t.includes("orgân") || t.includes("organica") || t.includes("turfa")) scattered = texOrganica(w, h, seedBase);
+      else if (t.includes("areia") || t.includes("arenos"))                          scattered = texAreia(w, h, seedBase);
+      else if (t.includes("argila") || t.includes("argilos"))                        scattered = texArgila(w, h, seedBase);
+      else if (t.includes("silte") || t.includes("siltos"))                          scattered = texSilte(w, h, seedBase);
+
+      if (scattered) {
+        return `background-color:${bg};background-image:${sheen}, url(${scattered});background-size:100% 100%, 100% 100%;background-repeat:no-repeat, no-repeat;`;
+      }
+      if (t.includes("aterro")) {
+        return `background-color:${bg};background-image:${sheen}, url(${TILE.aterro});background-size:100% 100%, 10px 10px;background-repeat:no-repeat, repeat;`;
       }
       return `background-color:${bg};background-image:${sheen};background-size:100% 100%;background-repeat:no-repeat;`;
     };
@@ -381,7 +406,10 @@ export default function SoloDetailPage() {
         // Pré-filtro
         const yPF = getY(preFiltroTopo);
         const hPF = yF - yPF;
-        if (hPF > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${yPF}px;height:${hPF}px;background-color:#fce663;background-image:${cylShade}, url(${TILE.areia});background-size:100% 100%, 8px 8px;background-repeat:no-repeat, repeat;border-left:1px solid #555;border-right:1px solid #555;border-bottom:1px solid #555;z-index:4;"></div>`;
+        if (hPF > 0) {
+          const pfTex = texAreia(CW, hPF, hashStr("pre-filtro"));
+          cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${yPF}px;height:${hPF}px;background-color:#fce663;background-image:${cylShade}, url(${pfTex});background-size:100% 100%, 100% 100%;background-repeat:no-repeat, no-repeat;border-left:1px solid #555;border-right:1px solid #555;border-bottom:1px solid #555;z-index:4;"></div>`;
+        }
       }
 
       // Tampão superior (logo abaixo do ícone do sensor) + tubo liso
@@ -424,8 +452,8 @@ export default function SoloDetailPage() {
     // top:4px numa linha de 24px, e o texto (9px/600) precisa de top:-2px para compensar
     // um deslocamento sistematico que o html2canvas produz ao posicionar essa fonte/tamanho
     // dentro de uma line-height maior que o texto.
-    const legendItems = uniqueTypes.map(tipo => {
-      const st = soloStyle(tipo);
+    const legendItems = uniqueTypes.map((tipo, idx) => {
+      const st = soloStyle(tipo, 26, 16, idx);
       return `<div style="position:relative;height:24px;background:white;border-radius:3px;border:0.5px solid #e0e0e0;white-space:nowrap;">
         <span style="position:absolute;left:8px;top:4px;width:26px;height:16px;border:0.5px solid #888;border-radius:2px;${st}"></span>
         <span style="position:absolute;left:41px;right:8px;top:-2px;line-height:24px;font-size:9px;font-weight:600;color:#333;">${tipo}</span>
@@ -583,8 +611,9 @@ export default function SoloDetailPage() {
         </div>` : ""}
 
       ${layers.map((l, i) => {
-        const rH  = rowHeights[i];
-        const st  = soloStyle(l.tipo);
+        const rH      = rowHeights[i];
+        const perfSt  = soloStyle(l.tipo, C_PERF, rH, i);
+        const swatchSt = soloStyle(l.tipo, SWATCH, SWATCH, i);
         const alt = i % 2 === 0 ? "#fff" : "#fafafa";
         // O "até" desta camada normalmente é igual ao "de" da próxima (camadas contínuas) —
         // mostrar os dois duplicaria o mesmo número em toda fronteira. Só repete o "até"
@@ -604,9 +633,9 @@ export default function SoloDetailPage() {
             <span class="c-prof-top">${fmt2(l.de)}</span>
             ${showAte ? `<span class="c-prof-bottom">${fmt2(l.ate)}</span>` : ""}
           </div>
-          <div class="c-perf" style="${st}"></div>
+          <div class="c-perf" style="${perfSt}"></div>
           <div class="c-desc" style="background:${alt};">
-            <div class="desc-swatch" style="${st}"></div>
+            <div class="desc-swatch" style="${swatchSt}"></div>
             <div class="desc-text">
               <div class="desc-tipo">${(l.tipo || "N/A").toUpperCase()}</div>
               ${showObs ? `<div class="desc-obs">Obs.: ${l.coloracao}</div>` : ""}
