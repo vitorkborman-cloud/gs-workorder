@@ -155,12 +155,84 @@ export default function SoloDetailPage() {
     return c.toDataURL("image/png");
   }
 
-  // Pré-gera os tiles uma vez
+  // PRNG determinístico (mesma semente sempre gera o mesmo tile) — usado pra
+  // espalhar pontos/traços em posições e tamanhos levemente irregulares, em
+  // vez da grade perfeita de antes (que ficava com cara de trama impressa,
+  // "uniforme demais" pra representar um material natural).
+  function mulberry32(seed: number) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Pré-gera os tiles uma vez. Cada canvas é maior que o tamanho final em
+  // CSS (2x) pra permitir vários pontos/traços aleatórios por tile com boa
+  // definição, e depois é escalado (background-size) no soloStyle().
   const TILE = {
-    areia:  makeTile(6, 6,   ctx => { ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.beginPath(); ctx.arc(3, 3, 1, 0, Math.PI * 2); ctx.fill(); }),
-    argila: makeTile(1, 7,   ctx => { ctx.fillStyle = "rgba(0,0,0,0.2)";  ctx.fillRect(0, 6, 1, 1); }),
-    silte:  makeTile(6, 6,   ctx => { ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(0, 5); ctx.stroke(); }),
-    brita:  makeTile(14, 14, ctx => { ctx.strokeStyle = "rgba(80,80,80,0.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(7, 7, 4, 0, Math.PI * 2); ctx.stroke(); }),
+    // Areia: pontos espalhados (raio e opacidade variando) — grão natural.
+    areia: makeTile(16, 16, ctx => {
+      const rnd = mulberry32(11);
+      for (let i = 0; i < 7; i++) {
+        const x = rnd() * 16, y = rnd() * 16, r = 0.7 + rnd() * 1;
+        ctx.fillStyle = `rgba(0,0,0,${0.22 + rnd() * 0.2})`;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+    }),
+    // Argila: traços horizontais finos, comprimento/posição irregulares —
+    // símbolo clássico de argila sem repetição mecânica perceptível.
+    argila: makeTile(20, 14, ctx => {
+      const rnd = mulberry32(23);
+      ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 0.9;
+      for (let i = 0; i < 4; i++) {
+        const y = 2 + i * 3.5 + (rnd() - 0.5) * 1.6;
+        const x0 = rnd() * 5, len = 7 + rnd() * 7;
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + len, y); ctx.stroke();
+      }
+    }),
+    // Silte: traços diagonais curtos, staggered — hachura sem virar grade.
+    silte: makeTile(16, 16, ctx => {
+      const rnd = mulberry32(37);
+      ctx.strokeStyle = "rgba(0,0,0,0.24)"; ctx.lineWidth = 0.8;
+      for (let i = 0; i < 6; i++) {
+        const x = rnd() * 16, y = rnd() * 16, len = 2.5 + rnd() * 2;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y - len); ctx.stroke();
+      }
+    }),
+    // Brita/cascalho: círculos de raio variável espalhados — pedregulho de
+    // fato, não uma trama de bolinhas idênticas.
+    brita: makeTile(24, 24, ctx => {
+      const rnd = mulberry32(53);
+      for (let i = 0; i < 5; i++) {
+        const x = 4 + rnd() * 16, y = 4 + rnd() * 16, r = 2 + rnd() * 2.6;
+        ctx.strokeStyle = `rgba(80,80,80,${0.32 + rnd() * 0.2})`; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+      }
+    }),
+    // Aterro/preenchimento: hachura cruzada diagonal (símbolo clássico de
+    // material de aterro). Antes esse tipo não tinha textura nenhuma — a
+    // camada inteira (geralmente a de topo, bem comum) ficava um bloco
+    // chapado, o principal motivo do perfil parecer "uniforme".
+    aterro: makeTile(12, 12, ctx => {
+      ctx.strokeStyle = "rgba(70,40,15,0.4)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(12, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(12, 12); ctx.stroke();
+    }),
+    // Orgânica/turfa: fragmentos fibrosos espalhados em ângulos aleatórios —
+    // textura, não uma cor sólida chapada.
+    organica: makeTile(18, 18, ctx => {
+      const rnd = mulberry32(71);
+      ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 0.8;
+      for (let i = 0; i < 6; i++) {
+        const x = rnd() * 18, y = rnd() * 18, len = 3 + rnd() * 3, ang = rnd() * Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+        ctx.stroke();
+      }
+    }),
     filtro: makeTile(1, 4,   ctx => { ctx.fillStyle = "#333"; ctx.fillRect(0, 3, 1, 1); }),
   };
 
@@ -253,11 +325,13 @@ export default function SoloDetailPage() {
       else if (t.startsWith("silte"))  bg = t.includes("aren") ? "#D1B280" : t.includes("argil") ? "#B88655" : "#C19A6B";
       else if (t.startsWith("argila")) bg = t.includes("aren") ? "#CC6B58" : t.includes("silt") ? "#B86554" : "#D47A6A";
 
-      let tile = "", sz = "6px 6px";
-      if (t.includes("brita") || t.includes("rach") || t.includes("cascalho"))      { tile = TILE.brita; sz = "14px 14px"; }
-      else if (t.includes("areia") || t.includes("arenos"))                          { tile = TILE.areia; sz = "6px 6px"; }
-      else if (t.includes("argila") || t.includes("argilos"))                        { tile = TILE.argila; sz = "1px 7px"; }
-      else if (t.includes("silte") || t.includes("siltos"))                          { tile = TILE.silte; sz = "6px 6px"; }
+      let tile = "", sz = "8px 8px";
+      if (t.includes("brita") || t.includes("rach") || t.includes("cascalho"))      { tile = TILE.brita; sz = "16px 16px"; }
+      else if (t.includes("aterro"))                                                 { tile = TILE.aterro; sz = "10px 10px"; }
+      else if (t.includes("orgân") || t.includes("organica") || t.includes("turfa")) { tile = TILE.organica; sz = "9px 9px"; }
+      else if (t.includes("areia") || t.includes("arenos"))                          { tile = TILE.areia; sz = "8px 8px"; }
+      else if (t.includes("argila") || t.includes("argilos"))                        { tile = TILE.argila; sz = "10px 7px"; }
+      else if (t.includes("silte") || t.includes("siltos"))                          { tile = TILE.silte; sz = "8px 8px"; }
 
       // Sheen suave (mais claro em cima, mais escuro embaixo) por cima da
       // textura, pra dar um acabamento mais "material" e menos chapado.
@@ -307,7 +381,7 @@ export default function SoloDetailPage() {
         // Pré-filtro
         const yPF = getY(preFiltroTopo);
         const hPF = yF - yPF;
-        if (hPF > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${yPF}px;height:${hPF}px;background-color:#fce663;background-image:${cylShade}, url(${TILE.areia});background-size:100% 100%, 6px 6px;background-repeat:no-repeat, repeat;border-left:1px solid #555;border-right:1px solid #555;border-bottom:1px solid #555;z-index:4;"></div>`;
+        if (hPF > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${yPF}px;height:${hPF}px;background-color:#fce663;background-image:${cylShade}, url(${TILE.areia});background-size:100% 100%, 8px 8px;background-repeat:no-repeat, repeat;border-left:1px solid #555;border-right:1px solid #555;border-bottom:1px solid #555;z-index:4;"></div>`;
       }
 
       // Tampão superior (logo abaixo do ícone do sensor) + tubo liso
