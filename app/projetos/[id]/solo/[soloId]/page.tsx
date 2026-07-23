@@ -463,17 +463,25 @@ export default function SoloDetailPage() {
       const maxVal   = Math.max(...vocPoints.map(p => p.value), 1);
       const leftPad  = 10, rightPad = 32;
       const plotW    = Math.max(10, C_VOC - leftPad - rightPad);
+      // Renderiza em 3x (mesma escala do html2canvas em renderProfileToCanvas):
+      // como essa imagem é pré-renderizada (não é texto/DOM nativo), sem isso
+      // ela fica em resolução normal enquanto o resto da página é capturado
+      // em alta resolução — daí a diferença de nitidez nos números.
+      const RENDER_SCALE = 3;
+      const logicalH = Math.max(1, Math.round(profileH));
       const c = document.createElement("canvas");
-      c.width = C_VOC; c.height = Math.max(1, Math.round(profileH));
+      c.width = Math.round(C_VOC * RENDER_SCALE);
+      c.height = logicalH * RENDER_SCALE;
       const ctx = c.getContext("2d")!;
+      ctx.scale(RENDER_SCALE, RENDER_SCALE);
 
       // Linha de base ("zero") + grades verticais leves de referência.
       ctx.strokeStyle = "#ddd"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(leftPad, 0); ctx.lineTo(leftPad, c.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(leftPad, 0); ctx.lineTo(leftPad, logicalH); ctx.stroke();
       for (let g = 1; g <= 3; g++) {
         const gx = leftPad + (plotW * g) / 4;
         ctx.strokeStyle = "#eee";
-        ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, c.height); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, logicalH); ctx.stroke();
       }
 
       const color = "#c0392b";
