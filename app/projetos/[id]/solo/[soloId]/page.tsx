@@ -267,13 +267,12 @@ export default function SoloDetailPage() {
     // Colunas do perfil
     const C_PROF = 52;   // profundidade
     const C_PERF = 170;  // perfil geológico
-    const C_VOC  = 56;   // VOC
-    const C_DESC = CONTENT_W - C_PROF - C_PERF - C_VOC; // restante (~480px)
+    const C_VOC  = 110;  // gráfico de leitura de PID/VOC (entre o perfil e a descrição)
+    const C_DESC = CONTENT_W - C_PROF - C_PERF - C_VOC; // restante (~426px)
 
     // Conteúdo interno de cada linha (fonte, swatch, padding) encolhe junto com a altura da linha.
     const rSize = (base: number, min: number) => Math.max(min, base * rowScale);
     const F_PROF      = rSize(9.5, 7);
-    const F_VOC       = rSize(10, 7);
     const F_TIPO      = rSize(11.5, 7.5);
     const F_OBS       = rSize(9, 6.5);
     const SWATCH      = rSize(20, 12);
@@ -445,6 +444,58 @@ export default function SoloDetailPage() {
       cHTML += `<div style="position:absolute;left:${CX - 6}px;top:${yNA - 8}px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #1d6fd8;z-index:13;"></div>`;
     }
 
+    // ── GRÁFICO DE LEITURA DE PID/VOC ───────────────────────────────────────
+    // Substitui o valor solto por um mini-gráfico (leitura x profundidade),
+    // alinhado com as mesmas linhas do perfil geológico (usa o mesmo getY()),
+    // posicionado entre a coluna do perfil e a de descrição.
+    const vocPoints = layers
+      .map(l => {
+        const v = parseFloat(String(l.leitura_voc));
+        if (isNaN(v) || v < 0) return null;
+        const de = parseFloat(String(l.de)), ate = parseFloat(String(l.ate));
+        const mid = isNaN(de) || isNaN(ate) ? de : (de + ate) / 2;
+        return { y: getY(mid), value: v };
+      })
+      .filter((p): p is { y: number; value: number } => p !== null);
+
+    let vocHTML = "";
+    if (vocPoints.length > 0) {
+      const maxVal   = Math.max(...vocPoints.map(p => p.value), 1);
+      const leftPad  = 10, rightPad = 32;
+      const plotW    = Math.max(10, C_VOC - leftPad - rightPad);
+      const c = document.createElement("canvas");
+      c.width = C_VOC; c.height = Math.max(1, Math.round(profileH));
+      const ctx = c.getContext("2d")!;
+
+      // Linha de base ("zero") + grades verticais leves de referência.
+      ctx.strokeStyle = "#ddd"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(leftPad, 0); ctx.lineTo(leftPad, c.height); ctx.stroke();
+      for (let g = 1; g <= 3; g++) {
+        const gx = leftPad + (plotW * g) / 4;
+        ctx.strokeStyle = "#eee";
+        ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, c.height); ctx.stroke();
+      }
+
+      const color = "#c0392b";
+      const pts = vocPoints.map(p => ({ x: leftPad + (p.value / maxVal) * plotW, y: p.y, value: p.value }));
+
+      // Linha conectando as leituras válidas.
+      ctx.strokeStyle = color; ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      pts.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+
+      // Marcador + valor numérico ao lado de cada ponto.
+      ctx.font = "8px Arial"; ctx.textBaseline = "middle"; ctx.fillStyle = color;
+      pts.forEach(p => {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2); ctx.fill();
+        const label = Number.isInteger(p.value) ? String(p.value) : p.value.toFixed(1);
+        ctx.fillText(label, Math.min(C_VOC - 2, p.x + 5), p.y);
+      });
+
+      vocHTML = `<img src="${c.toDataURL("image/png")}" style="width:100%;height:100%;display:block;" />`;
+    }
+
     // ── LEGENDA (solos presentes) ──────────────────────────────────────────
     const uniqueTypes = [...new Set(layers.map(l => l.tipo).filter(Boolean))];
     // Centralização vertical via position:absolute (nao flex, nao vertical-align): medido
@@ -520,8 +571,8 @@ export default function SoloDetailPage() {
   .c-prof-top { top: ${PAD_PROF_V}px; }
   .c-prof-bottom { bottom: ${PAD_PROF_V}px; }
   .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #222; }
-  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: ${PAD_DESC_V}px ${PAD_DESC_H}px; gap: ${GAP_DESC}px; border-right: 0.5px solid #222; }
-  .c-voc  { width: ${C_VOC}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: ${F_VOC}px; font-weight: 700; color: #5a8a1e; }
+  .c-voc  { width: ${C_VOC}px; flex-shrink: 0; border-right: 0.5px solid #222; }
+  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: ${PAD_DESC_V}px ${PAD_DESC_H}px; gap: ${GAP_DESC}px; }
   .desc-swatch { width: ${SWATCH}px; height: ${SWATCH}px; flex-shrink: 0; border: 0.5px solid #888; border-radius: 3px; }
   .desc-text { flex: 1; min-width: 0; }
   .desc-tipo { font-size: ${F_TIPO}px; font-weight: 800; color: #391e2a; text-transform: uppercase; word-break: break-word; }
@@ -592,8 +643,8 @@ export default function SoloDetailPage() {
     <div class="ptbl-head">
       <div class="ptbl-hcell" style="width:${C_PROF}px;">Prof.<br/>(m)</div>
       <div class="ptbl-hcell" style="width:${C_PERF}px;">Perfil Geológico<br/>e Construtivo</div>
+      <div class="ptbl-hcell" style="width:${C_VOC}px;">Leitura PID<br/>(ppm)</div>
       <div class="ptbl-hcell" style="flex:1;">Descrição Litológica</div>
-      <div class="ptbl-hcell" style="width:${C_VOC}px;">VOC<br/>(ppm)</div>
     </div>
 
     <div class="ptbl-body">
@@ -602,12 +653,17 @@ export default function SoloDetailPage() {
         ${cHTML}
       </div>
 
+      <!-- Overlay do gráfico de PID/VOC posicionado sobre a própria coluna -->
+      <div style="position:absolute;top:0;left:${C_PROF + C_PERF}px;width:${C_VOC}px;height:${profileH}px;pointer-events:none;z-index:10;overflow:visible;">
+        ${vocHTML}
+      </div>
+
       ${hasWell ? `
         <div class="ptbl-row" style="height:${TOP_OFFSET}px;background:#fff;border-bottom:1.5px solid #391e2a;">
           <div class="c-prof"></div>
           <div class="c-perf"></div>
-          <div class="c-desc"></div>
           <div class="c-voc"></div>
+          <div class="c-desc"></div>
         </div>` : ""}
 
       ${layers.map((l, i) => {
@@ -634,6 +690,7 @@ export default function SoloDetailPage() {
             ${showAte ? `<span class="c-prof-bottom">${fmt2(l.ate)}</span>` : ""}
           </div>
           <div class="c-perf" style="${perfSt}"></div>
+          <div class="c-voc" style="background:${alt};"></div>
           <div class="c-desc" style="background:${alt};">
             <div class="desc-swatch" style="${swatchSt}"></div>
             <div class="desc-text">
@@ -641,7 +698,6 @@ export default function SoloDetailPage() {
               ${showObs ? `<div class="desc-obs">Obs.: ${l.coloracao}</div>` : ""}
             </div>
           </div>
-          <div class="c-voc" style="background:${alt};">${l.leitura_voc || "—"}</div>
         </div>`;
       }).join("")}
 
@@ -649,8 +705,8 @@ export default function SoloDetailPage() {
         <div class="ptbl-row" style="height:${BOTTOM_ROW_H}px;background:#fff;border-bottom:none;">
           <div class="c-prof"></div>
           <div class="c-perf"></div>
-          <div class="c-desc"></div>
           <div class="c-voc"></div>
+          <div class="c-desc"></div>
         </div>` : ""}
     </div>
   </div>
