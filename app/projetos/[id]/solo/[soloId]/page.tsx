@@ -311,6 +311,41 @@ export default function SoloDetailPage() {
     });
     const profileH = TOP_OFFSET + rowHeights.reduce((s, h) => s + h, 0) + (hasWell ? BOTTOM_ROW_H : 0);
 
+    // Y (topo) de cada camada, na mesma origem usada pelo getY() abaixo.
+    const rowTopY: number[] = [];
+    {
+      let acc = TOP_OFFSET;
+      layers.forEach((l, i) => { rowTopY[i] = acc; acc += rowHeights[i]; });
+    }
+
+    // ── FUSÃO DE CAMADAS CONSECUTIVAS DO MESMO TIPO ────────────────────────
+    // Leitura de PID é feita a cada poucos metros, então o mesmo tipo de solo
+    // costuma se repetir em várias camadas seguidas. Na coluna do perfil e na
+    // descrição, essas camadas aparecem como um bloco único (sem costura,
+    // nome só uma vez) — profundidade e leitura de PID continuam por linha.
+    type LayerGroup = { start: number; end: number; tipo: string; heightPx: number };
+    const layerGroups: LayerGroup[] = [];
+    layers.forEach((l, i) => {
+      const norm = (l.tipo || "").trim().toLowerCase();
+      const last = layerGroups[layerGroups.length - 1];
+      if (last && norm && norm === (layers[last.end].tipo || "").trim().toLowerCase()) {
+        last.end = i;
+        last.heightPx += rowHeights[i];
+      } else {
+        layerGroups.push({ start: i, end: i, tipo: l.tipo, heightPx: rowHeights[i] });
+      }
+    });
+    const groupOfLayer: number[] = [];
+    const offsetInGroup: number[] = [];
+    layerGroups.forEach((g, gi) => {
+      let acc = 0;
+      for (let i = g.start; i <= g.end; i++) {
+        groupOfLayer[i] = gi;
+        offsetInGroup[i] = acc;
+        acc += rowHeights[i];
+      }
+    });
+
     // getY: posição Y absoluta dentro do overlay do perfil
     const getY = (depth: number | string): number => {
       let y = TOP_OFFSET;
@@ -333,12 +368,10 @@ export default function SoloDetailPage() {
       return isNaN(n) ? String(v ?? "—") : n.toFixed(2);
     };
 
-    // Estilo de solo (cor + textura). w/h = tamanho exato do elemento que vai
-    // receber a textura (coluna do perfil, swatch da descrição, legenda...);
-    // seed varia por linha pra duas camadas do mesmo tipo não saírem com o
-    // padrão espalhado idêntico.
-    const soloStyle = (tipo: string, w: number, h: number, seed: number = 0): string => {
-      if (!tipo) return "background-color:#f0f0f0;";
+    // Classifica o tipo de solo em cor + categoria de textura — compartilhado
+    // entre soloStyle() (ícone isolado: swatch, legenda) e soloStyleSlice()
+    // (fatia de um bloco maior: coluna do perfil, ver abaixo).
+    const classifySolo = (tipo: string): { bg: string; kind: string | null } => {
       const t = tipo.toLowerCase().trim();
       let bg = "#e0e0e0";
       if (t.includes("brita") || t.includes("rach") || t.includes("concreto") || t.includes("cascalho")) bg = "#c8c8c8";
@@ -347,23 +380,69 @@ export default function SoloDetailPage() {
       else if (t.startsWith("silte"))  bg = t.includes("aren") ? "#D1B280" : t.includes("argil") ? "#B88655" : "#C19A6B";
       else if (t.startsWith("argila")) bg = t.includes("aren") ? "#CC6B58" : t.includes("silt") ? "#B86554" : "#D47A6A";
 
+      let kind: string | null = null;
+      if (t.includes("brita") || t.includes("rach") || t.includes("cascalho")) kind = "brita";
+      else if (t.includes("aterro")) kind = "aterro";
+      else if (t.includes("orgân") || t.includes("organica") || t.includes("turfa")) kind = "organica";
+      else if (t.includes("areia") || t.includes("arenos")) kind = "areia";
+      else if (t.includes("argila") || t.includes("argilos")) kind = "argila";
+      else if (t.includes("silte") || t.includes("siltos")) kind = "silte";
+      return { bg, kind };
+    };
+
+    const soloTexture = (kind: string, w: number, h: number, seed: number): string => {
+      if (kind === "brita") return texBrita(w, h, seed);
+      if (kind === "organica") return texOrganica(w, h, seed);
+      if (kind === "areia") return texAreia(w, h, seed);
+      if (kind === "argila") return texArgila(w, h, seed);
+      if (kind === "silte") return texSilte(w, h, seed);
+      return "";
+    };
+
+    // Estilo de solo (cor + textura) para um ícone isolado e autocontido —
+    // swatch da descrição, legenda. w/h = tamanho exato do ícone; seed varia
+    // por ocorrência pra duas camadas do mesmo tipo não saírem com o padrão
+    // espalhado idêntico.
+    const soloStyle = (tipo: string, w: number, h: number, seed: number = 0): string => {
+      if (!tipo) return "background-color:#f0f0f0;";
+      const t = tipo.toLowerCase().trim();
+      const { bg, kind } = classifySolo(t);
       const seedBase = hashStr(t) + seed * 97;
       const sheen = "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(0,0,0,0.08))";
 
-      let scattered = "";
-      if (t.includes("brita") || t.includes("rach") || t.includes("cascalho"))      scattered = texBrita(w, h, seedBase);
-      else if (t.includes("orgân") || t.includes("organica") || t.includes("turfa")) scattered = texOrganica(w, h, seedBase);
-      else if (t.includes("areia") || t.includes("arenos"))                          scattered = texAreia(w, h, seedBase);
-      else if (t.includes("argila") || t.includes("argilos"))                        scattered = texArgila(w, h, seedBase);
-      else if (t.includes("silte") || t.includes("siltos"))                          scattered = texSilte(w, h, seedBase);
-
+      const scattered = kind && kind !== "aterro" ? soloTexture(kind, w, h, seedBase) : "";
       if (scattered) {
         return `background-color:${bg};background-image:${sheen}, url(${scattered});background-size:100% 100%, 100% 100%;background-repeat:no-repeat, no-repeat;`;
       }
-      if (t.includes("aterro")) {
+      if (kind === "aterro") {
         return `background-color:${bg};background-image:${sheen}, url(${TILE.aterro});background-size:100% 100%, 10px 10px;background-repeat:no-repeat, repeat;`;
       }
       return `background-color:${bg};background-image:${sheen};background-size:100% 100%;background-repeat:no-repeat;`;
+    };
+
+    // Como soloStyle(), mas para uma FATIA de um bloco maior: a textura é
+    // gerada na altura TOTAL do grupo (groupH) e essa fatia mostra só a
+    // janela [offsetY, offsetY+própria altura) dela, via background-position.
+    // Usado na coluna do perfil quando camadas consecutivas do mesmo tipo são
+    // fundidas visualmente (leitura de PID repete o mesmo tipo de solo a cada
+    // poucos metros) — sem isso, cada linha mostraria uma cópia esticada da
+    // textura, criando uma costura visível entre elas.
+    const soloStyleSlice = (tipo: string, w: number, groupH: number, offsetY: number, seed: number): string => {
+      if (!tipo) return "background-color:#f0f0f0;";
+      const t = tipo.toLowerCase().trim();
+      const { bg, kind } = classifySolo(t);
+      const seedBase = hashStr(t) + seed * 97;
+      const sheen = "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(0,0,0,0.08))";
+      const pos = `0 -${offsetY}px`;
+
+      const scattered = kind && kind !== "aterro" ? soloTexture(kind, w, groupH, seedBase) : "";
+      if (scattered) {
+        return `background-color:${bg};background-image:${sheen}, url(${scattered});background-size:${w}px ${groupH}px, ${w}px ${groupH}px;background-position:${pos}, ${pos};background-repeat:no-repeat, no-repeat;`;
+      }
+      if (kind === "aterro") {
+        return `background-color:${bg};background-image:${sheen}, url(${TILE.aterro});background-size:${w}px ${groupH}px, 10px 10px;background-position:${pos}, ${pos};background-repeat:no-repeat, repeat;`;
+      }
+      return `background-color:${bg};background-image:${sheen};background-size:${w}px ${groupH}px;background-position:${pos};background-repeat:no-repeat;`;
     };
 
     // ── CONSTRUTIVO DO POÇO ───────────────────────────────────────────────
@@ -504,6 +583,23 @@ export default function SoloDetailPage() {
       vocHTML = `<img src="${c.toDataURL("image/png")}" style="width:100%;height:100%;display:block;" />`;
     }
 
+    // ── DESCRIÇÃO DOS GRUPOS FUNDIDOS (2+ camadas do mesmo tipo) ────────────
+    // Pra grupo de 1 camada, a descrição continua sendo renderizada na própria
+    // linha (ptbl-row), sem mudança nenhuma. Só grupos fundidos usam este
+    // overlay, com o swatch + nome centralizados na extensão toda do grupo.
+    let descOverlayHTML = "";
+    layerGroups.forEach((g) => {
+      if (g.end === g.start) return;
+      const topY    = rowTopY[g.start];
+      const bottomY = rowTopY[g.end] + rowHeights[g.end];
+      const midY    = (topY + bottomY) / 2;
+      const swSt    = soloStyle(g.tipo, SWATCH, SWATCH, g.start);
+      const textW   = Math.max(20, C_DESC - PAD_DESC_H * 2 - SWATCH - GAP_DESC);
+      descOverlayHTML += `
+        <div style="position:absolute;left:${PAD_DESC_H}px;top:${midY}px;width:${SWATCH}px;height:${SWATCH}px;transform:translateY(-50%);border:0.5px solid #888;border-radius:3px;${swSt}"></div>
+        <div style="position:absolute;left:${PAD_DESC_H + SWATCH + GAP_DESC}px;top:${midY}px;width:${textW}px;transform:translateY(-50%);font-size:${F_TIPO}px;font-weight:800;color:#391e2a;text-transform:uppercase;word-break:break-word;">${(g.tipo || "N/A").toUpperCase()}</div>`;
+    });
+
     // ── LEGENDA (solos presentes) ──────────────────────────────────────────
     const uniqueTypes = [...new Set(layers.map(l => l.tipo).filter(Boolean))];
     // Centralização vertical via position:absolute (nao flex, nao vertical-align): medido
@@ -570,17 +666,19 @@ export default function SoloDetailPage() {
   .ptbl-hcell { display: flex; align-items: center; justify-content: center; text-align: center; padding: 9px 4px; color: #fff; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border-right: 1px solid rgba(255,255,255,0.15); }
   .ptbl-hcell:last-child { border-right: none; }
   .ptbl-body { position: relative; }
-  .ptbl-row { display: flex; border-bottom: 1.5px solid #391e2a; overflow: hidden; }
-  .ptbl-row:last-child { border-bottom: none; }
+  .ptbl-row { display: flex; overflow: hidden; }
 
-  /* cells */
-  .c-prof { position: relative; width: ${C_PROF}px; flex-shrink: 0; border-right: 0.5px solid #222; font-size: ${F_PROF}px; color: #555; font-weight: 600; line-height: 1; }
+  /* cells — a borda inferior fica em cada célula (não na linha inteira), pra
+     poder ser suprimida seletivamente no perfil/descrição quando camadas
+     consecutivas do mesmo tipo são fundidas visualmente (profundidade e
+     leitura de PID continuam com borda em toda linha, individualmente). */
+  .c-prof { position: relative; width: ${C_PROF}px; flex-shrink: 0; border-right: 0.5px solid #222; border-bottom: 1.5px solid #391e2a; font-size: ${F_PROF}px; color: #555; font-weight: 600; line-height: 1; }
   .c-prof-top, .c-prof-bottom { position: absolute; left: 0; right: 0; text-align: center; }
   .c-prof-top { top: ${PAD_PROF_V}px; }
   .c-prof-bottom { bottom: ${PAD_PROF_V}px; }
-  .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #222; }
-  .c-voc  { width: ${C_VOC}px; flex-shrink: 0; border-right: 0.5px solid #222; }
-  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: ${PAD_DESC_V}px ${PAD_DESC_H}px; gap: ${GAP_DESC}px; }
+  .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #222; border-bottom: 1.5px solid #391e2a; }
+  .c-voc  { width: ${C_VOC}px; flex-shrink: 0; border-right: 0.5px solid #222; border-bottom: 1.5px solid #391e2a; }
+  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: ${PAD_DESC_V}px ${PAD_DESC_H}px; gap: ${GAP_DESC}px; border-bottom: 1.5px solid #391e2a; }
   .desc-swatch { width: ${SWATCH}px; height: ${SWATCH}px; flex-shrink: 0; border: 0.5px solid #888; border-radius: 3px; }
   .desc-text { flex: 1; min-width: 0; }
   .desc-tipo { font-size: ${F_TIPO}px; font-weight: 800; color: #391e2a; text-transform: uppercase; word-break: break-word; }
@@ -666,8 +764,13 @@ export default function SoloDetailPage() {
         ${vocHTML}
       </div>
 
+      <!-- Overlay da descrição dos grupos de camadas fundidas -->
+      <div style="position:absolute;top:0;left:${C_PROF + C_PERF + C_VOC}px;width:${C_DESC}px;height:${profileH}px;pointer-events:none;z-index:10;overflow:visible;">
+        ${descOverlayHTML}
+      </div>
+
       ${hasWell ? `
-        <div class="ptbl-row" style="height:${TOP_OFFSET}px;background:#fff;border-bottom:1.5px solid #391e2a;">
+        <div class="ptbl-row" style="height:${TOP_OFFSET}px;background:#fff;">
           <div class="c-prof"></div>
           <div class="c-perf"></div>
           <div class="c-voc"></div>
@@ -676,9 +779,15 @@ export default function SoloDetailPage() {
 
       ${layers.map((l, i) => {
         const rH      = rowHeights[i];
-        const perfSt  = soloStyle(l.tipo, C_PERF, rH, i);
+        const group   = layerGroups[groupOfLayer[i]];
+        const grouped = group.end > group.start; // 2+ camadas do mesmo tipo fundidas
+        const perfSt  = soloStyleSlice(l.tipo, C_PERF, group.heightPx, offsetInGroup[i], groupOfLayer[i]);
         const swatchSt = soloStyle(l.tipo, SWATCH, SWATCH, i);
-        const alt = i % 2 === 0 ? "#fff" : "#fafafa";
+        // Alternância de fundo por GRUPO (não por camada) — senão um bloco fundido
+        // ficaria listrado por dentro, contradizendo a ideia de bloco único.
+        const alt = groupOfLayer[i] % 2 === 0 ? "#fff" : "#fafafa";
+        const isLastOfGroup = i === group.end;
+        const noBottomBorder = !isLastOfGroup ? "border-bottom:none;" : "";
         // O "até" desta camada normalmente é igual ao "de" da próxima (camadas contínuas) —
         // mostrar os dois duplicaria o mesmo número em toda fronteira. Só repete o "até"
         // quando é a última camada ou quando há uma descontinuidade real entre elas.
@@ -686,6 +795,9 @@ export default function SoloDetailPage() {
         const ateNum  = parseFloat(String(l.ate));
         const nextDe  = !isLast ? parseFloat(String(layers[i + 1].de)) : NaN;
         const showAte = isLast || isNaN(nextDe) || Math.abs(nextDe - ateNum) > 0.001;
+        // Só suprime a borda da ÚLTIMA linha do DOM de fato — se tem poço, a
+        // linha final é o espaçador do fundo do tubo (abaixo), não esta.
+        const isLastDomRow = isLast && !hasWell;
         // Camadas finas (proporcionais à espessura real) não têm altura pra
         // caber o tipo + a observação — nesse caso mostra só o tipo, em vez
         // de cortar a segunda linha ao meio.
@@ -693,28 +805,29 @@ export default function SoloDetailPage() {
         const showObs = !!l.coloracao && rH >= twoLineThreshold;
         return `
         <div class="ptbl-row" style="height:${rH}px;">
-          <div class="c-prof">
+          <div class="c-prof"${isLastDomRow ? ' style="border-bottom:none;"' : ""}>
             <span class="c-prof-top">${fmt2(l.de)}</span>
             ${showAte ? `<span class="c-prof-bottom">${fmt2(l.ate)}</span>` : ""}
           </div>
-          <div class="c-perf" style="${perfSt}"></div>
-          <div class="c-voc" style="background:${alt};"></div>
-          <div class="c-desc" style="background:${alt};">
+          <div class="c-perf" style="${perfSt}${isLastDomRow ? "border-bottom:none;" : noBottomBorder}"></div>
+          <div class="c-voc" style="background:${alt};${isLastDomRow ? "border-bottom:none;" : ""}"></div>
+          <div class="c-desc" style="background:${alt};${isLastDomRow ? "border-bottom:none;" : noBottomBorder}">
+            ${grouped ? "" : `
             <div class="desc-swatch" style="${swatchSt}"></div>
             <div class="desc-text">
               <div class="desc-tipo">${(l.tipo || "N/A").toUpperCase()}</div>
               ${showObs ? `<div class="desc-obs">Obs.: ${l.coloracao}</div>` : ""}
-            </div>
+            </div>`}
           </div>
         </div>`;
       }).join("")}
 
       ${hasWell ? `
-        <div class="ptbl-row" style="height:${BOTTOM_ROW_H}px;background:#fff;border-bottom:none;">
-          <div class="c-prof"></div>
-          <div class="c-perf"></div>
-          <div class="c-voc"></div>
-          <div class="c-desc"></div>
+        <div class="ptbl-row" style="height:${BOTTOM_ROW_H}px;background:#fff;">
+          <div class="c-prof" style="border-bottom:none;"></div>
+          <div class="c-perf" style="border-bottom:none;"></div>
+          <div class="c-voc" style="border-bottom:none;"></div>
+          <div class="c-desc" style="border-bottom:none;"></div>
         </div>` : ""}
     </div>
   </div>
