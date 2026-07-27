@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import MobileShell from "@/components/layout/MobileShell";
 import SignaturePad from "@/components/SignaturePad";
 import { useToast } from "@/components/Toast";
+import RdoQuickTables from "@/components/rdo/RdoQuickTables";
 
 // Ícones simples em SVG para manter o código portátil
 const Icons = {
@@ -419,6 +420,15 @@ export default function RdoPage() {
             placeholder="Digite aqui observações relevantes não cobertas nas seções anteriores..."
             className="w-full h-28 border border-gray-200 rounded-xl p-4 text-sm bg-gray-50 focus:ring-2 focus:ring-[#80b02d] focus:bg-white transition"
           />
+        </FormSection>
+
+        {/* ================= TABELAS RÁPIDAS ================= */}
+        <FormSection title="Tabelas Rápidas" icon={<Icons.Plus />}>
+          {draftId ? (
+            <RdoQuickTables rdoId={draftId} />
+          ) : (
+            <p className="text-xs text-gray-400">Salve o rascunho ao menos uma vez para poder adicionar tabelas.</p>
+          )}
         </FormSection>
 
         {/* ================= FOTOS ================= */}

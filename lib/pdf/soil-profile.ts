@@ -1,0 +1,901 @@
+import jsPDF from "jspdf";
+
+// Extraído de app/projetos/[id]/solo/[soloId]/page.tsx (etapa 1 da reestruturação RDO/WO):
+// mesma lógica de geração do perfil de solo, só que como funções puras (recebem
+// `data`/`layers` como parâmetro em vez de ler de useState do componente) para
+// poder ser reaproveitada tanto pela tela de perfil de solo quanto pelo merge
+// de PDFs anexados ao RDO. Nenhuma regra de fatiamento/textura foi alterada.
+
+export type SoilLayer = {
+  de: string;
+  ate: string;
+  tipo: string;
+  coloracao?: string;
+  leitura_voc?: string;
+};
+
+export type SoilDescription = {
+  nomenclatura_poco?: string;
+  nome_sondagem?: string;
+  tipo_sondagem?: string;
+  diametro_sondagem?: string;
+  diametro_poco?: string;
+  pre_filtro?: string | number;
+  secao_filtrante_topo?: string | number;
+  secao_filtrante_base?: string | number;
+  coord_x?: string;
+  coord_y?: string;
+  utm_zona?: string;
+  cota?: string | number;
+  profundidade_total?: string | number;
+  nivel_agua?: string | number;
+  data?: string;
+};
+
+async function fetchLogoBase64(src: string): Promise<string> {
+  const resp = await fetch(src);
+  const blob = await resp.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/* ================= CORES/TEXTURAS ================= */
+
+// gera um tile de textura como data URI (suportado pelo html2canvas)
+function makeTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void): string {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(w));
+  c.height = Math.max(1, Math.round(h));
+  const ctx = c.getContext("2d")!;
+  draw(ctx);
+  return c.toDataURL("image/png");
+}
+
+// PRNG determinístico (mesma semente sempre gera o mesmo resultado).
+function mulberry32(seed: number) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+// Texturas "espalhadas" (pontos/traços soltos): cada uma é gerada sob
+// medida pro tamanho EXATO do elemento (coluna do perfil, swatch, pré-filtro
+// etc.) e as marcas são sorteadas em toda a área w×h — não numa unidade
+// pequena que se repete. Uma textura pequena repetida (mesmo com posições
+// aleatórias dentro do próprio tile) sempre denuncia a costura quando
+// ampliada; gerando por área real, os pontos ficam de fato espalhados sem
+// padrão, como na referência trazida pelo usuário.
+function texAreia(w: number, h: number, seed: number): string {
+  return makeTexture(w, h, ctx => {
+    const rnd = mulberry32(seed);
+    const count = Math.max(5, Math.round((w * h) / 30));
+    for (let i = 0; i < count; i++) {
+      const x = rnd() * w, y = rnd() * h, r = 0.6 + rnd() * 1;
+      ctx.fillStyle = `rgba(0,0,0,${0.2 + rnd() * 0.22})`;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+  });
+}
+
+function texArgila(w: number, h: number, seed: number): string {
+  return makeTexture(w, h, ctx => {
+    const rnd = mulberry32(seed);
+    const count = Math.max(4, Math.round((w * h) / 55));
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 0.9;
+    for (let i = 0; i < count; i++) {
+      const x = rnd() * w, y = rnd() * h, len = 4 + rnd() * 7;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(Math.min(w, x + len), y); ctx.stroke();
+    }
+  });
+}
+
+function texSilte(w: number, h: number, seed: number): string {
+  return makeTexture(w, h, ctx => {
+    const rnd = mulberry32(seed);
+    const count = Math.max(5, Math.round((w * h) / 40));
+    ctx.strokeStyle = "rgba(0,0,0,0.26)"; ctx.lineWidth = 0.8;
+    for (let i = 0; i < count; i++) {
+      const x = rnd() * w, y = rnd() * h, len = 2.5 + rnd() * 2.5;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y - len); ctx.stroke();
+    }
+  });
+}
+
+function texBrita(w: number, h: number, seed: number): string {
+  return makeTexture(w, h, ctx => {
+    const rnd = mulberry32(seed);
+    const count = Math.max(3, Math.round((w * h) / 130));
+    for (let i = 0; i < count; i++) {
+      const r = 2 + rnd() * 2.4;
+      const x = w <= r * 2 ? w / 2 : r + rnd() * (w - r * 2);
+      const y = h <= r * 2 ? h / 2 : r + rnd() * (h - r * 2);
+      ctx.strokeStyle = `rgba(80,80,80,${0.3 + rnd() * 0.22})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    }
+  });
+}
+
+function texOrganica(w: number, h: number, seed: number): string {
+  return makeTexture(w, h, ctx => {
+    const rnd = mulberry32(seed);
+    const count = Math.max(4, Math.round((w * h) / 45));
+    ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 0.8;
+    for (let i = 0; i < count; i++) {
+      const x = rnd() * w, y = rnd() * h, len = 3 + rnd() * 3, ang = rnd() * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+      ctx.stroke();
+    }
+  });
+}
+
+// Aterro/preenchimento (hachura cruzada) e a ranhura do filtro são
+// símbolos geométricos regulares por convenção (não "espalhados" como os
+// materiais acima), então continuam como um tile pequeno que repete.
+function buildTiles() {
+  return {
+    aterro: makeTexture(12, 12, ctx => {
+      ctx.strokeStyle = "rgba(70,40,15,0.4)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(12, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(12, 12); ctx.stroke();
+    }),
+    filtro: makeTexture(1, 4, ctx => { ctx.fillStyle = "#333"; ctx.fillRect(0, 3, 1, 1); }),
+  };
+}
+
+// Classifica o tipo de solo em cor + categoria de textura — compartilhado
+// entre soloStyle() (ícone isolado: swatch, legenda) e soloStyleSlice()
+// (fatia de um bloco maior: coluna do perfil, ver abaixo).
+function classifySolo(tipo: string): { bg: string; kind: string | null } {
+  const t = tipo.toLowerCase().trim();
+  let bg = "#e0e0e0";
+  if (t.includes("brita") || t.includes("rach") || t.includes("concreto") || t.includes("cascalho")) bg = "#c8c8c8";
+  else if (t.includes("aterro") || t.includes("orgân") || t.includes("turfa")) bg = "#8b7355";
+  else if (t.startsWith("areia"))  bg = t.includes("argil") ? "#E6C27A" : t.includes("silt") ? "#EEDD82" : "#FCE663";
+  else if (t.startsWith("silte"))  bg = t.includes("aren") ? "#D1B280" : t.includes("argil") ? "#B88655" : "#C19A6B";
+  else if (t.startsWith("argila")) bg = t.includes("aren") ? "#CC6B58" : t.includes("silt") ? "#B86554" : "#D47A6A";
+
+  let kind: string | null = null;
+  if (t.includes("brita") || t.includes("rach") || t.includes("cascalho")) kind = "brita";
+  else if (t.includes("aterro")) kind = "aterro";
+  else if (t.includes("orgân") || t.includes("organica") || t.includes("turfa")) kind = "organica";
+  else if (t.includes("areia") || t.includes("arenos")) kind = "areia";
+  else if (t.includes("argila") || t.includes("argilos")) kind = "argila";
+  else if (t.includes("silte") || t.includes("siltos")) kind = "silte";
+  return { bg, kind };
+}
+
+function soloTexture(kind: string, w: number, h: number, seed: number): string {
+  if (kind === "brita") return texBrita(w, h, seed);
+  if (kind === "organica") return texOrganica(w, h, seed);
+  if (kind === "areia") return texAreia(w, h, seed);
+  if (kind === "argila") return texArgila(w, h, seed);
+  if (kind === "silte") return texSilte(w, h, seed);
+  return "";
+}
+
+// Estilo de solo (cor + textura) para um ícone isolado e autocontido —
+// swatch da descrição, legenda. w/h = tamanho exato do ícone; seed varia
+// por ocorrência pra duas camadas do mesmo tipo não saírem com o padrão
+// espalhado idêntico.
+function soloStyle(tipo: string, w: number, h: number, seed: number = 0, TILE = buildTiles()): string {
+  if (!tipo) return "background-color:#f0f0f0;";
+  const t = tipo.toLowerCase().trim();
+  const { bg, kind } = classifySolo(t);
+  const seedBase = hashStr(t) + seed * 97;
+  const sheen = "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(0,0,0,0.08))";
+
+  const scattered = kind && kind !== "aterro" ? soloTexture(kind, w, h, seedBase) : "";
+  if (scattered) {
+    return `background-color:${bg};background-image:${sheen}, url(${scattered});background-size:100% 100%, 100% 100%;background-repeat:no-repeat, no-repeat;`;
+  }
+  if (kind === "aterro") {
+    return `background-color:${bg};background-image:${sheen}, url(${TILE.aterro});background-size:100% 100%, 10px 10px;background-repeat:no-repeat, repeat;`;
+  }
+  return `background-color:${bg};background-image:${sheen};background-size:100% 100%;background-repeat:no-repeat;`;
+}
+
+// Como soloStyle(), mas para uma FATIA de um bloco maior: a textura é
+// gerada na altura TOTAL do grupo (groupH) e essa fatia mostra só a
+// janela [offsetY, offsetY+própria altura) dela, via background-position.
+// Usado na coluna do perfil quando camadas consecutivas do mesmo tipo são
+// fundidas visualmente (leitura de PID repete o mesmo tipo de solo a cada
+// poucos metros) — sem isso, cada linha mostraria uma cópia esticada da
+// textura, criando uma costura visível entre elas.
+function soloStyleSlice(tipo: string, w: number, groupH: number, offsetY: number, seed: number, TILE = buildTiles()): string {
+  if (!tipo) return "background-color:#f0f0f0;";
+  const t = tipo.toLowerCase().trim();
+  const { bg, kind } = classifySolo(t);
+  const seedBase = hashStr(t) + seed * 97;
+  const sheen = "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(0,0,0,0.08))";
+  const pos = `0 -${offsetY}px`;
+
+  const scattered = kind && kind !== "aterro" ? soloTexture(kind, w, groupH, seedBase) : "";
+  if (scattered) {
+    return `background-color:${bg};background-image:${sheen}, url(${scattered});background-size:${w}px ${groupH}px, ${w}px ${groupH}px;background-position:${pos}, ${pos};background-repeat:no-repeat, no-repeat;`;
+  }
+  if (kind === "aterro") {
+    return `background-color:${bg};background-image:${sheen}, url(${TILE.aterro});background-size:${w}px ${groupH}px, 10px 10px;background-position:${pos}, ${pos};background-repeat:no-repeat, repeat;`;
+  }
+  return `background-color:${bg};background-image:${sheen};background-size:${w}px ${groupH}px;background-position:${pos};background-repeat:no-repeat;`;
+}
+
+/* ================= HTML DO PERFIL ================= */
+
+function buildProfileHTML(data: SoilDescription, layers: SoilLayer[], logoBase64: string, rowScale: number = 1): string {
+  const TILE = buildTiles();
+
+  const ESCALA     = 42 * rowScale;                 // px por metro (encolhe p/ caber em 1 página)
+  const PAGE_W     = 794;  // largura total da página
+  const PAD        = 18;   // padding horizontal
+  const CONTENT_W  = PAGE_W - PAD * 2; // 758px
+
+  // Colunas do perfil
+  const C_PROF = 52;   // profundidade
+  const C_PERF = 170;  // perfil geológico
+  const C_VOC  = 110;  // gráfico de leitura de PID/VOC (entre o perfil e a descrição)
+  const C_DESC = CONTENT_W - C_PROF - C_PERF - C_VOC; // restante (~426px)
+
+  // Conteúdo interno de cada linha (fonte, swatch, padding) encolhe junto com a altura da linha.
+  const rSize = (base: number, min: number) => Math.max(min, base * rowScale);
+  const F_PROF      = rSize(9.5, 7);
+  const F_TIPO      = rSize(11.5, 7.5);
+  const F_OBS       = rSize(9, 6.5);
+  const SWATCH      = rSize(20, 12);
+  const PAD_DESC_V  = rSize(5, 2);
+  const PAD_DESC_H  = rSize(14, 6);
+  const GAP_DESC    = rSize(12, 4);
+  const PAD_PROF_V  = rSize(6, 2);
+  // Piso da altura de linha: DERIVADO do tamanho real do swatch/padding
+  // (que encolhem com rowScale), nunca um valor fixo à parte — assim o
+  // conteúdo NUNCA fica maior que a própria linha, em qualquer escala.
+  // Antes o piso era um número fixo (20) independente do swatch (26 em
+  // escala normal), e o swatch ficava cortado numa camada fina.
+  const MIN_H      = SWATCH + PAD_DESC_V * 2;
+  const PAD_PROF_H  = rSize(6, 3);
+
+  const preFiltroTopo = parseFloat(String(data.pre_filtro));
+  const filtroTopo    = parseFloat(String(data.secao_filtrante_topo));
+  const filtroBase    = parseFloat(String(data.secao_filtrante_base));
+  const nivelAgua     = parseFloat(String(data.nivel_agua));
+  const hasWell       = !isNaN(filtroTopo) || !isNaN(preFiltroTopo);
+  // Um pouco mais alto que o necessário só pro tubo, pra sobrar espaço pro
+  // ícone do sensor/cabeçote desenhado no topo do poço.
+  const TOP_OFFSET    = hasWell ? Math.max(20, 40 * rowScale) : 0;
+  // Menor que antes: já não precisa reservar espaço pra etiqueta de texto
+  // "Fim filtro" (removida — ver seção do NA/filtro abaixo), só a ponta
+  // arredondada do tubo.
+  const BOTTOM_ROW_H  = Math.max(14, 24 * rowScale);
+
+  const profTotal = parseFloat(String(data.profundidade_total))
+    || (layers.length ? parseFloat(String(layers[layers.length - 1].ate)) : 10);
+
+  // Altura de cada camada
+  const rowHeights = layers.map(l => {
+    const esp = parseFloat(String(l.ate)) - parseFloat(String(l.de));
+    return Math.max(MIN_H, esp * ESCALA);
+  });
+  const profileH = TOP_OFFSET + rowHeights.reduce((s, h) => s + h, 0) + (hasWell ? BOTTOM_ROW_H : 0);
+
+  // Y (topo) de cada camada, na mesma origem usada pelo getY() abaixo.
+  const rowTopY: number[] = [];
+  {
+    let acc = TOP_OFFSET;
+    layers.forEach((l, i) => { rowTopY[i] = acc; acc += rowHeights[i]; });
+  }
+
+  // ── FUSÃO DE CAMADAS CONSECUTIVAS DO MESMO TIPO ────────────────────────
+  // Leitura de PID é feita a cada poucos metros, então o mesmo tipo de solo
+  // costuma se repetir em várias camadas seguidas. Na coluna do perfil e na
+  // descrição, essas camadas aparecem como um bloco único (sem costura,
+  // nome só uma vez) — profundidade e leitura de PID continuam por linha.
+  type LayerGroup = { start: number; end: number; tipo: string; heightPx: number };
+  const layerGroups: LayerGroup[] = [];
+  layers.forEach((l, i) => {
+    const norm = (l.tipo || "").trim().toLowerCase();
+    const last = layerGroups[layerGroups.length - 1];
+    if (last && norm && norm === (layers[last.end].tipo || "").trim().toLowerCase()) {
+      last.end = i;
+      last.heightPx += rowHeights[i];
+    } else {
+      layerGroups.push({ start: i, end: i, tipo: l.tipo, heightPx: rowHeights[i] });
+    }
+  });
+  const groupOfLayer: number[] = [];
+  const offsetInGroup: number[] = [];
+  layerGroups.forEach((g, gi) => {
+    let acc = 0;
+    for (let i = g.start; i <= g.end; i++) {
+      groupOfLayer[i] = gi;
+      offsetInGroup[i] = acc;
+      acc += rowHeights[i];
+    }
+  });
+
+  // getY: posição Y absoluta dentro do overlay do perfil
+  const getY = (depth: number | string): number => {
+    let y = TOP_OFFSET;
+    let d = parseFloat(String(depth));
+    if (isNaN(d)) return TOP_OFFSET;
+    for (let i = 0; i < layers.length; i++) {
+      const de  = parseFloat(String(layers[i].de));
+      const ate = parseFloat(String(layers[i].ate));
+      const rH  = rowHeights[i];
+      if (d <= de) break;
+      if (d >= ate) y += rH;
+      else { y += ((d - de) / (ate - de)) * rH; break; }
+    }
+    return y;
+  };
+
+  // Formata profundidades/metragens sempre com 2 casas decimais (ex.: "8" → "8.00")
+  const fmt2 = (v: string | number | null | undefined): string => {
+    const n = parseFloat(String(v));
+    return isNaN(n) ? String(v ?? "—") : n.toFixed(2);
+  };
+
+  // ── CONSTRUTIVO DO POÇO ───────────────────────────────────────────────
+  // Dentro da coluna de 170px:
+  //   x 0–54     → zona esquerda (labels seção filtrante)
+  //   x 55–115   → tubo/casing centrado em x=85
+  //   x 116–170  → zona direita (NA, prof. total)
+
+  const CX     = 85;  // centro do tubo
+  const TW     = 16;  // tubo interno
+  const CW     = 46;  // casing / bentonita
+  const tL     = CX - TW / 2;   // 77
+  const tR     = CX + TW / 2;   // 93
+  const cL     = CX - CW / 2;   // 62
+  // Sombreamento lateral (mais escuro nas bordas, brilho no meio) por cima
+  // do tubo/casing, pra dar aparência cilíndrica/3D em vez de chapada.
+  const cylShade = "linear-gradient(90deg, rgba(0,0,0,0.22), rgba(255,255,255,0.4) 45%, rgba(0,0,0,0.16))";
+
+  let cHTML = "";
+
+  if (hasWell) {
+    const yF = getY(profTotal);
+
+    // Ícone do cabeçote do poço no topo (sem as ondas de sinal — removidas
+    // por pedido). Fica empilhado ACIMA do tampão superior (não sobreposto):
+    // tampaoY/tampaoH abaixo usam capBottom como referência.
+    const capW = rSize(24, 14), capH = rSize(13, 8);
+    const capX = CX - capW / 2;
+    const capY = 2;
+    const capBottom = capY + capH;
+    cHTML += `<div style="position:absolute;left:${capX}px;top:${capY}px;width:${capW}px;height:${capH}px;background:linear-gradient(180deg,#93a1ad,#5c6772);border:1px solid #3d4650;border-radius:${capH / 2}px;z-index:8;"></div>`;
+    const tampaoY = capBottom + 2;
+    const tampaoH = 10;
+
+    // Bentonita (selo de topo)
+    if (!isNaN(preFiltroTopo)) {
+      const hBen = getY(preFiltroTopo) - TOP_OFFSET;
+      if (hBen > 0) cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${TOP_OFFSET}px;height:${hBen}px;background-color:#c98a51;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border-left:1px solid #555;border-right:1px solid #555;border-radius:4px 4px 0 0;z-index:4;"></div>`;
+      // Pré-filtro
+      const yPF = getY(preFiltroTopo);
+      const hPF = yF - yPF;
+      if (hPF > 0) {
+        const pfTex = texAreia(CW, hPF, hashStr("pre-filtro"));
+        cHTML += `<div style="position:absolute;left:${cL}px;width:${CW}px;top:${yPF}px;height:${hPF}px;background-color:#fce663;background-image:${cylShade}, url(${pfTex});background-size:100% 100%, 100% 100%;background-repeat:no-repeat, no-repeat;border-left:1px solid #555;border-right:1px solid #555;border-bottom:1px solid #555;z-index:4;"></div>`;
+      }
+    }
+
+    // Tampão superior (logo abaixo do ícone do sensor) + tubo liso
+    if (!isNaN(filtroTopo)) {
+      cHTML += `<div style="position:absolute;left:${tL - 7}px;width:${TW + 14}px;top:${tampaoY}px;height:${tampaoH}px;background-color:#777;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border:1.5px solid #333;border-radius:3px 3px 0 0;z-index:6;"></div>`;
+      const tuboTopoY = tampaoY + tampaoH;
+      const hLiso = getY(filtroTopo) - tuboTopoY;
+      if (hLiso > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${tuboTopoY}px;height:${hLiso}px;background-color:#fff;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+    }
+
+    if (!isNaN(filtroTopo) && !isNaN(filtroBase)) {
+      const yTF = getY(filtroTopo), yBF = getY(filtroBase);
+
+      // Seção filtrante ranhurada
+      cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yTF}px;height:${yBF - yTF}px;background-color:#fff;background-image:${cylShade}, url(${TILE.filtro});background-size:100% 100%, 1px 4px;background-repeat:no-repeat, repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+
+      // Tubo liso abaixo + tampa (ponta arredondada, tipo cônica)
+      const hAb = yF - yBF;
+      if (hAb > 0) cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yBF}px;height:${hAb}px;background-color:#fff;background-image:${cylShade};background-size:100% 100%;background-repeat:no-repeat;border-left:1.5px solid #333;border-right:1.5px solid #333;z-index:5;"></div>`;
+      cHTML += `<div style="position:absolute;left:${tL}px;width:${TW}px;top:${yF - 7}px;height:7px;background-color:#333;border-radius:0 0 50% 50%;z-index:6;"></div>`;
+    }
+    // As profundidades de início/fim do filtro e a profundidade total já
+    // aparecem na tabela de cabeçalho (campo "Seção Filtrante" e "Profundidade
+    // Total") — aqui fica só a representação visual, sem números flutuando
+    // por cima do desenho.
+  }
+
+  // NA — linha azul tracejada + triângulo (símbolo padrão de nível d'água).
+  // O valor numérico já aparece na tabela de cabeçalho ("Nível d'Água").
+  if (!isNaN(nivelAgua)) {
+    const yNA = getY(nivelAgua);
+    cHTML += `<div style="position:absolute;left:0;width:170px;top:${yNA}px;border-top:2px dashed #1d6fd8;z-index:12;"></div>`;
+    cHTML += `<div style="position:absolute;left:${CX - 6}px;top:${yNA - 8}px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #1d6fd8;z-index:13;"></div>`;
+  }
+
+  // ── GRÁFICO DE LEITURA DE PID/VOC ───────────────────────────────────────
+  // Substitui o valor solto por um mini-gráfico (leitura x profundidade),
+  // alinhado com as mesmas linhas do perfil geológico (usa o mesmo getY()),
+  // posicionado entre a coluna do perfil e a de descrição.
+  const vocPoints = layers
+    .map(l => {
+      const v = parseFloat(String(l.leitura_voc));
+      if (isNaN(v) || v < 0) return null;
+      const de = parseFloat(String(l.de)), ate = parseFloat(String(l.ate));
+      const mid = isNaN(de) || isNaN(ate) ? de : (de + ate) / 2;
+      return { y: getY(mid), value: v };
+    })
+    .filter((p): p is { y: number; value: number } => p !== null);
+
+  let vocHTML = "";
+  if (vocPoints.length > 0) {
+    const maxVal   = Math.max(...vocPoints.map(p => p.value), 1);
+    const leftPad  = 10, rightPad = 32;
+    const plotW    = Math.max(10, C_VOC - leftPad - rightPad);
+    // Renderiza em 3x (mesma escala do html2canvas em renderProfileToCanvas):
+    // como essa imagem é pré-renderizada (não é texto/DOM nativo), sem isso
+    // ela fica em resolução normal enquanto o resto da página é capturado
+    // em alta resolução — daí a diferença de nitidez nos números.
+    const RENDER_SCALE = 3;
+    const logicalH = Math.max(1, Math.round(profileH));
+    const c = document.createElement("canvas");
+    c.width = Math.round(C_VOC * RENDER_SCALE);
+    c.height = logicalH * RENDER_SCALE;
+    const ctx = c.getContext("2d")!;
+    ctx.scale(RENDER_SCALE, RENDER_SCALE);
+
+    // Linha de base ("zero") + grades verticais leves de referência.
+    ctx.strokeStyle = "#ddd"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(leftPad, 0); ctx.lineTo(leftPad, logicalH); ctx.stroke();
+    for (let g = 1; g <= 3; g++) {
+      const gx = leftPad + (plotW * g) / 4;
+      ctx.strokeStyle = "#eee";
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, logicalH); ctx.stroke();
+    }
+
+    const color = "#c0392b";
+    const pts = vocPoints.map(p => ({ x: leftPad + (p.value / maxVal) * plotW, y: p.y, value: p.value }));
+
+    // Linha conectando as leituras válidas.
+    ctx.strokeStyle = color; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    pts.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+    ctx.stroke();
+
+    // Marcador + valor numérico ao lado de cada ponto.
+    ctx.font = "8px Arial"; ctx.textBaseline = "middle"; ctx.fillStyle = color;
+    pts.forEach(p => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2); ctx.fill();
+      const label = Number.isInteger(p.value) ? String(p.value) : p.value.toFixed(1);
+      ctx.fillText(label, Math.min(C_VOC - 2, p.x + 5), p.y);
+    });
+
+    vocHTML = `<img src="${c.toDataURL("image/png")}" style="width:100%;height:100%;display:block;" />`;
+  }
+
+  // ── DESCRIÇÃO DOS GRUPOS FUNDIDOS (2+ camadas do mesmo tipo) ────────────
+  // Pra grupo de 1 camada, a descrição continua sendo renderizada na própria
+  // linha (ptbl-row), sem mudança nenhuma. Só grupos fundidos usam este
+  // overlay, com o swatch + nome centralizados na extensão toda do grupo.
+  let descOverlayHTML = "";
+  layerGroups.forEach((g) => {
+    if (g.end === g.start) return;
+    const topY    = rowTopY[g.start];
+    const bottomY = rowTopY[g.end] + rowHeights[g.end];
+    const midY    = (topY + bottomY) / 2;
+    const swSt    = soloStyle(g.tipo, SWATCH, SWATCH, g.start, TILE);
+    const textW   = Math.max(20, C_DESC - PAD_DESC_H * 2 - SWATCH - GAP_DESC);
+    descOverlayHTML += `
+      <div style="position:absolute;left:${PAD_DESC_H}px;top:${midY}px;width:${SWATCH}px;height:${SWATCH}px;transform:translateY(-50%);border:0.5px solid #888;border-radius:3px;${swSt}"></div>
+      <div style="position:absolute;left:${PAD_DESC_H + SWATCH + GAP_DESC}px;top:${midY}px;width:${textW}px;transform:translateY(-50%);font-size:${F_TIPO}px;font-weight:800;color:#391e2a;text-transform:uppercase;word-break:break-word;">${(g.tipo || "N/A").toUpperCase()}</div>`;
+  });
+
+  // ── LEGENDA (solos presentes) ──────────────────────────────────────────
+  const uniqueTypes = [...new Set(layers.map(l => l.tipo).filter(Boolean))];
+  // Centralização vertical via position:absolute (nao flex, nao vertical-align): medido
+  // pixel a pixel na imagem real gerada pelo html2canvas — o swatch (16px) centraliza em
+  // top:4px numa linha de 24px, e o texto (9px/600) precisa de top:-2px para compensar
+  // um deslocamento sistematico que o html2canvas produz ao posicionar essa fonte/tamanho
+  // dentro de uma line-height maior que o texto.
+  const legendItems = uniqueTypes.map((tipo, idx) => {
+    const st = soloStyle(tipo, 26, 16, idx, TILE);
+    return `<div style="position:relative;height:24px;background:white;border-radius:3px;border:0.5px solid #e0e0e0;white-space:nowrap;">
+      <span style="position:absolute;left:8px;top:4px;width:26px;height:16px;border:0.5px solid #888;border-radius:2px;${st}"></span>
+      <span style="position:absolute;left:41px;right:8px;top:-2px;line-height:24px;font-size:9px;font-weight:600;color:#333;">${tipo}</span>
+    </div>`;
+  }).join("");
+
+  const hasLegend = uniqueTypes.length > 0;
+
+  // ── METADADOS ─────────────────────────────────────────────────────────
+  const nom   = data.nomenclatura_poco?.trim();
+  const sond  = data.nome_sondagem?.trim();
+  const ident = (nom && sond) ? `${nom} / ${sond}` : nom || sond || "—";
+
+  const meta = (label: string, val: string) => `
+    <div style="padding:6px 10px;border-right:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;min-width:0;">
+      <div style="font-size:7px;font-weight:700;color:#80b02d;text-transform:uppercase;letter-spacing:0.6px;">${label}</div>
+      <div style="font-size:10px;font-weight:600;color:#222;margin-top:2px;">${val || "—"}</div>
+    </div>`;
+
+  const now = new Date().toLocaleString("pt-BR");
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: ${PAGE_W}px; background: #fff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #222; }
+  .page { width: ${PAGE_W}px; padding: ${PAD}px; }
+
+  /* ── sheq bar ── */
+  .sheq-bar { display: flex; align-items: center; justify-content: space-between; background: #391e2a; border-radius: 4px 4px 0 0; padding: 6px 14px; border-bottom: 3px solid #80b02d; }
+  .sheq-bar-left { display: flex; align-items: center; gap: 10px; }
+  .sheq-bar-company { font-size: 9px; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
+  .sheq-bar-right { text-align: right; font-size: 8px; color: #b4d278; font-weight: 600; letter-spacing: 0.5px; }
+  .sheq-bar-right span { color: rgba(255,255,255,0.5); margin: 0 5px; }
+
+  /* ── header ── */
+  .hdr { display: flex; border: 2px solid #391e2a; border-top: none; overflow: hidden; }
+  .hdr-logo { width: 130px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 10px; background: #fff; border-right: 2px solid #391e2a; }
+  .hdr-body { flex: 1; display: flex; flex-direction: column; }
+  .hdr-title { background: #391e2a; color: #fff; text-align: center; padding: 9px 12px; font-size: 13px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; border-bottom: 3px solid #80b02d; }
+  .hdr-sub { display: grid; grid-template-columns: repeat(3, 1fr); border-top: none; }
+  .hdr-cell { padding: 7px 12px; border-right: 1px solid #ddd; }
+  .hdr-cell:last-child { border-right: none; }
+  .hdr-lbl { font-size: 7.5px; font-weight: 700; color: #391e2a; text-transform: uppercase; letter-spacing: 0.5px; }
+  .hdr-val { font-size: 10.5px; font-weight: 600; margin-top: 2px; }
+
+  /* ── meta grid ── */
+  .meta { display: grid; grid-template-columns: repeat(4, 1fr); border: 2px solid #391e2a; border-top: none; border-radius: 0 0 4px 4px; margin-bottom: 10px; background: #fafafa; }
+
+  /* ── profile table ── */
+  .ptbl { border: 2px solid #391e2a; border-radius: 4px; overflow: hidden; }
+  .ptbl-head { display: flex; background: #391e2a; }
+  .ptbl-hcell { display: flex; align-items: center; justify-content: center; text-align: center; padding: 9px 4px; color: #fff; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border-right: 1px solid rgba(255,255,255,0.15); }
+  .ptbl-hcell:last-child { border-right: none; }
+  .ptbl-body { position: relative; }
+  .ptbl-row { display: flex; overflow: hidden; }
+
+  /* cells — a borda inferior fica em cada célula (não na linha inteira), pra
+     poder ser suprimida seletivamente no perfil/descrição quando camadas
+     consecutivas do mesmo tipo são fundidas visualmente (profundidade e
+     leitura de PID continuam com borda em toda linha, individualmente). */
+  .c-prof { position: relative; width: ${C_PROF}px; flex-shrink: 0; border-right: 0.5px solid #222; border-bottom: 1.5px solid #391e2a; font-size: ${F_PROF}px; color: #555; font-weight: 600; line-height: 1; }
+  .c-prof-top, .c-prof-bottom { position: absolute; left: 0; right: 0; text-align: center; }
+  .c-prof-top { top: ${PAD_PROF_V}px; }
+  .c-prof-bottom { bottom: ${PAD_PROF_V}px; }
+  .c-perf { width: ${C_PERF}px; flex-shrink: 0; border-right: 0.5px solid #222; border-bottom: 1.5px solid #391e2a; }
+  .c-voc  { width: ${C_VOC}px; flex-shrink: 0; border-right: 0.5px solid #222; border-bottom: 1.5px solid #391e2a; }
+  .c-desc { flex: 1; min-width: 0; display: flex; align-items: center; padding: ${PAD_DESC_V}px ${PAD_DESC_H}px; gap: ${GAP_DESC}px; border-bottom: 1.5px solid #391e2a; }
+  .desc-swatch { width: ${SWATCH}px; height: ${SWATCH}px; flex-shrink: 0; border: 0.5px solid #888; border-radius: 3px; }
+  .desc-text { flex: 1; min-width: 0; }
+  .desc-tipo { font-size: ${F_TIPO}px; font-weight: 800; color: #391e2a; text-transform: uppercase; word-break: break-word; }
+  .desc-obs  { font-size: ${F_OBS}px; color: #666; margin-top: 3px; word-break: break-word; }
+
+  /* ── legend ── */
+  .legend { margin-top: 10px; border: 1.5px solid #391e2a; border-radius: 4px; overflow: hidden; }
+  .legend-title { line-height: 24px; background: #391e2a; color: #fff; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 0 10px; border-bottom: 2px solid #80b02d; }
+  .legend-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 10px; background: #f5f5f5; }
+
+  /* ── footer ── */
+  .footer { margin-top: 10px; padding-top: 7px; border-top: 2px solid #80b02d; display: flex; justify-content: space-between; align-items: flex-start; }
+  .footer-l { font-size: 7px; color: #aaa; line-height: 1.6; }
+  .footer-r { font-size: 7px; color: #aaa; text-align: right; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- SHEQ HEADER BAR -->
+  <div class="sheq-bar">
+    <div class="sheq-bar-left">
+      <span class="sheq-bar-company">GreenSoil do Brasil LTDA</span>
+    </div>
+    <div class="sheq-bar-right">
+      SHEQ n° 003<span>|</span>Versão V 00
+    </div>
+  </div>
+
+  <!-- HEADER (informações do poço) -->
+  <div class="hdr">
+    <div class="hdr-logo">
+      ${logoBase64 ? `<img src="${logoBase64}" style="max-width:105px;max-height:48px;object-fit:contain;" />` : `<span style="font-size:13px;font-weight:900;color:#391e2a;">GREENSOIL</span>`}
+    </div>
+    <div class="hdr-body">
+      <div class="hdr-title">Perfil Técnico e Descritivo de Sondagem</div>
+      <div class="hdr-sub">
+        <div class="hdr-cell">
+          <div class="hdr-lbl">Poço / Sondagem</div>
+          <div class="hdr-val">${ident}</div>
+        </div>
+        <div class="hdr-cell">
+          <div class="hdr-lbl">Método de Sondagem</div>
+          <div class="hdr-val">${data.tipo_sondagem || "—"}</div>
+        </div>
+        <div class="hdr-cell" style="border-right:none;">
+          <div class="hdr-lbl">Elaborado por</div>
+          <div class="hdr-val">GreenSoil do Brasil</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- METADATA GRID -->
+  <div class="meta">
+    ${meta("Data", data.data || "—")}
+    ${meta("Nível d'Água (NA)", data.nivel_agua ? fmt2(data.nivel_agua) + " m" : "—")}
+    ${meta("Profundidade Total", data.profundidade_total ? fmt2(data.profundidade_total) + " m" : "—")}
+    ${meta("Seção Filtrante", (!isNaN(filtroTopo) && !isNaN(filtroBase)) ? `${fmt2(filtroTopo)} a ${fmt2(filtroBase)} m` : "—")}
+    ${meta("Cota / Altitude", data.cota ? fmt2(data.cota) + " m" : "—")}
+    ${meta("Coordenadas UTM (X / Y)", (data.coord_x || data.coord_y) ? `${data.coord_x || "—"} / ${data.coord_y || "—"}` : "—")}
+    ${meta("Zona UTM", data.utm_zona || "—")}
+    ${meta("Ø Instalação / Sondagem", `${data.diametro_poco || "—"} / ${data.diametro_sondagem || "—"}`)}
+  </div>
+
+  <!-- PROFILE TABLE -->
+  <div class="ptbl">
+    <div class="ptbl-head">
+      <div class="ptbl-hcell" style="width:${C_PROF}px;">Prof.<br/>(m)</div>
+      <div class="ptbl-hcell" style="width:${C_PERF}px;">Perfil Geológico<br/>e Construtivo</div>
+      <div class="ptbl-hcell" style="width:${C_VOC}px;">Leitura PID<br/>(ppm)</div>
+      <div class="ptbl-hcell" style="flex:1;">Descrição Litológica</div>
+    </div>
+
+    <div class="ptbl-body">
+      <!-- Overlay do construtivo posicionado sobre a coluna de perfil -->
+      <div style="position:absolute;top:0;left:${C_PROF}px;width:${C_PERF}px;height:${profileH}px;pointer-events:none;z-index:10;overflow:visible;">
+        ${cHTML}
+      </div>
+
+      <!-- Overlay do gráfico de PID/VOC posicionado sobre a própria coluna -->
+      <div style="position:absolute;top:0;left:${C_PROF + C_PERF}px;width:${C_VOC}px;height:${profileH}px;pointer-events:none;z-index:10;overflow:visible;">
+        ${vocHTML}
+      </div>
+
+      <!-- Overlay da descrição dos grupos de camadas fundidas -->
+      <div style="position:absolute;top:0;left:${C_PROF + C_PERF + C_VOC}px;width:${C_DESC}px;height:${profileH}px;pointer-events:none;z-index:10;overflow:visible;">
+        ${descOverlayHTML}
+      </div>
+
+      ${hasWell ? `
+        <div class="ptbl-row" style="height:${TOP_OFFSET}px;background:#fff;">
+          <div class="c-prof"></div>
+          <div class="c-perf"></div>
+          <div class="c-voc"></div>
+          <div class="c-desc"></div>
+        </div>` : ""}
+
+      ${layers.map((l, i) => {
+        const rH      = rowHeights[i];
+        const group   = layerGroups[groupOfLayer[i]];
+        const grouped = group.end > group.start; // 2+ camadas do mesmo tipo fundidas
+        const perfSt  = soloStyleSlice(l.tipo, C_PERF, group.heightPx, offsetInGroup[i], groupOfLayer[i], TILE);
+        const swatchSt = soloStyle(l.tipo, SWATCH, SWATCH, i, TILE);
+        // Alternância de fundo por GRUPO (não por camada) — senão um bloco fundido
+        // ficaria listrado por dentro, contradizendo a ideia de bloco único.
+        const alt = groupOfLayer[i] % 2 === 0 ? "#fff" : "#fafafa";
+        const isLastOfGroup = i === group.end;
+        const noBottomBorder = !isLastOfGroup ? "border-bottom:none;" : "";
+        // O "até" desta camada normalmente é igual ao "de" da próxima (camadas contínuas) —
+        // mostrar os dois duplicaria o mesmo número em toda fronteira. Só repete o "até"
+        // quando é a última camada ou quando há uma descontinuidade real entre elas.
+        const isLast  = i === layers.length - 1;
+        const ateNum  = parseFloat(String(l.ate));
+        const nextDe  = !isLast ? parseFloat(String(layers[i + 1].de)) : NaN;
+        const showAte = isLast || isNaN(nextDe) || Math.abs(nextDe - ateNum) > 0.001;
+        // Só suprime a borda da ÚLTIMA linha do DOM de fato — se tem poço, a
+        // linha final é o espaçador do fundo do tubo (abaixo), não esta.
+        const isLastDomRow = isLast && !hasWell;
+        // Camadas finas (proporcionais à espessura real) não têm altura pra
+        // caber o tipo + a observação — nesse caso mostra só o tipo, em vez
+        // de cortar a segunda linha ao meio.
+        const twoLineThreshold = PAD_DESC_V * 2 + F_TIPO * 1.3 + F_OBS * 1.3;
+        const showObs = !!l.coloracao && rH >= twoLineThreshold;
+        return `
+        <div class="ptbl-row" style="height:${rH}px;">
+          <div class="c-prof"${isLastDomRow ? ' style="border-bottom:none;"' : ""}>
+            <span class="c-prof-top">${fmt2(l.de)}</span>
+            ${showAte ? `<span class="c-prof-bottom">${fmt2(l.ate)}</span>` : ""}
+          </div>
+          <div class="c-perf" style="${perfSt}${isLastDomRow ? "border-bottom:none;" : noBottomBorder}"></div>
+          <div class="c-voc" style="background:${alt};${isLastDomRow ? "border-bottom:none;" : ""}"></div>
+          <div class="c-desc" style="background:${alt};${isLastDomRow ? "border-bottom:none;" : noBottomBorder}">
+            ${grouped ? "" : `
+            <div class="desc-swatch" style="${swatchSt}"></div>
+            <div class="desc-text">
+              <div class="desc-tipo">${(l.tipo || "N/A").toUpperCase()}</div>
+              ${showObs ? `<div class="desc-obs">Obs.: ${l.coloracao}</div>` : ""}
+            </div>`}
+          </div>
+        </div>`;
+      }).join("")}
+
+      ${hasWell ? `
+        <div class="ptbl-row" style="height:${BOTTOM_ROW_H}px;background:#fff;">
+          <div class="c-prof" style="border-bottom:none;"></div>
+          <div class="c-perf" style="border-bottom:none;"></div>
+          <div class="c-voc" style="border-bottom:none;"></div>
+          <div class="c-desc" style="border-bottom:none;"></div>
+        </div>` : ""}
+    </div>
+  </div>
+
+  ${hasLegend ? `
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-title">Legenda — Tipos de Solo Identificados</div>
+    <div class="legend-body">
+      ${legendItems}
+    </div>
+  </div>` : ""}
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-l">
+      GreenSoil do Brasil LTDA &nbsp;·&nbsp; CNPJ: 29.088.151/0001-25<br>
+      Documento gerado eletronicamente em ${now}
+    </div>
+    <div class="footer-r">
+      ${ident}<br>
+      Perfil Técnico de Sondagem
+    </div>
+  </div>
+
+</div>
+</body>
+</html>`;
+}
+
+/* ================= CANVAS/PDF ================= */
+
+// Renderiza o HTML do perfil num iframe oculto, mede o conteúdo e captura com html2canvas.
+async function renderProfileToCanvas(html: string) {
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;top:-99999px;left:-99999px;width:794px;height:2000px;border:none;visibility:hidden;";
+  document.body.appendChild(iframe);
+
+  await new Promise<void>((resolve) => {
+    iframe.onload = () => resolve();
+    iframe.srcdoc = html;
+  });
+
+  // Aguarda imagens e fontes carregarem
+  await new Promise(r => setTimeout(r, 800));
+
+  // Ajusta altura do iframe ao conteúdo real.
+  // IMPORTANTE: nao usar documentElement.scrollHeight aqui — por definicao
+  // scrollHeight nunca fica MENOR que a altura do proprio iframe (2000px,
+  // setada acima), entao sempre que o conteudo real fosse mais baixo que
+  // isso (quase sempre), ele reportava 2000px de conteudo por engano. Isso
+  // inflava artificialmente o "espaco fixo" calculado (cabecalho+legenda+
+  // rodape), forcando um encolhimento das camadas muito maior do que o
+  // necessario (ate o piso minimo, deixando tudo com a mesma altura) e
+  // ocasionalmente gerando uma 2a pagina desnecessaria. getBoundingClientRect
+  // do próprio ".page" mede a altura real do conteudo, independente do
+  // tamanho do iframe.
+  const iframeDoc = iframe.contentDocument!;
+  const pageEl = iframeDoc.querySelector(".page") as HTMLElement | null;
+  const contentH = pageEl ? pageEl.getBoundingClientRect().height : iframeDoc.documentElement.scrollHeight;
+  iframe.style.height = contentH + "px";
+  await new Promise(r => setTimeout(r, 200));
+
+  const ptblBody  = iframeDoc.querySelector(".ptbl-body");
+  const ptblBodyH = ptblBody ? ptblBody.getBoundingClientRect().height : 0;
+
+  // Pontos seguros de corte: topo de cada linha de camada, da legenda e do rodapé.
+  // Evita que uma eventual quebra de página caia no meio de uma linha ou da legenda.
+  const bodyTop = iframeDoc.body.getBoundingClientRect().top;
+  const safeBreaksPx = Array.from(new Set([
+    0,
+    ...Array.from(iframeDoc.querySelectorAll(".ptbl-row, .legend, .footer"))
+      .map((el) => el.getBoundingClientRect().top - bodyTop),
+    contentH,
+  ])).sort((a, b) => a - b);
+
+  // Captura com html2canvas em alta resolução (scale 3 ≈ 300dpi)
+  const html2canvas = (await import("html2canvas")).default;
+  const canvas = await html2canvas(iframeDoc.body, {
+    scale: 3,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: "#ffffff",
+    logging: false,
+    windowWidth: 794,
+    scrollX: 0,
+    scrollY: 0,
+  });
+
+  document.body.removeChild(iframe);
+
+  return { canvas, contentH, ptblBodyH, safeBreaksPx };
+}
+
+export async function buildSoilProfilePdf(input: { data: SoilDescription; layers: SoilLayer[] }): Promise<jsPDF> {
+  const { data, layers } = input;
+
+  // 1. Busca a logo como base64 para embutir no HTML
+  let logoB64 = "";
+  try { logoB64 = await fetchLogoBase64("/logo.png"); } catch (_) {}
+
+  const pdf   = new jsPDF("p", "mm", "a4");
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const imgW  = pageW;
+
+  // Altura máxima de conteúdo (em px, na largura de referência de 794px) que cabe numa única página A4
+  const maxContentPx = (pageH / pageW) * 794 - 4;
+
+  // 2. Gera o HTML e renderiza com a escala normal
+  let html   = buildProfileHTML(data, layers, logoB64);
+  let render = await renderProfileToCanvas(html);
+
+  // 3. Se não couber numa página só, recalcula a escala das camadas para encolher e caber tudo
+  if (render.contentH > maxContentPx && render.ptblBodyH > 0) {
+    const fixedH  = render.contentH - render.ptblBodyH;
+    const targetH = Math.max(40, maxContentPx - fixedH);
+    const factor  = Math.min(1, Math.max(0.15, targetH / render.ptblBodyH));
+    html   = buildProfileHTML(data, layers, logoB64, factor);
+    render = await renderProfileToCanvas(html);
+  }
+
+  const { canvas, contentH, safeBreaksPx } = render;
+
+  // 4. Monta o PDF A4 (normalmente 1 página só; recorta em mais páginas apenas se, mesmo
+  //    encolhido, ainda não couber — sempre nos pontos seguros de corte)
+  const mmPerCanvasPx   = imgW / canvas.width; // escala uniforme (largura e altura)
+  const pageHCanvasPx   = pageH / mmPerCanvasPx;
+  const safeBreaksCanvasPx = safeBreaksPx.map((px) => px * (canvas.height / contentH));
+
+  // Tolerância: pequenas diferenças de medição entre a etapa de medir e a de capturar a
+  // imagem podem deixar uns poucos pixels de sobra (ex.: o padding inferior da página).
+  // Isso não é conteúdo de verdade, então nunca deve abrir uma 2ª página quase em branco por causa disso.
+  const toleranceCanvasPx = 40 * (canvas.height / contentH);
+
+  if (canvas.height <= pageHCanvasPx + toleranceCanvasPx) {
+    const sliceData = canvas.toDataURL("image/jpeg", 0.97);
+    pdf.addImage(sliceData, "JPEG", 0, 0, imgW, canvas.height * mmPerCanvasPx);
+  } else {
+    let offsetPx = 0;
+    while (offsetPx < canvas.height - 0.5) {
+      const idealEnd  = offsetPx + pageHCanvasPx;
+      const candidates = safeBreaksCanvasPx.filter((y) => y > offsetPx + 0.5 && y <= idealEnd);
+      let cut = candidates.length ? candidates[candidates.length - 1] : undefined;
+      if (cut === undefined) {
+        // Nenhum ponto seguro cabe numa página inteira (linha mais alta que a página) — usa o próximo mesmo assim
+        const next = safeBreaksCanvasPx.find((y) => y > offsetPx + 0.5);
+        cut = next !== undefined ? Math.min(next, canvas.height) : canvas.height;
+      }
+
+      const sliceHeightPx = Math.max(1, Math.round(cut - offsetPx));
+      const pageCanvas = document.createElement("canvas");
+      pageCanvas.width  = canvas.width;
+      pageCanvas.height = sliceHeightPx;
+      const ctx = pageCanvas.getContext("2d")!;
+      ctx.drawImage(canvas, 0, Math.round(offsetPx), canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+
+      const sliceData   = pageCanvas.toDataURL("image/jpeg", 0.97);
+      const sliceHeightMm = sliceHeightPx * mmPerCanvasPx;
+      pdf.addImage(sliceData, "JPEG", 0, 0, imgW, sliceHeightMm);
+
+      offsetPx = cut;
+      if (offsetPx < canvas.height - 0.5) pdf.addPage();
+    }
+  }
+
+  return pdf;
+}
