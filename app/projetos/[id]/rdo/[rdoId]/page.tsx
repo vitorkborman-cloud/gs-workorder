@@ -6,9 +6,14 @@ import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
 import { buildRdoPdf } from "@/lib/pdf/rdo";
+import { buildSoilProfilePdf } from "@/lib/pdf/soil-profile";
+import { buildWaterSamplingPdf } from "@/lib/pdf/water-sampling";
+import { mergeJsPdfDocs } from "@/lib/pdf/merge";
+import { downloadPdfBytes } from "@/lib/pdf/download";
 import RdoQuickTables from "@/components/rdo/RdoQuickTables";
 import { RdoStatusBadge } from "@/components/rdo/RdoStatusBadge";
 import { AtividadeEditor } from "@/components/rdo/AtividadeEditor";
+import { RdoAttachmentsPicker, type PdfAttachment } from "@/components/rdo/RdoAttachmentsPicker";
 
 // ================= HELPERS =================
 
@@ -34,6 +39,7 @@ export default function RdoViewPage() {
   const [isEditing, setIsEditing]       = useState(false);
   const [isSaving, setIsSaving]         = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf]   = useState(false);
   const [saveMsg, setSaveMsg]           = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => { load(); }, []);
@@ -108,11 +114,38 @@ export default function RdoViewPage() {
   const updateSheq = (field: string, val: string) =>
     setRdo({ ...rdo, sheq: { ...rdo.sheq, [field]: val } });
 
+  // --- Anexos de PDF (perfil de solo / físico-químico) ---
+  async function updateAttachments(next: PdfAttachment[]) {
+    setRdo({ ...rdo, pdf_attachments: next });
+    await supabase.from("rdo_reports").update({ pdf_attachments: next }).eq("id", rdoId);
+  }
+
   // --- PDF ---
   async function gerarPDF() {
     if (!rdo) return;
-    const doc = await buildRdoPdf({ rdo, projectName });
-    doc.save(`RDO_${projectName}_${rdo.data}.pdf`);
+    setIsGeneratingPdf(true);
+    try {
+      const docs = [await buildRdoPdf({ rdo, projectName })];
+
+      const attachments: PdfAttachment[] = rdo.pdf_attachments || [];
+      for (const att of attachments) {
+        if (att.tipo === "soil_description") {
+          const { data: solo } = await supabase.from("soil_descriptions").select("*").eq("id", att.id).single();
+          if (solo) docs.push(await buildSoilProfilePdf({ data: solo, layers: solo.layers || [] }));
+        } else if (att.tipo === "water_sampling") {
+          const { data: amostra } = await supabase.from("water_samplings").select("*").eq("id", att.id).single();
+          if (amostra) docs.push(await buildWaterSamplingPdf({ amostra, projectName }));
+        }
+      }
+
+      const mergedBytes = await mergeJsPdfDocs(docs);
+      downloadPdfBytes(mergedBytes, `RDO_${projectName}_${rdo.data}.pdf`);
+    } catch (err) {
+      alert("Erro ao gerar o PDF. Verifique o console.");
+      console.error(err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   }
 
   if (!rdo) return <AdminShell><p className="p-10">Carregando...</p></AdminShell>;
@@ -457,9 +490,10 @@ export default function RdoViewPage() {
                   </Button>
                   <Button
                     onClick={gerarPDF}
+                    disabled={isGeneratingPdf}
                     className="bg-[#80b02d] hover:bg-[#6a9425] text-white px-8 h-11 rounded-lg font-bold shadow-lg"
                   >
-                    BAIXAR PDF
+                    {isGeneratingPdf ? "GERANDO..." : "BAIXAR PDF"}
                   </Button>
                 </>
               )}
@@ -474,6 +508,18 @@ export default function RdoViewPage() {
           )}
 
           {isEditing ? editForm : dataView}
+
+          {/* Anexos ao PDF final — perfis de solo e amostragens finalizadas do projeto */}
+          <div className="p-8 border-t border-gray-100">
+            <h3 className="text-xs font-bold text-[#391e2a] uppercase tracking-widest mb-3 pb-1 border-b border-[#80b02d]/40">
+              Anexar Relatórios ao PDF
+            </h3>
+            <RdoAttachmentsPicker
+              projectId={projectId}
+              attachments={rdo.pdf_attachments || []}
+              onChange={updateAttachments}
+            />
+          </div>
 
           {/* Tabelas Rápidas — independentes do modo de edição do RDO, salvam direto */}
           <div className="p-8 border-t border-gray-100">
