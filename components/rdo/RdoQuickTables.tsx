@@ -2,9 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/Toast";
 import { downloadQuickTableExcel, type QuickTable as QuickTableExcelShape } from "@/lib/excel/quick-table";
 import { QuickTableEditor, type QuickTableColumn, type QuickTableRow } from "./QuickTableEditor";
 import { QuickTableTemplatePicker, type TableTemplate } from "./QuickTableTemplatePicker";
+
+// PostgREST ainda não recarregou o schema depois que as tabelas foram criadas
+// via SQL Editor — precisa recarregar em Supabase Dashboard > Settings > API
+// > "Reload schema cache" (ou `NOTIFY pgrst, 'reload schema';`).
+function describeError(error: { code?: string; message: string }): string {
+  if (error.code === "PGRST205" || error.message?.toLowerCase().includes("schema cache")) {
+    return "O Supabase ainda não reconhece as tabelas novas. Peça para recarregar o schema cache (Dashboard > Settings > API > Reload schema cache) e tente de novo.";
+  }
+  return error.message;
+}
 
 type QuickTableRecord = {
   id: string;
@@ -17,6 +28,7 @@ type QuickTableRecord = {
 const SAVE_DEBOUNCE_MS = 800;
 
 export default function RdoQuickTables({ rdoId }: { rdoId: string }) {
+  const { showToast } = useToast();
   const [tables, setTables] = useState<QuickTableRecord[]>([]);
   const [templates, setTemplates] = useState<TableTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,10 +39,12 @@ export default function RdoQuickTables({ rdoId }: { rdoId: string }) {
 
   async function load() {
     setLoading(true);
-    const [{ data: t }, { data: tpl }] = await Promise.all([
+    const [{ data: t, error: tErr }, { data: tpl, error: tplErr }] = await Promise.all([
       supabase.from("rdo_quick_tables").select("*").eq("rdo_id", rdoId).order("ordem", { ascending: true }),
       supabase.from("rdo_table_templates").select("id, nome, colunas").order("created_at", { ascending: false }),
     ]);
+    if (tErr) showToast(`Erro ao carregar tabelas: ${describeError(tErr)}`, "error");
+    if (tplErr) showToast(`Erro ao carregar modelos: ${describeError(tplErr)}`, "error");
     if (t) setTables(t as QuickTableRecord[]);
     if (tpl) setTemplates(tpl as TableTemplate[]);
     setLoading(false);
@@ -50,21 +64,27 @@ export default function RdoQuickTables({ rdoId }: { rdoId: string }) {
       })
       .select("*")
       .single();
-    if (!error && data) setTables((prev) => [...prev, data as QuickTableRecord]);
+    if (error) {
+      showToast(`Erro ao criar tabela: ${describeError(error)}`, "error");
+      return;
+    }
+    if (data) setTables((prev) => [...prev, data as QuickTableRecord]);
     setPickerOpen(false);
   }
 
   function scheduleSave(id: string, patch: Partial<Pick<QuickTableRecord, "titulo" | "colunas" | "linhas">>) {
     setTables((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
     if (saveTimers.current[id]) clearTimeout(saveTimers.current[id]);
-    saveTimers.current[id] = setTimeout(() => {
-      supabase.from("rdo_quick_tables").update(patch).eq("id", id);
+    saveTimers.current[id] = setTimeout(async () => {
+      const { error } = await supabase.from("rdo_quick_tables").update(patch).eq("id", id);
+      if (error) showToast(`Erro ao salvar tabela: ${describeError(error)}`, "error");
     }, SAVE_DEBOUNCE_MS);
   }
 
   async function deleteTable(id: string) {
     if (!confirm("Remover esta tabela do RDO?")) return;
-    await supabase.from("rdo_quick_tables").delete().eq("id", id);
+    const { error } = await supabase.from("rdo_quick_tables").delete().eq("id", id);
+    if (error) { showToast(`Erro ao remover tabela: ${describeError(error)}`, "error"); return; }
     setTables((prev) => prev.filter((t) => t.id !== id));
   }
 
@@ -76,7 +96,8 @@ export default function RdoQuickTables({ rdoId }: { rdoId: string }) {
       .insert({ nome, colunas: table.colunas })
       .select("id, nome, colunas")
       .single();
-    if (!error && data) setTemplates((prev) => [data as TableTemplate, ...prev]);
+    if (error) { showToast(`Erro ao salvar modelo: ${describeError(error)}`, "error"); return; }
+    if (data) { setTemplates((prev) => [data as TableTemplate, ...prev]); showToast("Modelo salvo com sucesso."); }
   }
 
   function exportExcel(table: QuickTableRecord) {
