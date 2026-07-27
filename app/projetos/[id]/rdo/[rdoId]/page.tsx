@@ -7,6 +7,8 @@ import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
 import { buildRdoPdf } from "@/lib/pdf/rdo";
 import RdoQuickTables from "@/components/rdo/RdoQuickTables";
+import { RdoStatusBadge } from "@/components/rdo/RdoStatusBadge";
+import { AtividadeEditor } from "@/components/rdo/AtividadeEditor";
 
 // ================= HELPERS =================
 
@@ -337,24 +339,7 @@ export default function RdoViewPage() {
       {/* Atividades */}
       <div>
         <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">Atividades</h3>
-        <div className="space-y-3">
-          {(rdo.atividades || []).map((ativ: any, idx: number) => (
-            <div key={idx} className="flex gap-3 bg-white p-3 border rounded-md shadow-sm items-center">
-              <input type="text" value={ativ.atividade || ""} onChange={(e) => updateArrayItem("atividades", idx, "atividade", e.target.value)} className="w-1/3 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Atividade" />
-              <input type="text" value={ativ.empresa || ""} onChange={(e) => updateArrayItem("atividades", idx, "empresa", e.target.value)} className="w-1/5 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Responsável" />
-              <select value={ativ.status || ""} onChange={(e) => updateArrayItem("atividades", idx, "status", e.target.value)} className="w-1/6 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none">
-                {["Concluído","Em andamento","Não iniciado","Impedido"].map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </select>
-              <input type="text" value={ativ.obs || ""} onChange={(e) => updateArrayItem("atividades", idx, "obs", e.target.value)} className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none" placeholder="Observações" />
-              <button onClick={() => removeArrayItem("atividades", idx)} className="text-red-500 hover:bg-red-50 p-2 rounded">✕</button>
-            </div>
-          ))}
-          <button onClick={() => addArrayItem("atividades", { atividade: "", empresa: "", status: "Não iniciado", obs: "" })} className="text-xs font-bold text-[#80b02d] hover:text-[#6a9425] flex items-center gap-1 mt-2">
-            + ADICIONAR ATIVIDADE
-          </button>
-        </div>
+        <AtividadeEditor atividades={rdo.atividades || []} onChange={(next) => setRdo({ ...rdo, atividades: next })} />
       </div>
 
       {/* Mão de Obra */}
@@ -438,10 +423,10 @@ export default function RdoViewPage() {
               <h1 className="text-2xl font-bold tracking-tight">
                 {isEditing ? "Editando RDO" : "Relatório Diário de Obra"}
               </h1>
-              <p className="text-[#80b02d] font-semibold mt-1 uppercase tracking-wider text-xs">
+              <p className="text-[#80b02d] font-semibold mt-1 uppercase tracking-wider text-xs flex items-center gap-2">
                 {projectName} • {rdo.data}
-                {!rdo.draft && !isEditing && (
-                  <span className="ml-3 text-green-400">✓ Finalizado</span>
+                {!isEditing && (
+                  <RdoStatusBadge status={rdo.status || (rdo.draft ? "rascunho" : "finalizado")} />
                 )}
               </p>
             </div>

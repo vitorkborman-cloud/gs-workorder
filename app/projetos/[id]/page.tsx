@@ -5,10 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import AdminShell from "../../../components/layout/AdminShell";
 import { isMobileDevice } from "../../../lib/isMobile";
+import { RdoStatusBadge } from "../../../components/rdo/RdoStatusBadge";
 
 type WorkOrder = { id: string; title: string; finalized: boolean; created_at: string; };
 type Perfil = { id: string; nome_sondagem: string; nomenclatura_poco: string; created_at: string; };
-type RDO = { id: string; data: string; created_at: string; };
+type RDO = { id: string; data: string; created_at: string; status?: string; draft?: boolean; scheduled_date?: string | null; };
 type CampanhaFQ = { data: string; quantidade: number; };
 type ProjectDoc = { id: string; name: string; file_url: string; file_type: string; file_size: number; created_at: string; };
 type TelemetryDevice = { id: string; name: string; configuration_id: string; reference_id: string; status: string; last_reading: any; last_checked_at: string | null; };
@@ -89,7 +90,7 @@ export default function ProjetoPage() {
     const [{ data: wo }, { data: sd }, { data: rdoData }, { data: fqData }, { data: docsData }, { data: telData }] = await Promise.all([
       supabase.from("work_orders").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
       supabase.from("soil_descriptions").select("id, nome_sondagem, nomenclatura_poco, created_at").eq("project_id", projectId).eq("finalized", true).order("created_at", { ascending: false }),
-      supabase.from("rdo_reports").select("id, data, created_at").eq("project_id", projectId).eq("draft", false).order("created_at", { ascending: false }),
+      supabase.from("rdo_reports").select("id, data, created_at, status, draft, scheduled_date").eq("project_id", projectId).order("created_at", { ascending: false }),
       supabase.from("water_samplings").select("id, data").eq("project_id", projectId).eq("finalized", true),
       supabase.from("project_documents").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
       supabase.from("telemetry_devices").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
@@ -445,27 +446,43 @@ export default function ProjetoPage() {
 
         {/* ── RDOS ── */}
         <section>
-          <SectionHeader title="Relatórios Diários" subtitle="RDOs finalizados" count={rdos.length} />
-          {rdos.length === 0 ? <EmptyState message="Nenhum relatório finalizado." /> : (
+          <SectionHeader
+            title="Relatórios Diários"
+            subtitle="Programados, em preenchimento e finalizados"
+            count={rdos.length}
+            action={!mobile && (
+              <button
+                onClick={() => router.push(`/projetos/${projectId}/rdo/programar`)}
+                className="flex items-center gap-2 bg-[#80b02d] hover:bg-[#6c9526] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all hover:-translate-y-0.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                Programar RDO
+              </button>
+            )}
+          />
+          {rdos.length === 0 ? <EmptyState message="Nenhum RDO criado ainda." /> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {rdos.map((r) => (
-                <div key={r.id} className="relative group">
-                  {!mobile && <DeleteBtn onClick={(e) => { e.stopPropagation(); deleteRDO(r.id, r.data || "Sem data"); }} />}
-                  <button
-                    onClick={() => router.push(`/projetos/${projectId}/rdo/${r.id}`)}
-                    className="w-full text-left bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-[#4b5563]/10 flex items-center justify-center text-[#4b5563] mb-3">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
-                    </div>
-                    <p className="font-bold text-[#391e2a] text-sm">RDO — {formatDateBr(r.data)}</p>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleDateString("pt-BR")}</p>
-                    <div className="mt-3 inline-flex items-center gap-1 bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">
-                      ✓ Finalizado
-                    </div>
-                  </button>
-                </div>
-              ))}
+              {rdos.map((r) => {
+                const status = r.status || (r.draft ? "rascunho" : "finalizado");
+                return (
+                  <div key={r.id} className="relative group">
+                    {!mobile && <DeleteBtn onClick={(e) => { e.stopPropagation(); deleteRDO(r.id, r.data || "Sem data"); }} />}
+                    <button
+                      onClick={() => router.push(`/projetos/${projectId}/rdo/${r.id}`)}
+                      className="w-full text-left bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-[#4b5563]/10 flex items-center justify-center text-[#4b5563] mb-3">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
+                      </div>
+                      <p className="font-bold text-[#391e2a] text-sm">RDO — {formatDateBr(r.scheduled_date || r.data)}</p>
+                      <p className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleDateString("pt-BR")}</p>
+                      <div className="mt-3">
+                        <RdoStatusBadge status={status} />
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
