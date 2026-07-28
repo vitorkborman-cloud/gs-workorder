@@ -8,7 +8,7 @@ import { PDFDocument, PDFFont, StandardFonts, rgb } from "pdf-lib";
 // visualmente onde cada pílula/ícone cai na página.
 const TEMPLATE_URL = "/rdo-cover-template.pdf";
 
-const GREEN = rgb(128 / 255, 176 / 255, 45 / 255);
+const WHITE = rgb(1, 1, 1);
 
 const PROJETO_FIELD = { x: 145, y: 213, maxWidth: 175, startSize: 18, minSize: 10 };
 const PERIODO_FIELD = { x: 145, y: 73, size: 20 };
@@ -39,9 +39,9 @@ export async function buildRdoCoverBytes(input: { projectName: string; periodo: 
 
   const projectText = input.projectName || "—";
   const projSize = fitFontSize(projectText, font, PROJETO_FIELD.maxWidth, PROJETO_FIELD.startSize, PROJETO_FIELD.minSize);
-  page.drawText(projectText, { x: PROJETO_FIELD.x, y: PROJETO_FIELD.y, size: projSize, font, color: GREEN });
+  page.drawText(projectText, { x: PROJETO_FIELD.x, y: PROJETO_FIELD.y, size: projSize, font, color: WHITE });
 
-  page.drawText(input.periodo, { x: PERIODO_FIELD.x, y: PERIODO_FIELD.y, size: PERIODO_FIELD.size, font, color: GREEN });
+  page.drawText(input.periodo, { x: PERIODO_FIELD.x, y: PERIODO_FIELD.y, size: PERIODO_FIELD.size, font, color: WHITE });
 
   return pdfDoc.save();
 }
