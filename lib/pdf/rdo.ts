@@ -2,6 +2,8 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabase";
 import { BRAND_PURPLE, BRAND_GREEN, generateWhiteLogoBase64, getLogoSize, drawHeaderBar, drawFooterPageNumbers } from "./brand";
+import { buildRdoCoverBytes, formatPeriodoAbreviado } from "./cover";
+import { mergePdfSources } from "./merge";
 
 export type RdoReport = {
   data: string;
@@ -14,7 +16,7 @@ export type RdoReport = {
   assinaturas?: { empresa: string; assinatura?: string }[];
 };
 
-export async function buildRdoPdf(input: { rdo: RdoReport; projectName: string }): Promise<jsPDF> {
+export async function buildRdoPdf(input: { rdo: RdoReport; projectName: string }): Promise<Uint8Array> {
   const { rdo, projectName } = input;
 
   let whiteLogo: string | null = null;
@@ -160,5 +162,6 @@ export async function buildRdoPdf(input: { rdo: RdoReport; projectName: string }
 
   drawFooterPageNumbers(doc, { pageWidth });
 
-  return doc;
+  const coverBytes = await buildRdoCoverBytes({ projectName, periodo: formatPeriodoAbreviado(rdo.data) });
+  return mergePdfSources([coverBytes, doc]);
 }

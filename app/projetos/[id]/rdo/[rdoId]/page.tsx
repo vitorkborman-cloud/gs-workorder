@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import type { jsPDF } from "jspdf";
 import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
 import { buildRdoPdf } from "@/lib/pdf/rdo";
 import { buildSoilProfilePdf } from "@/lib/pdf/soil-profile";
 import { buildWaterSamplingPdf } from "@/lib/pdf/water-sampling";
-import { mergeJsPdfDocs } from "@/lib/pdf/merge";
+import { mergePdfSources } from "@/lib/pdf/merge";
 import { downloadPdfBytes } from "@/lib/pdf/download";
 import RdoQuickTables from "@/components/rdo/RdoQuickTables";
 import { RdoStatusBadge } from "@/components/rdo/RdoStatusBadge";
@@ -125,20 +126,20 @@ export default function RdoViewPage() {
     if (!rdo) return;
     setIsGeneratingPdf(true);
     try {
-      const docs = [await buildRdoPdf({ rdo, projectName })];
+      const sources: (jsPDF | Uint8Array)[] = [await buildRdoPdf({ rdo, projectName })];
 
       const attachments: PdfAttachment[] = rdo.pdf_attachments || [];
       for (const att of attachments) {
         if (att.tipo === "soil_description") {
           const { data: solo } = await supabase.from("soil_descriptions").select("*").eq("id", att.id).single();
-          if (solo) docs.push(await buildSoilProfilePdf({ data: solo, layers: solo.layers || [] }));
+          if (solo) sources.push(await buildSoilProfilePdf({ data: solo, layers: solo.layers || [] }));
         } else if (att.tipo === "water_sampling") {
           const { data: amostra } = await supabase.from("water_samplings").select("*").eq("id", att.id).single();
-          if (amostra) docs.push(await buildWaterSamplingPdf({ amostra, projectName }));
+          if (amostra) sources.push(await buildWaterSamplingPdf({ amostra, projectName }));
         }
       }
 
-      const mergedBytes = await mergeJsPdfDocs(docs);
+      const mergedBytes = await mergePdfSources(sources);
       downloadPdfBytes(mergedBytes, `RDO_${projectName}_${rdo.data}.pdf`);
     } catch (err) {
       alert("Erro ao gerar o PDF. Verifique o console.");
