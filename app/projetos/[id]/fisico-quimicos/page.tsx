@@ -9,6 +9,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import { DOC_CONTROL, formatDocControl } from "@/lib/pdf/doc-control";
 
 // ================= HELPERS (Logo Branco) =================
 async function generateWhiteLogoBase64(src: string): Promise<string> {
@@ -144,7 +145,7 @@ export default function FisicoQuimicosDesktopPage() {
         doc.text(`Projeto: ${projectName}   |   Campanha: ${formatDateBr(dataCampanha)}`, pageWidth - marginX, 22, { align: "right" });
         doc.setFontSize(7.5);
         doc.setTextColor(180, 210, 120);
-        doc.text("SHEQ n° 002   |   Versão V 00", pageWidth - marginX, 29, { align: "right" });
+        doc.text(formatDocControl(DOC_CONTROL.fichaAmostragem), pageWidth - marginX, 29, { align: "right" });
         doc.setTextColor(0, 0, 0);
         currentY = 46;
       };
@@ -307,7 +308,7 @@ export default function FisicoQuimicosDesktopPage() {
       rr2.getCell(1).alignment = { vertical: "middle", horizontal: "right" };
 
       const rr3 = resumo.getRow(3);
-      rr3.getCell(1).value = "SHEQ n° 002   |   Versão V 00";
+      rr3.getCell(1).value = formatDocControl(DOC_CONTROL.excelAmostragem);
       rr3.getCell(1).font = { name: "Calibri", size: 9, bold: true, color: { argb: "FFB4D278" } };
       rr3.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
       rr3.getCell(5).value = `Gerado em: ${new Date().toLocaleString("pt-BR")}   |   GreenSoil do Brasil LTDA`;
@@ -372,7 +373,7 @@ export default function FisicoQuimicosDesktopPage() {
       sheet.getRow(2).getCell(1).value = `Projeto: ${projectName}   |   Campanha: ${formatDateBr(dataCampanha)}`;
       sheet.getRow(2).getCell(1).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF80B02D" } };
       sheet.getRow(2).getCell(1).alignment = { vertical: "middle", horizontal: "right" };
-      sheet.getRow(3).getCell(1).value = "SHEQ n° 002   |   Versão V 00";
+      sheet.getRow(3).getCell(1).value = formatDocControl(DOC_CONTROL.excelAmostragem);
       sheet.getRow(3).getCell(1).font = { name: "Calibri", size: 9, bold: true, color: { argb: "FFB4D278" } };
       sheet.getRow(3).getCell(1).alignment = { vertical: "middle", horizontal: "left" };
       sheet.getRow(3).getCell(5).value = `Gerado em: ${new Date().toLocaleString("pt-BR")}   |   GreenSoil do Brasil LTDA`;

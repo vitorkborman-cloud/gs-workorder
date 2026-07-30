@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { BRAND_PURPLE, BRAND_GREEN, generateWhiteLogoBase64, getLogoSize, drawHeaderBar, drawFooterPageNumbers } from "./brand";
 import { buildRdoCoverBytes, formatPeriodoAbreviado } from "./cover";
 import { mergePdfSources } from "./merge";
+import { DOC_CONTROL, formatDocControl } from "./doc-control";
 
 export type RdoReport = {
   data: string;
@@ -39,7 +40,7 @@ export async function buildRdoPdf(input: { rdo: RdoReport; projectName: string }
     doc.setFontSize(8); doc.setFont("helvetica", "normal");
     doc.text(`Projeto: ${projectName}   |   Data: ${rdo.data}`, pageWidth - marginX, 22, { align: "right" });
     doc.setFontSize(7.5); doc.setTextColor(180, 210, 120);
-    doc.text("SHEQ n° 004   |   Versão V 00", pageWidth - marginX, 29, { align: "right" });
+    doc.text(formatDocControl(DOC_CONTROL.rdo), pageWidth - marginX, 29, { align: "right" });
     doc.setTextColor(0, 0, 0);
   };
 

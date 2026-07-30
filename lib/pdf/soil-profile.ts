@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { DOC_CONTROL } from "./doc-control";
 
 // Extraído de app/projetos/[id]/solo/[soloId]/page.tsx (etapa 1 da reestruturação RDO/WO):
 // mesma lógica de geração do perfil de solo, só que como funções puras (recebem
@@ -607,7 +608,7 @@ function buildProfileHTML(data: SoilDescription, layers: SoilLayer[], logoBase64
       <span class="sheq-bar-company">GreenSoil do Brasil LTDA</span>
     </div>
     <div class="sheq-bar-right">
-      SHEQ n° 003<span>|</span>Versão V 00
+      SHEQ n° ${DOC_CONTROL.fichaSolo.sheq}<span>|</span>Versão V ${String(DOC_CONTROL.fichaSolo.versao).padStart(2, "0")}
     </div>
   </div>
 
