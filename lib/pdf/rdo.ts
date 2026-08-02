@@ -33,19 +33,56 @@ export async function buildRdoPdf(input: { rdo: RdoReport; projectName: string }
 
   const [lW, lH] = whiteLogo ? await getLogoSize(whiteLogo, 10) : [33, 10];
 
+  // Cabeçalho: hierarquia clara (rótulo pequeno → nome do projeto em
+  // destaque → data + selo de controle), em vez de 3 linhas soltas do mesmo
+  // peso visual. Faixa verde lateral como detalhe de acabamento.
+  const BAR_H = 38;
   const header = () => {
-    drawHeaderBar(doc, { pageWidth, logoBase64: whiteLogo, logoX: marginX, logoWidth: lW, logoHeight: lH });
-    doc.setTextColor(255, 255, 255); doc.setFontSize(13); doc.setFont("helvetica", "bold");
-    doc.text("RELATÓRIO DIÁRIO DE OBRA", pageWidth - marginX, 15, { align: "right" });
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    doc.text(`Projeto: ${projectName}   |   Data: ${rdo.data}`, pageWidth - marginX, 22, { align: "right" });
-    doc.setFontSize(7.5); doc.setTextColor(180, 210, 120);
-    doc.text(formatDocControl(DOC_CONTROL.rdo), pageWidth - marginX, 29, { align: "right" });
+    drawHeaderBar(doc, { pageWidth, barHeight: BAR_H, logoBase64: whiteLogo, logoX: marginX, logoWidth: lW, logoHeight: lH });
+
+    doc.setFillColor(...BRAND_GREEN);
+    doc.rect(0, 0, 2.2, BAR_H, "F");
+
+    const rightX = pageWidth - marginX;
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+    doc.setTextColor(180, 210, 120);
+    doc.text("RELATÓRIO DIÁRIO DE OBRA", rightX, 11, { align: "right" });
+
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold");
+    let titleSize = 15;
+    doc.setFontSize(titleSize);
+    const maxTitleW = pageWidth - marginX * 2 - lW - 6;
+    while (titleSize > 10 && doc.getTextWidth(projectName) > maxTitleW) {
+      titleSize -= 0.5;
+      doc.setFontSize(titleSize);
+    }
+    doc.text(projectName, rightX, 21, { align: "right" });
+
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+    doc.setTextColor(230, 230, 235);
+    const dateLabel = `Data: ${rdo.data}`;
+    doc.text(dateLabel, rightX, 30, { align: "right" });
+    const dateW = doc.getTextWidth(dateLabel);
+
+    const badgeLabel = formatDocControl(DOC_CONTROL.rdo).replace("   |   ", "  ·  ");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7);
+    const badgeW  = doc.getTextWidth(badgeLabel) + 6;
+    const badgeH  = 5.2;
+    const badgeX  = rightX - dateW - 6 - badgeW;
+    const badgeY  = 30 - badgeH + 1.6;
+    doc.setDrawColor(180, 210, 120); doc.setLineWidth(0.35);
+    doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.3, 1.3, "S");
+    doc.setTextColor(180, 210, 120);
+    doc.text(badgeLabel, badgeX + badgeW / 2, badgeY + badgeH / 2 + 1, { align: "center" });
+
     doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
   };
 
+  const CONTENT_START_Y = BAR_H + 16;
   const chk = (n: number) => {
-    if (y + n > 275) { doc.addPage(); header(); y = 50; }
+    if (y + n > 275) { doc.addPage(); header(); y = CONTENT_START_Y; }
   };
 
   const sec = (title: string) => {
@@ -64,7 +101,7 @@ export async function buildRdoPdf(input: { rdo: RdoReport; projectName: string }
     alternateRowStyles: { fillColor: [252, 252, 252] },
   };
 
-  header(); y = 50;
+  header(); y = CONTENT_START_Y;
 
   const total = rdo.envolvidos?.reduce((a: number, b: any) => a + (Number(b.colaboradores) || 0), 0) || 0;
   [

@@ -19,7 +19,7 @@ não sobe a cada atualização de conteúdo.
 
 | Documento                       | SHEQ n° | Versão atual | Gerado em |
 |----------------------------------|:-------:|:-------------:|-----------|
-| RDO (Relatório Diário de Obra)    | 151     | V 00          | `lib/pdf/rdo.ts` |
+| RDO (Relatório Diário de Obra)    | 151     | V 01          | `lib/pdf/rdo.ts` |
 | Ficha de Amostragem (PDF)         | 152     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarPDFGeral`) |
 | Excel de Amostragem               | 153     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarExcelGeral`) |
 | Ficha Descritiva de Solo          | 154     | V 00          | `lib/pdf/soil-profile.ts` |
@@ -42,3 +42,12 @@ leitura de PID/VOC substituindo o valor solto, fusão visual de camadas
 consecutivas do mesmo tipo) — mudanças de conteúdo reais, mas anteriores à
 adoção deste controle formal de versão, por isso não numeradas
 retroativamente.
+
+### 2026-07-23 — RDO: cabeçalho redesenhado (V00 → V01)
+Cabeçalho do PDF do RDO modernizado: hierarquia tipográfica clara (rótulo
+"Relatório Diário de Obra" pequeno, nome do projeto em destaque como título
+principal — antes as 3 linhas tinham o mesmo peso visual), faixa de destaque
+verde na lateral esquerda, e selo (badge) contornado para o número SHEQ/versão
+no lugar da linha de texto solta. Fonte do nome do projeto encolhe
+automaticamente se for muito longo, sem sobrepor a logo. Nenhuma mudança de
+conteúdo/dados, só de layout do cabeçalho.
