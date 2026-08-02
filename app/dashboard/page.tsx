@@ -73,26 +73,26 @@ export default function DashboardPage() {
     const projectIds = sortedProjects.map((x) => x.id);
     if (projectIds.length === 0) return;
 
-    // 2. Work orders filtrados pelos projetos (respeita RLS)
-    const { data: wos } = await supabase
-      .from("work_orders")
-      .select("id")
+    // 2. RDOs dos projetos (Work Order foi desativado — atividades agora
+    // vivem dentro de cada RDO, em vez de uma tabela própria com created_at
+    // individual). Cada atividade é atribuída à data do RDO em que foi
+    // reportada.
+    const { data: rdos } = await supabase
+      .from("rdo_reports")
+      .select("data, atividades")
       .in("project_id", projectIds);
 
-    const woIds = (wos || []).map((w) => w.id);
-    if (woIds.length === 0) return;
+    const activities: { created_at: string; status: string }[] = [];
+    (rdos || []).forEach((r: any) => {
+      const ativs = Array.isArray(r.atividades) ? r.atividades : [];
+      ativs.forEach((a: any) => {
+        if (r.data) activities.push({ created_at: r.data, status: a?.status || "" });
+      });
+    });
 
-    // 3. Atividades filtradas pelos work orders
-    const { data: a } = await supabase
-      .from("activities")
-      .select("created_at, status")
-      .in("work_order_id", woIds);
-
-    if (a) {
-      setTotalActivities(a.length);
-      setDoneActivities(a.filter((x) => x.status === "concluído").length);
-      setCurveData(buildCurveData(a));
-    }
+    setTotalActivities(activities.length);
+    setDoneActivities(activities.filter((x) => x.status.toLowerCase().includes("conclu")).length);
+    setCurveData(buildCurveData(activities));
   }
 
   function getWeekKey(dateStr: string): string {
@@ -122,7 +122,7 @@ export default function DashboardPage() {
       if (!a.created_at) return;
       const wk = getWeekKey(a.created_at);
       createdByWeek[wk] = (createdByWeek[wk] || 0) + 1;
-      if (a.status === "concluído") {
+      if ((a.status || "").toLowerCase().includes("conclu")) {
         completedByWeek[wk] = (completedByWeek[wk] || 0) + 1;
       }
     });
@@ -262,7 +262,7 @@ export default function DashboardPage() {
               Curva S — Atividades Acumuladas por Semana
             </h2>
             <p className="text-sm text-gray-500 mt-1 ml-4">
-              Atividades criadas vs. concluídas acumuladas semana a semana
+              Atividades reportadas vs. concluídas acumuladas semana a semana
             </p>
           </div>
 
@@ -298,7 +298,7 @@ export default function DashboardPage() {
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
 
                   <Line
-                    name="Criadas (acumulado)"
+                    name="Reportadas (acumulado)"
                     type="monotone"
                     dataKey="criadas"
                     stroke="#391e2a"
