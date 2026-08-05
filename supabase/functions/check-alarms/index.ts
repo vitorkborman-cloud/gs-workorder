@@ -1,7 +1,8 @@
 import webpush from "npm:web-push@3.6.7";
 
 // Edge Function: verifica mudanças de alarme via /connectors/ e envia push notifications
-// Chamada pelo pg_cron a cada 2 minutos via HTTP POST
+// Chamada a cada 2 minutos via HTTP POST pela rota app/api/cron/check-alarms,
+// que por sua vez é disparada pelo cron-job.org (ver comentário nesse arquivo).
 
 const HITEC_BASE_URL = "https://api.telemetria.hitecnologia.com.br/rest/v1";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -188,6 +189,70 @@ function formatAlarmDesc(active: ActiveAlarm[]): string {
   return desc;
 }
 
+// ── Saúde do pipeline: log de execuções + alerta em caso de falha sustentada ───
+// O pipeline falha de forma silenciosa (HTTP 200 mesmo sem checar nada) sempre que
+// getHitecToken() não consegue logar na API HI Tecnologia, ou quando ocorre uma
+// exceção não tratada. Sem isso, uma parada de vários dias só é percebida por
+// acaso. Aqui gravamos cada execução e, se houver falhas seguidas por tempo
+// suficiente (10 min = 5 execuções), avisamos por push quem tem subscription —
+// e avisamos de novo quando normalizar.
+const FAILURE_ALERT_THRESHOLD = 5; // ~10 min de falhas seguidas (execução a cada 2 min)
+
+async function sendAlertPush(subs: any[], title: string, body: string) {
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        JSON.stringify({ title, body, tag: "pipeline-health", data: { url: "/mobile" } })
+      );
+    } catch {
+      // Assinatura ruim: a limpeza normal (410/404) já cuida disso na execução seguinte.
+    }
+  }
+}
+
+async function logRunAndCheckHealth(status: "ok" | "skipped" | "error", detail: string | undefined, subs: any[]) {
+  await fetch(`${SUPABASE_URL}/rest/v1/cron_run_log`, {
+    method: "POST",
+    headers: sbHeaders(),
+    body: JSON.stringify({ status, detail: detail ?? null }),
+  }).catch(() => {});
+
+  // Mantém a tabela pequena: descarta logs com mais de 30 dias.
+  fetch(
+    `${SUPABASE_URL}/rest/v1/cron_run_log?run_at=lt.${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()}`,
+    { method: "DELETE", headers: sbHeaders() }
+  ).catch(() => {});
+
+  const recent: any[] = await sbGet(
+    `cron_run_log?select=status&order=run_at.desc&limit=${FAILURE_ALERT_THRESHOLD + 1}`
+  ).catch(() => []);
+  if (!Array.isArray(recent)) return;
+
+  let streak = 0;
+  for (const row of recent) {
+    if (row.status === "ok") break;
+    streak++;
+  }
+
+  if (status !== "ok" && streak === FAILURE_ALERT_THRESHOLD) {
+    await sendAlertPush(
+      subs,
+      "⚠️ Monitoramento de alarmes falhando",
+      `${FAILURE_ALERT_THRESHOLD} verificações seguidas falharam (~${FAILURE_ALERT_THRESHOLD * 2} min). Causa: ${detail ?? status}`
+    );
+  } else if (status === "ok") {
+    const previousStreak = recent.slice(1).filter((r) => r.status !== "ok").length;
+    if (previousStreak >= FAILURE_ALERT_THRESHOLD) {
+      await sendAlertPush(
+        subs,
+        "✅ Monitoramento de alarmes normalizado",
+        "As verificações voltaram a funcionar normalmente."
+      );
+    }
+  }
+}
+
 // ── Handler principal ──────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -196,16 +261,19 @@ Deno.serve(async (req: Request) => {
   try {
     webpush.setVapidDetails("mailto:ti@greensoil.com.br", VAPID_PUBLIC, VAPID_PRIVATE);
 
+    const subs: any[] = await sbGet("push_subscriptions?select=*");
+
     const token = await getHitecToken();
     if (!token) {
-      return new Response(JSON.stringify({ skipped: "Credenciais HI Tecnologia não configuradas" }), {
+      const detail = "Credenciais HI Tecnologia não configuradas ou login falhou";
+      await logRunAndCheckHealth("skipped", detail, subs);
+      return new Response(JSON.stringify({ skipped: detail }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Busca dispositivos, subscriptions e preferências de uma vez
+    // Busca dispositivos e preferências
     const devices: any[] = await sbGet("telemetry_devices?select=*");
-    const subs: any[] = await sbGet("push_subscriptions?select=*");
     const results: any[] = [];
 
     // Carrega preferências de todos os usuários com subscription
@@ -321,10 +389,25 @@ Deno.serve(async (req: Request) => {
       console.log(`Subscription expirada removida: ${expiredId}`);
     }
 
+    // Se TODOS os dispositivos falharam ao consultar a API HI Tecnologia, trata
+    // como falha do pipeline (mesmo padrão silencioso do token, só que mais adiante).
+    const allDevicesFailed = devices.length > 0 && results.every((r) => r.error);
+    await logRunAndCheckHealth(
+      allDevicesFailed ? "error" : "ok",
+      allDevicesFailed ? "Todos os dispositivos falharam ao consultar a API HI Tecnologia" : undefined,
+      subs
+    );
+
     return new Response(JSON.stringify({ ok: true, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
+    try {
+      const subs: any[] = await sbGet("push_subscriptions?select=*");
+      await logRunAndCheckHealth("error", String(err), subs);
+    } catch {
+      // Se nem isso funcionar, a próxima execução ok/skipped ainda vai registrar o histórico.
+    }
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
