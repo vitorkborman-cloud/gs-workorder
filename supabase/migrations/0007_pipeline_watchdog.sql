@@ -6,13 +6,19 @@
 --
 -- Requer as extensões pg_cron e pg_net habilitadas (Database → Extensions),
 -- as mesmas já usadas pela agenda do check-alarms em scripts/push_subscriptions.sql.
+--
+-- IMPORTANTE: o slug real da function no Supabase ficou "dynamic-service" (nome
+-- padrão do template ao criar pelo dashboard) em vez de "pipeline-watchdog" — o
+-- campo "Name" nas configurações da function é só um rótulo de exibição, não
+-- muda a URL de fato. A URL abaixo aponta pro slug real; se algum dia recriar
+-- a function com o slug correto, atualize aqui também.
 
 select cron.schedule(
   'pipeline-watchdog',
   '*/20 * * * *',
   $$
     select net.http_post(
-      url := (select decrypted_secret from vault.decrypted_secrets where name = 'SUPABASE_URL') || '/functions/v1/pipeline-watchdog',
+      url := (select decrypted_secret from vault.decrypted_secrets where name = 'SUPABASE_URL') || '/functions/v1/dynamic-service',
       headers := jsonb_build_object(
         'Content-Type',  'application/json',
         'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'SUPABASE_SERVICE_ROLE_KEY')
