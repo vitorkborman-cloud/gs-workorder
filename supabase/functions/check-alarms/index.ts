@@ -198,6 +198,25 @@ function formatAlarmDesc(active: ActiveAlarm[]): string {
 // e avisamos de novo quando normalizar.
 const FAILURE_ALERT_THRESHOLD = 5; // ~10 min de falhas seguidas (execução a cada 2 min)
 
+// Janelas de manutenção avisadas com antecedência pela própria HI Tecnologia
+// (banner no portal deles). Durante esses períodos, falha ao consultar a API
+// é esperada e não deve gerar o alerta de "pipeline quebrado" — o run
+// continua sendo registrado normalmente em cron_run_log, só o push é
+// suprimido. Para uma nova manutenção futura, adicione outra linha aqui (e no
+// mesmo array em pipeline-watchdog/index.ts) e faça o redeploy.
+const KNOWN_MAINTENANCE_WINDOWS: [string, string][] = [
+  ["2026-08-13T05:00:00-03:00", "2026-08-13T09:00:00-03:00"], // aviso da plataforma HI Tecnologia
+];
+
+function isInMaintenanceWindow(): boolean {
+  const now = Date.now();
+  return KNOWN_MAINTENANCE_WINDOWS.some(([start, end]) => {
+    const s = new Date(start).getTime();
+    const e = new Date(end).getTime();
+    return now >= s && now <= e;
+  });
+}
+
 async function sendAlertPush(subs: any[], title: string, body: string) {
   for (const sub of subs) {
     try {
@@ -228,6 +247,10 @@ async function logRunAndCheckHealth(status: "ok" | "skipped" | "error", detail: 
     `cron_run_log?select=status&order=run_at.desc&limit=${FAILURE_ALERT_THRESHOLD + 1}`
   ).catch(() => []);
   if (!Array.isArray(recent)) return;
+
+  // Falha esperada (manutenção avisada) — o run já foi registrado acima, só
+  // não alerta por push nem conta pra streak de "pipeline quebrado".
+  if (isInMaintenanceWindow()) return;
 
   let streak = 0;
   for (const row of recent) {

@@ -24,6 +24,24 @@ const STALE_AFTER_MS = 10 * 60 * 1000;
 // (20 min) — só reavisa depois de 1h ainda parado.
 const REALERT_AFTER_MS = 60 * 60 * 1000;
 
+// Janelas de manutenção avisadas com antecedência pela própria HI Tecnologia
+// (mesma lista de check-alarms/index.ts — manter as duas em sincronia). Nosso
+// próprio cron continua rodando/logando normalmente durante esses períodos
+// (ver check-alarms), então isto é só uma proteção extra caso algo mais
+// inesperado também afete a checagem nesse intervalo.
+const KNOWN_MAINTENANCE_WINDOWS: [string, string][] = [
+  ["2026-08-13T05:00:00-03:00", "2026-08-13T09:00:00-03:00"], // aviso da plataforma HI Tecnologia
+];
+
+function isInMaintenanceWindow(): boolean {
+  const now = Date.now();
+  return KNOWN_MAINTENANCE_WINDOWS.some(([start, end]) => {
+    const s = new Date(start).getTime();
+    const e = new Date(end).getTime();
+    return now >= s && now <= e;
+  });
+}
+
 function sbHeaders() {
   return {
     "apikey": SUPABASE_SERVICE_KEY,
@@ -48,6 +66,12 @@ Deno.serve(async () => {
 
     if (lastRunAt && ageMs <= STALE_AFTER_MS) {
       return new Response(JSON.stringify({ ok: true, ageMinutes: Math.round(ageMs / 60000) }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (isInMaintenanceWindow()) {
+      return new Response(JSON.stringify({ ok: true, suppressed: "known maintenance window" }), {
         headers: { "Content-Type": "application/json" },
       });
     }
