@@ -19,7 +19,7 @@ não sobe a cada atualização de conteúdo.
 
 | Documento                       | SHEQ n° | Versão atual | Gerado em |
 |----------------------------------|:-------:|:-------------:|-----------|
-| RDO (Relatório Diário de Obra)    | 151     | V 01          | `lib/pdf/rdo.ts` |
+| RDO (Relatório Diário de Obra)    | 151     | V 02          | `lib/pdf/rdo.ts` |
 | Ficha de Amostragem (PDF)         | 152     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarPDFGeral`) |
 | Excel de Amostragem               | 153     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarExcelGeral`) |
 | Ficha Descritiva de Solo          | 154     | V 00          | `lib/pdf/soil-profile.ts` |
@@ -51,3 +51,7 @@ verde na lateral esquerda, e selo (badge) contornado para o número SHEQ/versão
 no lugar da linha de texto solta. Fonte do nome do projeto encolhe
 automaticamente se for muito longo, sem sobrepor a logo. Nenhuma mudança de
 conteúdo/dados, só de layout do cabeçalho.
+
+### 2026-08-05 — RDO: renomeia coluna "Empresa Parceira" para "Empresa" (V01 → V02)
+Cabeçalho da tabela "Mão de Obra e Efetivo" — só o rótulo da coluna mudou,
+sem alteração de dados/cálculo.

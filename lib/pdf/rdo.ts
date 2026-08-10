@@ -122,7 +122,7 @@ export async function buildRdoPdf(input: { rdo: RdoReport; projectName: string }
   y = (doc as any).lastAutoTable.finalY + 12;
 
   sec("Mão de Obra e Efetivo");
-  autoTable(doc, { ...tbl, startY: y, head: [["Empresa Parceira","N° Colaboradores","Função Principal"]], body: rdo.envolvidos?.map((e: any) => [e.empresa, e.colaboradores, e.funcao]) || [] });
+  autoTable(doc, { ...tbl, startY: y, head: [["Empresa","N° Colaboradores","Função Principal"]], body: rdo.envolvidos?.map((e: any) => [e.empresa, e.colaboradores, e.funcao]) || [] });
   y = (doc as any).lastAutoTable.finalY + 12;
 
   sec("Progresso das Atividades");
