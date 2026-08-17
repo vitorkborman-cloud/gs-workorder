@@ -15,6 +15,71 @@ export type SoilLayer = {
   leitura_voc?: string;
 };
 
+// Leitura de PID/VOC lançada separadamente da camada (ver mergeLayersWithVocReadings
+// logo abaixo) — no campo, com liner, a leitura é feita a cada intervalo fixo (ex.:
+// 20cm) ANTES de abrir o liner e saber o tipo de solo; a descrição da camada só
+// acontece depois. Guardar como lista própria, por profundidade, permite lançar as
+// leituras na hora sem precisar do tipo de solo ainda.
+export type VocReading = {
+  profundidade: string;
+  valor: string;
+};
+
+// Reconstrói o array de camadas "combinado" (De/Até/Tipo/Obs/VOC por linha) que
+// buildProfileHTML() já espera, a partir das duas listas lançadas separadamente no
+// app. Isso existe pra o PDF continuar EXATAMENTE igual (mesmo fatiamento/textura/
+// gráfico de sempre) mesmo com o novo fluxo de lançamento desacoplado.
+//
+// Algoritmo: junta todas as fronteiras de profundidade conhecidas (bordas de cada
+// camada descrita + profundidade de cada leitura de VOC), ordena, e cria uma linha
+// pra cada intervalo entre duas fronteiras consecutivas — herdando tipo/observação da
+// camada descrita que contém aquele intervalo, e o valor de VOC da leitura que começa
+// exatamente ali (se houver). Registros antigos (sem voc_readings — leitura já vinha
+// dentro da própria camada) continuam funcionando: sem leituras separadas, devolve
+// `layers` sem alteração nenhuma.
+export function mergeLayersWithVocReadings(
+  layers: SoilLayer[],
+  vocReadings: VocReading[],
+  profundidadeTotal?: string | number
+): SoilLayer[] {
+  if (!vocReadings || vocReadings.length === 0) return layers;
+
+  const boundarySet = new Set<number>();
+  layers.forEach((l) => {
+    const de = parseFloat(l.de), ate = parseFloat(l.ate);
+    if (!isNaN(de)) boundarySet.add(de);
+    if (!isNaN(ate)) boundarySet.add(ate);
+  });
+  vocReadings.forEach((r) => {
+    const p = parseFloat(r.profundidade);
+    if (!isNaN(p)) boundarySet.add(p);
+  });
+  const total = parseFloat(String(profundidadeTotal));
+  if (!isNaN(total)) boundarySet.add(total);
+
+  const boundaries = [...boundarySet].sort((a, b) => a - b);
+  if (boundaries.length < 2) return layers;
+
+  const rows: SoilLayer[] = [];
+  for (let i = 0; i < boundaries.length - 1; i++) {
+    const de = boundaries[i], ate = boundaries[i + 1];
+    const mid = (de + ate) / 2;
+    const layer = layers.find((l) => {
+      const ld = parseFloat(l.de), la = parseFloat(l.ate);
+      return !isNaN(ld) && !isNaN(la) && mid >= ld && mid <= la;
+    });
+    const reading = vocReadings.find((r) => Math.abs(parseFloat(r.profundidade) - de) < 0.001);
+    rows.push({
+      de: String(de),
+      ate: String(ate),
+      tipo: layer?.tipo || "",
+      coloracao: layer?.coloracao || "",
+      leitura_voc: reading?.valor || "",
+    });
+  }
+  return rows;
+}
+
 export type SoilDescription = {
   nomenclatura_poco?: string;
   nome_sondagem?: string;

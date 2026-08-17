@@ -61,6 +61,7 @@ export default function SoloListPage() {
         cota: "",
         profundidade_total: "",
         layers: [],
+        voc_readings: [],
       })
       .select("id")
       .single();

@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
 import { buildRdoPdf } from "@/lib/pdf/rdo";
-import { buildSoilProfilePdf } from "@/lib/pdf/soil-profile";
+import { buildSoilProfilePdf, mergeLayersWithVocReadings } from "@/lib/pdf/soil-profile";
 import { buildWaterSamplingPdf } from "@/lib/pdf/water-sampling";
 import { mergePdfSources } from "@/lib/pdf/merge";
 import { downloadPdfBytes } from "@/lib/pdf/download";
@@ -132,7 +132,10 @@ export default function RdoViewPage() {
       for (const att of attachments) {
         if (att.tipo === "soil_description") {
           const { data: solo } = await supabase.from("soil_descriptions").select("*").eq("id", att.id).single();
-          if (solo) sources.push(await buildSoilProfilePdf({ data: solo, layers: solo.layers || [] }));
+          if (solo) {
+            const mergedLayers = mergeLayersWithVocReadings(solo.layers || [], solo.voc_readings || [], solo.profundidade_total);
+            sources.push(await buildSoilProfilePdf({ data: solo, layers: mergedLayers }));
+          }
         } else if (att.tipo === "water_sampling") {
           const { data: amostra } = await supabase.from("water_samplings").select("*").eq("id", att.id).single();
           if (amostra) sources.push(await buildWaterSamplingPdf({ amostra, projectName }));

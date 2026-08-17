@@ -18,9 +18,16 @@ const Icons = {
   Save: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
   Loader: () => <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
   Crosshair: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 22v-4M12 6V2M22 12h-4M6 12H2M12 12a4 4 0 100-8 4 4 0 000 8z" /></svg>,
+  Pulse: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12h4l2-7 4 14 2-7h6" /></svg>,
 };
 
-type Layer = { de: string; ate: string; tipo: string; leitura_voc: string; coloracao: string; };
+type Layer = { de: string; ate: string; tipo: string; coloracao: string; };
+
+// Leitura de PID/VOC lançada separadamente da camada — no campo, com liner, a
+// leitura é feita a cada intervalo fixo (ex.: 20cm) ANTES de abrir o liner e
+// saber o tipo de solo; a camada só é descrita depois. O PDF final continua
+// exatamente igual (ver mergeLayersWithVocReadings em lib/pdf/soil-profile.ts).
+type VocReading = { profundidade: string; valor: string };
 
 type FormData = {
   nome_sondagem: string; nomenclatura_poco: string; data: string; hora: string;
@@ -64,7 +71,8 @@ export default function SoloFormPage() {
   const [fetchingLocation, setFetchingLocation] = useState(false);
   const [finalized, setFinalized] = useState(false);
 
-  const [layers, setLayers] = useState<Layer[]>([{ de: "", ate: "", tipo: "", leitura_voc: "", coloracao: "" }]);
+  const [layers, setLayers] = useState<Layer[]>([{ de: "", ate: "", tipo: "", coloracao: "" }]);
+  const [vocReadings, setVocReadings] = useState<VocReading[]>([{ profundidade: "", valor: "" }]);
   const [form, setForm] = useState<FormData>(emptyForm);
 
   useEffect(() => { load(); }, []);
@@ -84,6 +92,7 @@ export default function SoloFormPage() {
         cota: data.cota ?? "", profundidade_total: data.profundidade_total ?? "",
       });
       if (data.layers?.length > 0) setLayers(data.layers);
+      if (data.voc_readings?.length > 0) setVocReadings(data.voc_readings);
     }
     setLoading(false);
   }
@@ -131,7 +140,7 @@ export default function SoloFormPage() {
   async function salvar() {
     setSaving(true);
     try {
-      await supabase.from("soil_descriptions").update({ ...form, layers }).eq("id", soloId);
+      await supabase.from("soil_descriptions").update({ ...form, layers, voc_readings: vocReadings }).eq("id", soloId);
       showToast("Rascunho salvo com sucesso!");
     } catch {
       showToast("Erro ao salvar.", "error");
@@ -144,7 +153,7 @@ export default function SoloFormPage() {
     if (!confirm("Concluir descrição de solo? Após isso não será possível editar.")) return;
     setSaving(true);
     try {
-      await supabase.from("soil_descriptions").update({ ...form, layers, finalized: true }).eq("id", soloId);
+      await supabase.from("soil_descriptions").update({ ...form, layers, voc_readings: vocReadings, finalized: true }).eq("id", soloId);
       showToast("Perfil concluído com sucesso!");
       router.push(`/mobile/projetos/${projectId}/solo`);
     } catch {
@@ -227,6 +236,34 @@ export default function SoloFormPage() {
             </div>
           </Section>
 
+          <Section title={`Leituras de PID/VOC (${vocReadings.length})`} icon={<Icons.Pulse />}>
+            <p className="text-xs text-gray-400 -mt-2">Lance aqui a cada intervalo de furo (ex.: 20cm), antes de abrir o liner — a camada é descrita depois, separadamente.</p>
+            <div className="space-y-3">
+              {vocReadings.map((reading, i) => (
+                <div key={i} className="relative bg-white border-2 border-gray-100 p-4 rounded-2xl shadow-sm">
+                  <div className="grid grid-cols-2 gap-3 items-end">
+                    <Input label="Profundidade (m)" type="number" value={reading.profundidade} onChange={(v: string) => { const c = [...vocReadings]; c[i].profundidade = v; setVocReadings(c); }} placeholder="0.00" disabled={finalized} />
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <Input label="Leitura VOC (ppm)" type="number" value={reading.valor} onChange={(v: string) => { const c = [...vocReadings]; c[i].valor = v; setVocReadings(c); }} placeholder="0.0" disabled={finalized} />
+                      </div>
+                      {!finalized && vocReadings.length > 1 && (
+                        <button onClick={() => setVocReadings((prev) => prev.filter((_, idx) => idx !== i))} className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white w-[46px] h-[46px] shrink-0 rounded-xl flex items-center justify-center transition-colors">
+                          <Icons.Trash />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {!finalized && (
+              <button onClick={() => setVocReadings((prev) => [...prev, { profundidade: "", valor: "" }])} className="w-full mt-2 bg-white hover:bg-gray-50 text-[#391e2a] py-3.5 rounded-xl border-2 border-gray-200 border-dashed text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                <Icons.Plus /> Adicionar Leitura
+              </button>
+            )}
+          </Section>
+
           <Section title={`Camadas Estratigráficas (${layers.length})`} icon={<Icons.LayersIcon />}>
             <div className="space-y-5">
               {layers.map((layer, i) => (
@@ -244,9 +281,8 @@ export default function SoloFormPage() {
                     <Input label="Até (m)" type="number" value={layer.ate} onChange={(v: string) => { const c = [...layers]; c[i].ate = v; setLayers(c); }} placeholder="0.00" disabled={finalized} />
                   </div>
                   <Select label="Classificação do Solo" value={layer.tipo} options={tiposSolo} onChange={(v: string) => { const c = [...layers]; c[i].tipo = v; setLayers(c); }} disabled={finalized} />
-                  <div className="grid grid-cols-2 gap-4 items-end bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+                  <div className="bg-gray-50/50 p-3 rounded-xl border border-gray-100">
                     <Input label="Observações" value={layer.coloracao} onChange={(v: string) => { const c = [...layers]; c[i].coloracao = v; setLayers(c); }} placeholder="Avermelhado/Úmido/Odor" disabled={finalized} />
-                    <Input label="Leitura VOC (ppm)" type="number" value={layer.leitura_voc} onChange={(v: string) => { const c = [...layers]; c[i].leitura_voc = v; setLayers(c); }} placeholder="0.0" disabled={finalized} />
                   </div>
                 </div>
               ))}

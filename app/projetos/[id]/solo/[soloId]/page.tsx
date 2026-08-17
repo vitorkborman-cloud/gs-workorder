@@ -5,14 +5,23 @@ import { useParams } from "next/navigation";
 import { supabase } from "../../../../../lib/supabase";
 import AdminShell from "../../../../../components/layout/AdminShell";
 import { Button } from "../../../../../components/ui/button";
-import { buildSoilProfilePdf } from "../../../../../lib/pdf/soil-profile";
+import { buildSoilProfilePdf, mergeLayersWithVocReadings } from "../../../../../lib/pdf/soil-profile";
 
 type Layer = {
   de: string;
   ate: string;
   tipo: string;
   coloracao?: string;
-  leitura_voc?: string;
+};
+
+// Leitura de PID/VOC lançada separadamente da camada — no campo, com liner, a
+// leitura é feita a cada intervalo fixo (ex.: 20cm) ANTES de abrir o liner e
+// saber o tipo de solo; a camada só é descrita depois. Ver
+// mergeLayersWithVocReadings (lib/pdf/soil-profile.ts) pra como isso vira o
+// PDF de sempre, sem nenhuma mudança visual nele.
+type VocReading = {
+  profundidade: string;
+  valor: string;
 };
 
 const tiposSolo = [
@@ -37,6 +46,7 @@ export default function SoloDetailPage() {
 
   const [data, setData] = useState<any>(null);
   const [layers, setLayers] = useState<Layer[]>([]);
+  const [vocReadings, setVocReadings] = useState<VocReading[]>([]);
   const [loading, setLoading] = useState(true);
 
   // === ESTADOS DO MODO EDIÇÃO ===
@@ -44,12 +54,14 @@ export default function SoloDetailPage() {
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [editLayers, setEditLayers] = useState<Layer[]>([]);
+  const [editVocReadings, setEditVocReadings] = useState<VocReading[]>([]);
 
   async function load() {
     const { data } = await supabase.from("soil_descriptions").select("*").eq("id", soloId).single();
     if (data) {
       setData(data);
       setLayers((data.layers as Layer[]) || []);
+      setVocReadings((data.voc_readings as VocReading[]) || []);
     }
     setLoading(false);
   }
@@ -61,7 +73,8 @@ export default function SoloDetailPage() {
   // === FUNÇÕES DE EDIÇÃO ===
   function startEditing() {
     setEditForm({ ...data });
-    setEditLayers(layers.length > 0 ? JSON.parse(JSON.stringify(layers)) : [{ de: "", ate: "", tipo: "", coloracao: "", leitura_voc: "" }]);
+    setEditLayers(layers.length > 0 ? JSON.parse(JSON.stringify(layers)) : [{ de: "", ate: "", tipo: "", coloracao: "" }]);
+    setEditVocReadings(vocReadings.length > 0 ? JSON.parse(JSON.stringify(vocReadings)) : [{ profundidade: "", valor: "" }]);
     setIsEditing(true);
   }
 
@@ -74,11 +87,11 @@ export default function SoloDetailPage() {
     try {
       const { error } = await supabase
         .from("soil_descriptions")
-        .update({ ...editForm, layers: editLayers })
+        .update({ ...editForm, layers: editLayers, voc_readings: editVocReadings })
         .eq("id", soloId);
-      
+
       if (error) throw error;
-      
+
       await load(); // Recarrega os dados novos do banco
       setIsEditing(false);
     } catch (error) {
@@ -100,11 +113,25 @@ export default function SoloDetailPage() {
   }
 
   function addLayer() {
-    setEditLayers([...editLayers, { de: "", ate: "", tipo: "", coloracao: "", leitura_voc: "" }]);
+    setEditLayers([...editLayers, { de: "", ate: "", tipo: "", coloracao: "" }]);
   }
 
   function removeLayer(index: number) {
     setEditLayers(editLayers.filter((_, i) => i !== index));
+  }
+
+  function handleVocReadingChange(index: number, field: keyof VocReading, value: string) {
+    const next = [...editVocReadings];
+    next[index] = { ...next[index], [field]: value };
+    setEditVocReadings(next);
+  }
+
+  function addVocReading() {
+    setEditVocReadings([...editVocReadings, { profundidade: "", valor: "" }]);
+  }
+
+  function removeVocReading(index: number) {
+    setEditVocReadings(editVocReadings.filter((_, i) => i !== index));
   }
 
   /* ================= CORES AUTOMÁTICAS E PDF ================= */
@@ -140,7 +167,8 @@ export default function SoloDetailPage() {
   async function gerarPDF() {
     if (!data) return;
     try {
-      const pdf = await buildSoilProfilePdf({ data, layers });
+      const mergedLayers = mergeLayersWithVocReadings(layers, vocReadings, data.profundidade_total);
+      const pdf = await buildSoilProfilePdf({ data, layers: mergedLayers });
       const nom   = data.nomenclatura_poco?.trim();
       const sond  = data.nome_sondagem?.trim();
       const ident = (nom && sond) ? `${nom}_${sond}` : nom || sond || "Sondagem";
@@ -241,6 +269,35 @@ export default function SoloDetailPage() {
                 </Section>
               </div>
 
+              <Section title="Leituras de PID/VOC">
+                <p className="text-xs text-gray-400 -mt-3 mb-3">Lançadas por profundidade, independente da descrição da camada (que costuma vir depois, ao abrir o liner).</p>
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-sm border-collapse text-left bg-white">
+                    <thead>
+                      <tr className="bg-[#391e2a]/5 border-b border-gray-200">
+                        <th className="p-3 font-bold text-[#391e2a] text-xs">Profundidade (m)</th>
+                        <th className="p-3 font-bold text-[#391e2a] text-xs">Leitura VOC (ppm)</th>
+                        <th className="p-3 font-bold text-[#391e2a] text-xs text-center">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {editVocReadings.map((reading, index) => (
+                        <tr key={index} className="hover:bg-gray-50/50">
+                          <td className="p-2"><input type="number" className="w-full border rounded-md p-2 text-sm focus:ring-1 focus:ring-[#80b02d]" value={reading.profundidade} onChange={(e) => handleVocReadingChange(index, "profundidade", e.target.value)} /></td>
+                          <td className="p-2"><input type="number" className="w-full border rounded-md p-2 text-sm focus:ring-1 focus:ring-[#80b02d]" value={reading.valor} onChange={(e) => handleVocReadingChange(index, "valor", e.target.value)} /></td>
+                          <td className="p-2 text-center">
+                            <button onClick={() => removeVocReading(index)} className="text-red-400 hover:text-red-600 font-bold p-2 bg-red-50 rounded-md">✕</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Button onClick={addVocReading} variant="outline" className="w-full mt-4 border-dashed border-2 text-[#391e2a] font-bold">
+                  + Adicionar Leitura
+                </Button>
+              </Section>
+
               <Section title="Planilha de Camadas Estratigráficas">
                 <div className="overflow-x-auto rounded-xl border border-gray-200">
                   <table className="w-full text-sm border-collapse text-left bg-white">
@@ -250,7 +307,6 @@ export default function SoloDetailPage() {
                         <th className="p-3 font-bold text-[#391e2a] text-xs">Até (m)</th>
                         <th className="p-3 font-bold text-[#391e2a] text-xs w-[30%]">Tipo de Solo</th>
                         <th className="p-3 font-bold text-[#391e2a] text-xs">Observações</th>
-                        <th className="p-3 font-bold text-[#391e2a] text-xs">VOC (ppm)</th>
                         <th className="p-3 font-bold text-[#391e2a] text-xs text-center">Ações</th>
                       </tr>
                     </thead>
@@ -266,7 +322,6 @@ export default function SoloDetailPage() {
                             </select>
                           </td>
                           <td className="p-2"><input type="text" className="w-full border rounded-md p-2 text-sm focus:ring-1 focus:ring-[#80b02d]" value={layer.coloracao || ""} onChange={(e) => handleLayerChange(index, "coloracao", e.target.value)} /></td>
-                          <td className="p-2"><input type="number" className="w-full border rounded-md p-2 text-sm focus:ring-1 focus:ring-[#80b02d]" value={layer.leitura_voc || ""} onChange={(e) => handleLayerChange(index, "leitura_voc", e.target.value)} /></td>
                           <td className="p-2 text-center">
                             <button onClick={() => removeLayer(index)} className="text-red-400 hover:text-red-600 font-bold p-2 bg-red-50 rounded-md">✕</button>
                           </td>
@@ -313,6 +368,29 @@ export default function SoloDetailPage() {
                 </Section>
               </div>
 
+              <Section title="Leituras de PID/VOC">
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-sm border-collapse text-left bg-white">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">Profundidade (m)</th>
+                        <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">Leitura VOC (ppm)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {vocReadings.length === 0 ? (
+                        <tr><td colSpan={2} className="p-4 text-gray-400 text-center">Nenhuma leitura registrada.</td></tr>
+                      ) : vocReadings.map((reading, index) => (
+                        <tr key={index} className="hover:bg-gray-50/50 transition">
+                          <td className="p-4 text-gray-700">{reading.profundidade}</td>
+                          <td className="p-4 text-[#80b02d] font-bold">{reading.valor || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Section>
+
               <Section title="Camadas Estratigráficas">
                 <div className="overflow-x-auto rounded-xl border border-gray-200">
                   <table className="w-full text-sm border-collapse text-left bg-white">
@@ -322,7 +400,6 @@ export default function SoloDetailPage() {
                         <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">Até (m)</th>
                         <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">Tipo de Solo</th>
                         <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">Observações</th>
-                        <th className="p-4 font-bold text-gray-600 uppercase text-xs tracking-wider">VOC (ppm)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -332,7 +409,6 @@ export default function SoloDetailPage() {
                           <td className="p-4 text-gray-700">{layer.ate}</td>
                           <td className="p-4 font-medium text-[#391e2a]">{layer.tipo}</td>
                           <td className="p-4 text-gray-600">{layer.coloracao || "-"}</td>
-                          <td className="p-4 text-[#80b02d] font-bold">{layer.leitura_voc || "-"}</td>
                         </tr>
                       ))}
                     </tbody>
