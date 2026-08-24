@@ -276,6 +276,52 @@ async function logRunAndCheckHealth(status: "ok" | "skipped" | "error", detail: 
   }
 }
 
+// ── Saúde POR DISPOSITIVO: alerta quando um equipamento específico fica sem
+// resposta, mesmo com o pipeline inteiro funcionando normalmente pros outros ──
+// Achado real: um dispositivo ficou ~4h travado (HTTP 429 da HI Tecnologia
+// específico daquele conector) sem nenhum alerta, porque o alerta de pipeline
+// só dispara quando TODOS os dispositivos falham. Usa duas colunas na própria
+// telemetry_devices (consecutive_failures/failure_alerted) em vez de uma
+// tabela de log separada — mais simples, e o estado já mora junto do
+// dispositivo que ele descreve.
+const DEVICE_FAILURE_THRESHOLD = 5; // ~10 min de falhas seguidas (mesma janela do pipeline)
+
+async function handleDeviceFailure(device: any, errorDetail: string, subs: any[]) {
+  const newCount = (device.consecutive_failures ?? 0) + 1;
+  const alreadyAlerted = device.failure_alerted === true;
+  // >= (não ===): se a manutenção suprimir o alerta bem no momento em que
+  // cruzaria o limite, a próxima falha ainda precisa conseguir alertar,
+  // mesmo que a contagem já tenha passado do limite exato.
+  const crossedThreshold = newCount >= DEVICE_FAILURE_THRESHOLD && !alreadyAlerted;
+  const shouldAlert = crossedThreshold && !isInMaintenanceWindow();
+
+  await fetch(`${SUPABASE_URL}/rest/v1/telemetry_devices?id=eq.${device.id}`, {
+    method: "PATCH",
+    headers: sbHeaders(),
+    body: JSON.stringify({
+      consecutive_failures: newCount,
+      failure_alerted: alreadyAlerted || shouldAlert,
+    }),
+  }).catch(() => {});
+
+  if (shouldAlert) {
+    await sendAlertPush(
+      subs,
+      `⚠️ ${device.name} sem resposta`,
+      `${DEVICE_FAILURE_THRESHOLD}+ verificações seguidas falharam (~${DEVICE_FAILURE_THRESHOLD * 2} min ou mais). Última causa: ${errorDetail}`
+    );
+  }
+}
+
+async function handleDeviceRecovery(device: any, subs: any[]) {
+  if (!device.failure_alerted) return; // não tinha alertado — nada pra normalizar
+  await sendAlertPush(
+    subs,
+    `✅ ${device.name} normalizado`,
+    "O dispositivo voltou a responder normalmente."
+  );
+}
+
 // ── Handler principal ──────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -318,8 +364,12 @@ Deno.serve(async (req: Request) => {
       });
       if (!connResp.ok) {
         results.push({ device: device.name, error: `HTTP ${connResp.status}` });
+        await handleDeviceFailure(device, `HTTP ${connResp.status}`, subs);
         continue;
       }
+
+      // Volta a responder depois de ter alertado por falha — avisa que normalizou.
+      await handleDeviceRecovery(device, subs);
 
       const conn = await connResp.json();
       const isConnected = conn.is_connected ?? false;
@@ -354,6 +404,8 @@ Deno.serve(async (req: Request) => {
             connector_status: conn.connector_status?.name,
             last_activity_at: lastActivity,
           },
+          consecutive_failures: 0,
+          failure_alerted: false,
         }),
       });
 
