@@ -302,7 +302,7 @@ function soloStyleSlice(tipo: string, w: number, groupH: number, offsetY: number
 
 /* ================= HTML DO PERFIL ================= */
 
-function buildProfileHTML(data: SoilDescription, layers: SoilLayer[], logoBase64: string, rowScale: number = 1): string {
+function buildProfileHTML(data: SoilDescription, layers: SoilLayer[], vocReadings: VocReading[] | undefined, logoBase64: string, rowScale: number = 1): string {
   const TILE = buildTiles();
 
   const ESCALA     = 42 * rowScale;                 // px por metro (encolhe p/ caber em 1 página)
@@ -496,15 +496,36 @@ function buildProfileHTML(data: SoilDescription, layers: SoilLayer[], logoBase64
   // Substitui o valor solto por um mini-gráfico (leitura x profundidade),
   // alinhado com as mesmas linhas do perfil geológico (usa o mesmo getY()),
   // posicionado entre a coluna do perfil e a de descrição.
-  const vocPoints = layers
-    .map(l => {
-      const v = parseFloat(String(l.leitura_voc));
-      if (isNaN(v) || v < 0) return null;
-      const de = parseFloat(String(l.de)), ate = parseFloat(String(l.ate));
-      const mid = isNaN(de) || isNaN(ate) ? de : (de + ate) / 2;
-      return { y: getY(mid), value: v };
-    })
-    .filter((p): p is { y: number; value: number } => p !== null);
+  //
+  // Quando há leituras lançadas separadamente (vocReadings), plota cada uma
+  // na sua profundidade real (getY(profundidade)) em vez de depender de
+  // leitura_voc por linha de camada. Isso é necessário porque a fusão em
+  // mergeLayersWithVocReadings só consegue anexar uma leitura a uma linha
+  // quando a profundidade dela é o INÍCIO de algum intervalo — a última
+  // leitura de uma sondagem (feita exatamente na profundidade total) nunca é
+  // início de intervalo nenhum, então sempre ficava de fora do gráfico.
+  // Registros antigos (sem vocReadings — leitura já vinha dentro da própria
+  // camada) continuam usando o ponto médio da camada, como sempre.
+  const vocPoints = vocReadings && vocReadings.length > 0
+    ? vocReadings
+        .map(r => {
+          const v = parseFloat(String(r.valor));
+          const d = parseFloat(String(r.profundidade));
+          if (isNaN(v) || v < 0 || isNaN(d)) return null;
+          return { d, y: getY(d), value: v };
+        })
+        .filter((p): p is { d: number; y: number; value: number } => p !== null)
+        .sort((a, b) => a.d - b.d)
+        .map(({ y, value }) => ({ y, value }))
+    : layers
+        .map(l => {
+          const v = parseFloat(String(l.leitura_voc));
+          if (isNaN(v) || v < 0) return null;
+          const de = parseFloat(String(l.de)), ate = parseFloat(String(l.ate));
+          const mid = isNaN(de) || isNaN(ate) ? de : (de + ate) / 2;
+          return { y: getY(mid), value: v };
+        })
+        .filter((p): p is { y: number; value: number } => p !== null);
 
   let vocHTML = "";
   if (vocPoints.length > 0) {
@@ -541,12 +562,16 @@ function buildProfileHTML(data: SoilDescription, layers: SoilLayer[], logoBase64
     pts.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
     ctx.stroke();
 
-    // Marcador + valor numérico ao lado de cada ponto.
+    // Marcador + valor numérico ao lado de cada ponto. O rótulo sobe um pouco
+    // em relação ao ponto (que fica exatamente na profundidade real da
+    // leitura) porque muitas leituras caem bem em cima da linha de fronteira
+    // de uma camada — sem esse deslocamento, o número ficava colado/cortado
+    // na própria linha da grade.
     ctx.font = "8px Arial"; ctx.textBaseline = "middle"; ctx.fillStyle = color;
     pts.forEach(p => {
       ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2); ctx.fill();
       const label = Number.isInteger(p.value) ? String(p.value) : p.value.toFixed(1);
-      ctx.fillText(label, Math.min(C_VOC - 2, p.x + 5), p.y);
+      ctx.fillText(label, Math.min(C_VOC - 2, p.x + 5), p.y - 4);
     });
 
     vocHTML = `<img src="${c.toDataURL("image/png")}" style="width:100%;height:100%;display:block;" />`;
@@ -891,8 +916,8 @@ async function renderProfileToCanvas(html: string) {
   return { canvas, contentH, ptblBodyH, safeBreaksPx };
 }
 
-export async function buildSoilProfilePdf(input: { data: SoilDescription; layers: SoilLayer[] }): Promise<jsPDF> {
-  const { data, layers } = input;
+export async function buildSoilProfilePdf(input: { data: SoilDescription; layers: SoilLayer[]; vocReadings?: VocReading[] }): Promise<jsPDF> {
+  const { data, layers, vocReadings } = input;
 
   // 1. Busca a logo como base64 para embutir no HTML
   let logoB64 = "";
@@ -907,7 +932,7 @@ export async function buildSoilProfilePdf(input: { data: SoilDescription; layers
   const maxContentPx = (pageH / pageW) * 794 - 4;
 
   // 2. Gera o HTML e renderiza com a escala normal
-  let html   = buildProfileHTML(data, layers, logoB64);
+  let html   = buildProfileHTML(data, layers, vocReadings, logoB64);
   let render = await renderProfileToCanvas(html);
 
   // 3. Se não couber numa página só, recalcula a escala das camadas para encolher e caber tudo
@@ -915,7 +940,7 @@ export async function buildSoilProfilePdf(input: { data: SoilDescription; layers
     const fixedH  = render.contentH - render.ptblBodyH;
     const targetH = Math.max(40, maxContentPx - fixedH);
     const factor  = Math.min(1, Math.max(0.15, targetH / render.ptblBodyH));
-    html   = buildProfileHTML(data, layers, logoB64, factor);
+    html   = buildProfileHTML(data, layers, vocReadings, logoB64, factor);
     render = await renderProfileToCanvas(html);
   }
 

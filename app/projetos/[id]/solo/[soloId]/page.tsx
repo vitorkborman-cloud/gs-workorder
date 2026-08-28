@@ -168,7 +168,7 @@ export default function SoloDetailPage() {
     if (!data) return;
     try {
       const mergedLayers = mergeLayersWithVocReadings(layers, vocReadings, data.profundidade_total);
-      const pdf = await buildSoilProfilePdf({ data, layers: mergedLayers });
+      const pdf = await buildSoilProfilePdf({ data, layers: mergedLayers, vocReadings });
       const nom   = data.nomenclatura_poco?.trim();
       const sond  = data.nome_sondagem?.trim();
       const ident = (nom && sond) ? `${nom}_${sond}` : nom || sond || "Sondagem";

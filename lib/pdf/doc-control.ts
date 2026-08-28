@@ -10,7 +10,7 @@ export const DOC_CONTROL = {
   rdo:             { sheq: "151", versao: 2 },
   fichaAmostragem: { sheq: "152", versao: 0 },
   excelAmostragem: { sheq: "153", versao: 0 },
-  fichaSolo:       { sheq: "154", versao: 0 },
+  fichaSolo:       { sheq: "154", versao: 1 },
 } as const satisfies Record<string, DocControl>;
 
 export function formatDocControl(doc: DocControl): string {

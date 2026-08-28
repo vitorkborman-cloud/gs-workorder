@@ -22,7 +22,7 @@ não sobe a cada atualização de conteúdo.
 | RDO (Relatório Diário de Obra)    | 151     | V 02          | `lib/pdf/rdo.ts` |
 | Ficha de Amostragem (PDF)         | 152     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarPDFGeral`) |
 | Excel de Amostragem               | 153     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarExcelGeral`) |
-| Ficha Descritiva de Solo          | 154     | V 00          | `lib/pdf/soil-profile.ts` |
+| Ficha Descritiva de Solo          | 154     | V 01          | `lib/pdf/soil-profile.ts` |
 
 (Work Orders mantém a numeração anterior, SHEQ n° 001 — fora do escopo desta
 atualização.)
@@ -55,3 +55,24 @@ conteúdo/dados, só de layout do cabeçalho.
 ### 2026-08-05 — RDO: renomeia coluna "Empresa Parceira" para "Empresa" (V01 → V02)
 Cabeçalho da tabela "Mão de Obra e Efetivo" — só o rótulo da coluna mudou,
 sem alteração de dados/cálculo.
+
+### 2026-08-28 — Ficha Descritiva de Solo: corrige leitura ausente e rótulos colados na margem do gráfico de PID/VOC (V00 → V01)
+Duas correções no gráfico de leitura de PID/VOC do perfil:
+
+1. Desde a separação do lançamento de leituras de PID/VOC da descrição de
+   camada (`mergeLayersWithVocReadings`), o gráfico só conseguia plotar uma
+   leitura quando sua profundidade coincidia com o INÍCIO de algum intervalo
+   entre camadas. A última leitura de uma sondagem (feita exatamente na
+   profundidade total) nunca é início de intervalo nenhum, então sempre
+   ficava de fora do gráfico, mesmo aparecendo corretamente na lista de
+   leituras da tela de lançamento. O gráfico agora plota cada leitura na sua
+   profundidade real (quando lançada no fluxo novo, separado por leitura) em
+   vez de depender do ponto médio da camada mesclada.
+2. O rótulo numérico ao lado de cada ponto ficava colado/cortado na linha de
+   fronteira da camada sempre que a leitura caía bem naquela profundidade
+   (comum, já que as leituras são feitas em profundidades fixas). O texto
+   agora sobe um pouco em relação ao marcador, sem alterar a posição real do
+   ponto.
+
+Registros antigos (sem leituras separadas) continuam exatamente como antes
+em ambos os casos.

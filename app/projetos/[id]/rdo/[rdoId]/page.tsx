@@ -134,7 +134,7 @@ export default function RdoViewPage() {
           const { data: solo } = await supabase.from("soil_descriptions").select("*").eq("id", att.id).single();
           if (solo) {
             const mergedLayers = mergeLayersWithVocReadings(solo.layers || [], solo.voc_readings || [], solo.profundidade_total);
-            sources.push(await buildSoilProfilePdf({ data: solo, layers: mergedLayers }));
+            sources.push(await buildSoilProfilePdf({ data: solo, layers: mergedLayers, vocReadings: solo.voc_readings || [] }));
           }
         } else if (att.tipo === "water_sampling") {
           const { data: amostra } = await supabase.from("water_samplings").select("*").eq("id", att.id).single();
