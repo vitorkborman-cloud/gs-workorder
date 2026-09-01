@@ -6,6 +6,7 @@ import { supabase } from "../../../../../lib/supabase";
 import AdminShell from "../../../../../components/layout/AdminShell";
 import { Button } from "../../../../../components/ui/button";
 import { buildSoilProfilePdf, mergeLayersWithVocReadings } from "../../../../../lib/pdf/soil-profile";
+import { CoordinatePickerModal } from "../../../../../components/geo/CoordinatePickerModal";
 
 type Layer = {
   de: string;
@@ -55,6 +56,7 @@ export default function SoloDetailPage() {
   const [editForm, setEditForm] = useState<any>({});
   const [editLayers, setEditLayers] = useState<Layer[]>([]);
   const [editVocReadings, setEditVocReadings] = useState<VocReading[]>([]);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
 
   async function load() {
     const { data } = await supabase.from("soil_descriptions").select("*").eq("id", soloId).single();
@@ -257,6 +259,15 @@ export default function SoloDetailPage() {
 
                 <Section title="Geolocalização">
                   <div className="space-y-4">
+                    <button
+                      type="button"
+                      onClick={() => setMapPickerOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 bg-[#80b02d]/10 text-[#5c8020] hover:bg-[#80b02d]/20 py-2.5 rounded-lg border border-[#80b02d]/30 text-sm font-bold transition"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      Selecionar no mapa (satélite)
+                    </button>
+                    <p className="text-[11px] text-gray-400 -mt-2">Mais preciso que o GPS do celular — clique no ponto exato do poço direto na imagem de satélite.</p>
                     <div className="grid grid-cols-2 gap-3">
                       <EditInput label="UTM Este (X)" value={editForm.coord_x} onChange={(v) => handleFieldChange("coord_x", v)} />
                       <EditInput label="UTM Norte (Y)" value={editForm.coord_y} onChange={(v) => handleFieldChange("coord_y", v)} />
@@ -267,6 +278,17 @@ export default function SoloDetailPage() {
                     </div>
                   </div>
                 </Section>
+
+                <CoordinatePickerModal
+                  open={mapPickerOpen}
+                  onOpenChange={setMapPickerOpen}
+                  initial={{ coordX: editForm.coord_x, coordY: editForm.coord_y, utmZona: editForm.utm_zona }}
+                  onConfirm={({ coordX, coordY, utmZona }) => {
+                    handleFieldChange("coord_x", coordX);
+                    handleFieldChange("coord_y", coordY);
+                    handleFieldChange("utm_zona", utmZona);
+                  }}
+                />
               </div>
 
               <Section title="Leituras de PID/VOC">
