@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../../../../lib/supabase";
 import MobileShell from "../../../../../../components/layout/MobileShell";
 import { useToast } from "../../../../../../components/Toast";
-import proj4 from "proj4";
 import { CoordinatePickerModal } from "../../../../../../components/geo/CoordinatePickerModal";
 
 const Icons = {
@@ -69,7 +68,6 @@ export default function SoloFormPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [fetchingLocation, setFetchingLocation] = useState(false);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [finalized, setFinalized] = useState(false);
 
@@ -103,41 +101,6 @@ export default function SoloFormPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function obterLocalizacaoAutomatica() {
-    if (!navigator.geolocation) { showToast("Geolocalização não suportada.", "error"); return; }
-    setFetchingLocation(true);
-    let watchId: number;
-    let bestPosition: GeolocationPosition | null = null;
-    watchId = navigator.geolocation.watchPosition(
-      (pos) => { if (!bestPosition || pos.coords.accuracy < bestPosition.coords.accuracy) bestPosition = pos; },
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-    );
-    setTimeout(() => {
-      navigator.geolocation.clearWatch(watchId);
-      if (bestPosition) {
-        const lat = bestPosition.coords.latitude;
-        const lon = bestPosition.coords.longitude;
-        const altitude = bestPosition.coords.altitude;
-        const precisao = bestPosition.coords.accuracy;
-        if (precisao > 20) showToast(`GPS com margem de ${precisao.toFixed(0)}m. Vá para local aberto.`, "info");
-        const zoneNum = Math.floor((lon + 180) / 6) + 1;
-        const isSouth = lat < 0;
-        const [easting, northing] = proj4(
-          "+proj=longlat +datum=WGS84 +no_defs",
-          `+proj=utm +zone=${zoneNum} ${isSouth ? "+south" : ""} +datum=WGS84 +units=m +no_defs`,
-          [lon, lat]
-        );
-        setForm((prev) => ({
-          ...prev, coord_x: easting.toFixed(2), coord_y: northing.toFixed(2),
-          utm_zona: `${zoneNum}${isSouth ? "S" : "N"}`, cota: altitude ? altitude.toFixed(2) : "",
-        }));
-      } else {
-        showToast("Não foi possível capturar o GPS.", "error");
-      }
-      setFetchingLocation(false);
-    }, 8000);
-  }
 
   async function salvar() {
     setSaving(true);
@@ -234,14 +197,7 @@ export default function SoloFormPage() {
                   >
                     <Icons.MapPin /> Selecionar no mapa (satélite)
                   </button>
-                  <p className="text-[11px] text-gray-400 px-1">Mais preciso que o GPS pra poços próximos entre si — toque no ponto exato sobre a imagem de satélite.</p>
-                  <button
-                    onClick={obterLocalizacaoAutomatica}
-                    disabled={fetchingLocation}
-                    className="w-full bg-[#80b02d]/10 text-[#6a9425] hover:bg-[#80b02d]/20 py-3 rounded-xl border border-[#80b02d]/30 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition disabled:opacity-50"
-                  >
-                    {fetchingLocation ? <><Icons.Loader /> Triangulando satélites (8s)...</> : <><Icons.Crosshair /> Capturar por GPS (UTM + Cota)</>}
-                  </button>
+                  <p className="text-[11px] text-gray-400 px-1">Toque no ponto exato do poço sobre a imagem de satélite — não use o GPS do celular, que pode errar 2-3m e inverter poços próximos entre si.</p>
                 </div>
               )}
             </div>
