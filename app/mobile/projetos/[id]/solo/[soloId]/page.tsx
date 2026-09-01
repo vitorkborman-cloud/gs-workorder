@@ -6,6 +6,7 @@ import { supabase } from "../../../../../../lib/supabase";
 import MobileShell from "../../../../../../components/layout/MobileShell";
 import { useToast } from "../../../../../../components/Toast";
 import proj4 from "proj4";
+import { CoordinatePickerModal } from "../../../../../../components/geo/CoordinatePickerModal";
 
 const Icons = {
   Clipboard: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
@@ -69,6 +70,7 @@ export default function SoloFormPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(false);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [finalized, setFinalized] = useState(false);
 
   const [layers, setLayers] = useState<Layer[]>([{ de: "", ate: "", tipo: "", coloracao: "" }]);
@@ -225,15 +227,35 @@ export default function SoloFormPage() {
                 <Input label="Cota / Alt. (m)" value={form.cota} type="number" onChange={(v: string) => setField("cota", v)} placeholder="Ex: 750.50" disabled={finalized} />
               </div>
               {!finalized && (
-                <button
-                  onClick={obterLocalizacaoAutomatica}
-                  disabled={fetchingLocation}
-                  className="w-full bg-[#80b02d]/10 text-[#6a9425] hover:bg-[#80b02d]/20 py-3 rounded-xl border border-[#80b02d]/30 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition disabled:opacity-50"
-                >
-                  {fetchingLocation ? <><Icons.Loader /> Triangulando satélites (8s)...</> : <><Icons.Crosshair /> Capturar Localização (UTM + Cota)</>}
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setMapPickerOpen(true)}
+                    className="w-full bg-[#391e2a]/5 text-[#391e2a] hover:bg-[#391e2a]/10 py-3 rounded-xl border border-[#391e2a]/20 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                  >
+                    <Icons.MapPin /> Selecionar no mapa (satélite)
+                  </button>
+                  <p className="text-[11px] text-gray-400 px-1">Mais preciso que o GPS pra poços próximos entre si — toque no ponto exato sobre a imagem de satélite.</p>
+                  <button
+                    onClick={obterLocalizacaoAutomatica}
+                    disabled={fetchingLocation}
+                    className="w-full bg-[#80b02d]/10 text-[#6a9425] hover:bg-[#80b02d]/20 py-3 rounded-xl border border-[#80b02d]/30 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition disabled:opacity-50"
+                  >
+                    {fetchingLocation ? <><Icons.Loader /> Triangulando satélites (8s)...</> : <><Icons.Crosshair /> Capturar por GPS (UTM + Cota)</>}
+                  </button>
+                </div>
               )}
             </div>
+
+            <CoordinatePickerModal
+              open={mapPickerOpen}
+              onOpenChange={setMapPickerOpen}
+              initial={{ coordX: form.coord_x, coordY: form.coord_y, utmZona: form.utm_zona }}
+              onConfirm={({ coordX, coordY, utmZona }) => {
+                setField("coord_x", coordX);
+                setField("coord_y", coordY);
+                setField("utm_zona", utmZona);
+              }}
+            />
           </Section>
 
           <Section title={`Leituras de PID/VOC (${vocReadings.length})`} icon={<Icons.Pulse />}>
