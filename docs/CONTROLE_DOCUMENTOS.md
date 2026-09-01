@@ -23,6 +23,7 @@ não sobe a cada atualização de conteúdo.
 | Ficha de Amostragem (PDF)         | 152     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarPDFGeral`) |
 | Excel de Amostragem               | 153     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarExcelGeral`) |
 | Ficha Descritiva de Solo          | 154     | V 01          | `lib/pdf/soil-profile.ts` |
+| Mapa Geral do Site                | 155     | V 00          | `lib/pdf/mapa-geral.ts` |
 
 (Work Orders mantém a numeração anterior, SHEQ n° 001 — fora do escopo desta
 atualização.)
@@ -76,3 +77,14 @@ Duas correções no gráfico de leitura de PID/VOC do perfil:
 
 Registros antigos (sem leituras separadas) continuam exatamente como antes
 em ambos os casos.
+
+### 2026-09-01 — Mapa Geral do Site: novo documento (V00)
+Primeira versão (Fase 1 do desafio de mapas/plumas/seções): mostra todos os
+poços de um projeto (a partir dos Perfis Descritivos) posicionados sobre
+imagem de satélite gratuita, com legenda, seta norte, escala e o mesmo
+cabeçalho de marca dos demais documentos. Poços sem coordenada válida (não
+preenchida, ou com latitude/longitude gravada por engano no campo de UTM —
+resquício do fluxo antigo de captura por GPS) não são plotados; ficam
+listados como pendência na própria tela, com atalho pra corrigir usando o
+seletor de mapa. Ainda não inclui plumas de contaminação (Fase 2) nem
+seções de solo (fora de escopo por ora).

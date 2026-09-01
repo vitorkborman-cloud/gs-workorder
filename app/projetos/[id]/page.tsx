@@ -387,16 +387,29 @@ export default function ProjetoPage() {
             title="Perfis Descritivos"
             subtitle="Perfis estratigráficos de sondagem"
             count={perfis.length}
-            action={perfis.length > 0 && (
-              <SelectionToolbar
-                active={selectModePerfil}
-                count={selectedPerfis.size}
-                downloading={downloadingPerfis}
-                onToggle={() => setSelectModePerfil(true)}
-                onDownload={baixarPerfisSelecionados}
-                onCancel={() => { setSelectModePerfil(false); setSelectedPerfis(new Set()); }}
-              />
-            )}
+            action={
+              <div className="flex items-center gap-2">
+                {perfis.length > 0 && (
+                  <SelectionToolbar
+                    active={selectModePerfil}
+                    count={selectedPerfis.size}
+                    downloading={downloadingPerfis}
+                    onToggle={() => setSelectModePerfil(true)}
+                    onDownload={baixarPerfisSelecionados}
+                    onCancel={() => { setSelectModePerfil(false); setSelectedPerfis(new Set()); }}
+                  />
+                )}
+                {!selectModePerfil && (
+                  <button
+                    onClick={() => router.push(`/projetos/${projectId}/mapa`)}
+                    className="flex items-center gap-2 bg-[#391e2a] hover:bg-[#2a161f] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                    Mapa Geral
+                  </button>
+                )}
+              </div>
+            }
           />
           {perfis.length === 0 ? <EmptyState message="Nenhum perfil gerado." /> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
