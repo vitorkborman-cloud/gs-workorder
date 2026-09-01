@@ -23,6 +23,7 @@ import { Button } from "../ui/button";
 const DEFAULT_CENTER: [number, number] = [-15.78, -47.93]; // Brasil (Brasília), fallback sem coordenada prévia
 const DEFAULT_ZOOM = 4;
 const PICKED_ZOOM = 19;
+const GPS_CENTER_ZOOM = 18; // perto o suficiente pra já mostrar o entorno, mas sem assumir que o GPS acertou o ponto exato
 
 function forwardToUtm(lat: number, lon: number) {
   const zoneNum = Math.floor((lon + 180) / 6) + 1;
@@ -74,6 +75,7 @@ export function CoordinatePickerModal({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     if (!open || !mapEl || mapInstanceRef.current) return;
@@ -123,7 +125,24 @@ export function CoordinatePickerModal({
         setUtmPreview(forwardToUtm(lat, lon));
       }
 
-      if (initialLatLng) placeMarker(initialLatLng[0], initialLatLng[1]);
+      if (initialLatLng) {
+        placeMarker(initialLatLng[0], initialLatLng[1]);
+      } else if (navigator.geolocation) {
+        // Sem coordenada salva ainda: centraliza no GPS aproximado do
+        // dispositivo só pra abrir a área certa (evita começar do zero,
+        // navegando o Brasil inteiro) — o ponto final continua sendo o
+        // clique manual sobre a imagem de satélite, não o GPS.
+        setLocating(true);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (cancelled) return;
+            map.setView([pos.coords.latitude, pos.coords.longitude], GPS_CENTER_ZOOM);
+            setLocating(false);
+          },
+          () => { if (!cancelled) setLocating(false); },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+        );
+      }
 
       map.on("click", (e: any) => placeMarker(e.latlng.lat, e.latlng.lng));
     })();
@@ -145,6 +164,7 @@ export function CoordinatePickerModal({
       setUtmPreview(null);
       setSearchQuery("");
       setSearchResults([]);
+      setLocating(false);
     }
   }, [open]);
 
@@ -220,7 +240,15 @@ export function CoordinatePickerModal({
             </div>
           )}
 
-          <div ref={setMapEl} className="w-full h-[420px] rounded-xl border border-gray-200 z-0" />
+          <div className="relative">
+            <div ref={setMapEl} className="w-full h-[420px] rounded-xl border border-gray-200 z-0" />
+            {locating && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 text-[#391e2a] text-xs font-bold px-3 py-1.5 rounded-full shadow-md border border-gray-200 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                Localizando você...
+              </div>
+            )}
+          </div>
 
           <div className="mt-2 text-sm text-gray-500">
             {utmPreview ? (
