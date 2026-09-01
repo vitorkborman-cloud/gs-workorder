@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import type { jsPDF } from "jspdf";
 import { supabase } from "../../../lib/supabase";
 import AdminShell from "../../../components/layout/AdminShell";
 import { isMobileDevice } from "../../../lib/isMobile";
 import { RdoStatusBadge } from "../../../components/rdo/RdoStatusBadge";
+import { SelectionToolbar } from "../../../components/pdf/SelectionToolbar";
+import type { PdfAttachment } from "../../../components/rdo/RdoAttachmentsPicker";
+import { buildRdoPdf } from "../../../lib/pdf/rdo";
+import { buildSoilProfilePdf, mergeLayersWithVocReadings } from "../../../lib/pdf/soil-profile";
+import { buildWaterSamplingPdf } from "../../../lib/pdf/water-sampling";
+import { mergePdfSources } from "../../../lib/pdf/merge";
+import { downloadPdfBytes } from "../../../lib/pdf/download";
 
 type WorkOrder = { id: string; title: string; finalized: boolean; created_at: string; };
 type Perfil = { id: string; nome_sondagem: string; nomenclatura_poco: string; created_at: string; };
@@ -80,6 +88,20 @@ export default function ProjetoPage() {
   const [loading, setLoading] = useState(true);
   const [mobile, setMobile] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // ── Seleção múltipla (baixar vários RDOs/Perfis de uma vez, mesclados num único PDF) ──
+  const [selectModeRdo, setSelectModeRdo] = useState(false);
+  const [selectedRdos, setSelectedRdos] = useState<Set<string>>(new Set());
+  const [downloadingRdos, setDownloadingRdos] = useState(false);
+  const [selectModePerfil, setSelectModePerfil] = useState(false);
+  const [selectedPerfis, setSelectedPerfis] = useState<Set<string>>(new Set());
+  const [downloadingPerfis, setDownloadingPerfis] = useState(false);
+
+  function toggleInSet(set: Set<string>, id: string, setter: (s: Set<string>) => void) {
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setter(next);
+  }
 
   useEffect(() => {
     setMobile(isMobileDevice());
@@ -187,6 +209,75 @@ export default function ProjetoPage() {
     load();
   }
 
+  // Baixa os Perfis Descritivos selecionados como um único PDF mesclado —
+  // mesma lógica de geração da página de detalhe (buildSoilProfilePdf), só
+  // que em lote, sem precisar abrir cada registro.
+  async function baixarPerfisSelecionados() {
+    if (selectedPerfis.size === 0) return;
+    setDownloadingPerfis(true);
+    try {
+      const orderedIds = perfis.filter((p) => selectedPerfis.has(p.id)).map((p) => p.id);
+      const sources: jsPDF[] = [];
+      for (const id of orderedIds) {
+        const { data: solo } = await supabase.from("soil_descriptions").select("*").eq("id", id).single();
+        if (!solo) continue;
+        const mergedLayers = mergeLayersWithVocReadings(solo.layers || [], solo.voc_readings || [], solo.profundidade_total);
+        sources.push(await buildSoilProfilePdf({ data: solo, layers: mergedLayers, vocReadings: solo.voc_readings || [] }));
+      }
+      const mergedBytes = await mergePdfSources(sources);
+      downloadPdfBytes(mergedBytes, `Perfis_Descritivos_${orderedIds.length}.pdf`);
+    } catch (err) {
+      alert("Erro ao gerar os PDFs. Verifique o console.");
+      console.error(err);
+    } finally {
+      setDownloadingPerfis(false);
+      setSelectModePerfil(false);
+      setSelectedPerfis(new Set());
+    }
+  }
+
+  // Baixa os RDOs selecionados como um único PDF mesclado — cada RDO junto
+  // com seus anexos de perfil de solo/físico-químico, na mesma ordem da
+  // geração individual (gerarPDF em app/projetos/[id]/rdo/[rdoId]/page.tsx).
+  async function baixarRdosSelecionados() {
+    if (selectedRdos.size === 0) return;
+    setDownloadingRdos(true);
+    try {
+      const { data: proj } = await supabase.from("projects").select("name").eq("id", projectId).single();
+      const projectName = proj?.name || "";
+      const orderedIds = rdos.filter((r) => selectedRdos.has(r.id)).map((r) => r.id);
+      const sources: (jsPDF | Uint8Array)[] = [];
+      for (const id of orderedIds) {
+        const { data: rdo } = await supabase.from("rdo_reports").select("*").eq("id", id).single();
+        if (!rdo) continue;
+        sources.push(await buildRdoPdf({ rdo, projectName }));
+
+        const attachments: PdfAttachment[] = rdo.pdf_attachments || [];
+        for (const att of attachments) {
+          if (att.tipo === "soil_description") {
+            const { data: solo } = await supabase.from("soil_descriptions").select("*").eq("id", att.id).single();
+            if (solo) {
+              const mergedLayers = mergeLayersWithVocReadings(solo.layers || [], solo.voc_readings || [], solo.profundidade_total);
+              sources.push(await buildSoilProfilePdf({ data: solo, layers: mergedLayers, vocReadings: solo.voc_readings || [] }));
+            }
+          } else if (att.tipo === "water_sampling") {
+            const { data: amostra } = await supabase.from("water_samplings").select("*").eq("id", att.id).single();
+            if (amostra) sources.push(await buildWaterSamplingPdf({ amostra, projectName }));
+          }
+        }
+      }
+      const mergedBytes = await mergePdfSources(sources);
+      downloadPdfBytes(mergedBytes, `RDOs_${projectName}_${orderedIds.length}.pdf`);
+    } catch (err) {
+      alert("Erro ao gerar os PDFs. Verifique o console.");
+      console.error(err);
+    } finally {
+      setDownloadingRdos(false);
+      setSelectModeRdo(false);
+      setSelectedRdos(new Set());
+    }
+  }
+
   async function deletePerfil(id: string, nome: string) {
     if (!confirm(`Excluir o perfil "${nome}"?`)) return;
     await supabase.from("soil_descriptions").delete().eq("id", id);
@@ -292,15 +383,44 @@ export default function ProjetoPage() {
 
         {/* ── PERFIS DESCRITIVOS ── */}
         <section>
-          <SectionHeader title="Perfis Descritivos" subtitle="Perfis estratigráficos de sondagem" count={perfis.length} />
+          <SectionHeader
+            title="Perfis Descritivos"
+            subtitle="Perfis estratigráficos de sondagem"
+            count={perfis.length}
+            action={perfis.length > 0 && (
+              <SelectionToolbar
+                active={selectModePerfil}
+                count={selectedPerfis.size}
+                downloading={downloadingPerfis}
+                onToggle={() => setSelectModePerfil(true)}
+                onDownload={baixarPerfisSelecionados}
+                onCancel={() => { setSelectModePerfil(false); setSelectedPerfis(new Set()); }}
+              />
+            )}
+          />
           {perfis.length === 0 ? <EmptyState message="Nenhum perfil gerado." /> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {perfis.map((p) => (
+              {perfis.map((p) => {
+                const selected = selectedPerfis.has(p.id);
+                return (
                 <div key={p.id} className="relative group">
-                  <DeleteBtn onClick={(e) => { e.stopPropagation(); deletePerfil(p.id, p.nome_sondagem || p.nomenclatura_poco); }} />
+                  {!selectModePerfil && <DeleteBtn onClick={(e) => { e.stopPropagation(); deletePerfil(p.id, p.nome_sondagem || p.nomenclatura_poco); }} />}
+                  {selectModePerfil && (
+                    <label
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute -top-2 -left-2 z-10 w-7 h-7 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleInSet(selectedPerfis, p.id, setSelectedPerfis)}
+                        className="w-4 h-4 accent-[#80b02d]"
+                      />
+                    </label>
+                  )}
                   <button
-                    onClick={() => router.push(`/projetos/${projectId}/solo/${p.id}`)}
-                    className="w-full text-left bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                    onClick={() => selectModePerfil ? toggleInSet(selectedPerfis, p.id, setSelectedPerfis) : router.push(`/projetos/${projectId}/solo/${p.id}`)}
+                    className={`w-full text-left bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${selected ? "border-[#80b02d] ring-2 ring-[#80b02d]/30" : "border-gray-100"}`}
                   >
                     <div className="w-9 h-9 rounded-xl bg-[#391e2a]/10 flex items-center justify-center text-[#391e2a] mb-3">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
@@ -311,7 +431,8 @@ export default function ProjetoPage() {
                     <p className="text-xs text-gray-400 mt-1">{new Date(p.created_at).toLocaleDateString("pt-BR")}</p>
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -451,25 +572,53 @@ export default function ProjetoPage() {
             subtitle="Programados, em preenchimento e finalizados"
             count={rdos.length}
             action={!mobile && (
-              <button
-                onClick={() => router.push(`/projetos/${projectId}/rdo/programar`)}
-                className="flex items-center gap-2 bg-[#80b02d] hover:bg-[#6c9526] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all hover:-translate-y-0.5"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                Programar RDO
-              </button>
+              <div className="flex items-center gap-2">
+                {rdos.length > 0 && (
+                  <SelectionToolbar
+                    active={selectModeRdo}
+                    count={selectedRdos.size}
+                    downloading={downloadingRdos}
+                    onToggle={() => setSelectModeRdo(true)}
+                    onDownload={baixarRdosSelecionados}
+                    onCancel={() => { setSelectModeRdo(false); setSelectedRdos(new Set()); }}
+                  />
+                )}
+                {!selectModeRdo && (
+                  <button
+                    onClick={() => router.push(`/projetos/${projectId}/rdo/programar`)}
+                    className="flex items-center gap-2 bg-[#80b02d] hover:bg-[#6c9526] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all hover:-translate-y-0.5"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                    Programar RDO
+                  </button>
+                )}
+              </div>
             )}
           />
           {rdos.length === 0 ? <EmptyState message="Nenhum RDO criado ainda." /> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {rdos.map((r) => {
                 const status = r.status || (r.draft ? "rascunho" : "finalizado");
+                const selected = selectedRdos.has(r.id);
                 return (
                   <div key={r.id} className="relative group">
-                    {!mobile && <DeleteBtn onClick={(e) => { e.stopPropagation(); deleteRDO(r.id, r.data || "Sem data"); }} />}
+                    {!mobile && !selectModeRdo && <DeleteBtn onClick={(e) => { e.stopPropagation(); deleteRDO(r.id, r.data || "Sem data"); }} />}
+                    {selectModeRdo && (
+                      <label
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute -top-2 -left-2 z-10 w-7 h-7 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleInSet(selectedRdos, r.id, setSelectedRdos)}
+                          className="w-4 h-4 accent-[#80b02d]"
+                        />
+                      </label>
+                    )}
                     <button
-                      onClick={() => router.push(`/projetos/${projectId}/rdo/${r.id}`)}
-                      className="w-full text-left bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                      onClick={() => selectModeRdo ? toggleInSet(selectedRdos, r.id, setSelectedRdos) : router.push(`/projetos/${projectId}/rdo/${r.id}`)}
+                      className={`w-full text-left bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${selected ? "border-[#80b02d] ring-2 ring-[#80b02d]/30" : "border-gray-100"}`}
                     >
                       <div className="w-9 h-9 rounded-xl bg-[#4b5563]/10 flex items-center justify-center text-[#4b5563] mb-3">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>

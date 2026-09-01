@@ -10,6 +10,10 @@ import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { DOC_CONTROL, formatDocControl } from "@/lib/pdf/doc-control";
+import { buildWaterSamplingPdf } from "@/lib/pdf/water-sampling";
+import { mergePdfSources } from "@/lib/pdf/merge";
+import { downloadPdfBytes } from "@/lib/pdf/download";
+import { SelectionToolbar } from "@/components/pdf/SelectionToolbar";
 
 // ================= HELPERS (Logo Branco) =================
 async function generateWhiteLogoBase64(src: string): Promise<string> {
@@ -65,6 +69,44 @@ export default function FisicoQuimicosDesktopPage() {
   const [loading, setLoading] = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
   const [generatingExcel, setGeneratingExcel] = useState<string | null>(null);
+
+  // ── Seleção múltipla de fichas individuais (baixar várias de uma vez, mescladas num único PDF) ──
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedAmostras, setSelectedAmostras] = useState<Set<string>>(new Set());
+  const [downloadingFichas, setDownloadingFichas] = useState(false);
+
+  function toggleAmostra(id: string) {
+    setSelectedAmostras((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  // Baixa as fichas individuais selecionadas (podendo vir de dias de campanha
+  // diferentes) como um único PDF mesclado — mesma ficha oficial gerada na
+  // página de detalhe de cada amostra (buildWaterSamplingPdf), em lote.
+  async function baixarFichasSelecionadas() {
+    if (selectedAmostras.size === 0) return;
+    setDownloadingFichas(true);
+    try {
+      const datas = Object.keys(groupedData).sort((a, b) => b.localeCompare(a));
+      const ordered = datas.flatMap((d) => groupedData[d]).filter((a) => selectedAmostras.has(a.id));
+      const sources: jsPDF[] = [];
+      for (const amostra of ordered) {
+        sources.push(await buildWaterSamplingPdf({ amostra, projectName }));
+      }
+      const mergedBytes = await mergePdfSources(sources);
+      downloadPdfBytes(mergedBytes, `Fichas_FQ_${projectName}_${ordered.length}.pdf`);
+    } catch (err) {
+      alert("Erro ao gerar os PDFs. Verifique o console.");
+      console.error(err);
+    } finally {
+      setDownloadingFichas(false);
+      setSelectMode(false);
+      setSelectedAmostras(new Set());
+    }
+  }
 
   useEffect(() => {
     loadData();
@@ -455,6 +497,26 @@ export default function FisicoQuimicosDesktopPage() {
           </div>
         </div>
 
+        {/* ================= SELEÇÃO EM LOTE DE FICHAS INDIVIDUAIS ================= */}
+        {datasAgrupadas.length > 0 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-500">
+              {selectMode
+                ? `${selectedAmostras.size} ficha${selectedAmostras.size === 1 ? "" : "s"} selecionada${selectedAmostras.size === 1 ? "" : "s"} — pode ser de dias diferentes.`
+                : "Selecione fichas individuais de um ou mais dias para baixar em lote."}
+            </p>
+            <SelectionToolbar
+              active={selectMode}
+              count={selectedAmostras.size}
+              downloading={downloadingFichas}
+              onToggle={() => setSelectMode(true)}
+              onDownload={baixarFichasSelecionadas}
+              onCancel={() => { setSelectMode(false); setSelectedAmostras(new Set()); }}
+              label="Selecionar fichas"
+            />
+          </div>
+        )}
+
         {/* ================= LISTA DE CARDS COMPILADOS POR DATA ================= */}
         {datasAgrupadas.length === 0 ? (
           <div className="bg-white border-2 border-dashed border-gray-200 rounded-3xl p-16 text-center">
@@ -511,7 +573,23 @@ export default function FisicoQuimicosDesktopPage() {
                     <table className="w-full text-sm text-left">
                       <thead className="bg-white text-gray-400 font-bold uppercase text-[10px] tracking-wider border-b border-gray-100">
                         <tr>
-                          <th className="px-8 py-4">Poço</th>
+                          {selectMode && (
+                            <th className="pl-8 pr-2 py-4 w-8">
+                              <input
+                                type="checkbox"
+                                checked={amostrasDoDia.every((a) => selectedAmostras.has(a.id))}
+                                onChange={(e) => {
+                                  setSelectedAmostras((prev) => {
+                                    const next = new Set(prev);
+                                    amostrasDoDia.forEach((a) => e.target.checked ? next.add(a.id) : next.delete(a.id));
+                                    return next;
+                                  });
+                                }}
+                                className="w-4 h-4 accent-[#80b02d]"
+                              />
+                            </th>
+                          )}
+                          <th className={selectMode ? "px-2 py-4" : "px-8 py-4"}>Poço</th>
                           <th className="px-6 py-4">Amostra (Código)</th>
                           <th className="px-6 py-4">Início</th>
                           <th className="px-6 py-4">Fase Livre</th>
@@ -522,7 +600,17 @@ export default function FisicoQuimicosDesktopPage() {
                       <tbody className="divide-y divide-gray-50">
                         {amostrasDoDia.map((amostra) => (
                           <tr key={amostra.id} className="hover:bg-gray-50/50 transition-colors group/row">
-                            <td className="px-8 py-4 font-bold text-[#391e2a]">
+                            {selectMode && (
+                              <td className="pl-8 pr-2 py-4">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAmostras.has(amostra.id)}
+                                  onChange={() => toggleAmostra(amostra.id)}
+                                  className="w-4 h-4 accent-[#80b02d]"
+                                />
+                              </td>
+                            )}
+                            <td className={`${selectMode ? "px-2" : "px-8"} py-4 font-bold text-[#391e2a]`}>
                               {amostra.poco}
                             </td>
                             <td className="px-6 py-4">
