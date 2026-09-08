@@ -104,7 +104,7 @@ export default function SoloDetailPage() {
     }
   }
 
-  function handleFieldChange(field: string, value: string) {
+  function handleFieldChange(field: string, value: string | boolean) {
     setEditForm((prev: any) => ({ ...prev, [field]: value }));
   }
 
@@ -240,6 +240,17 @@ export default function SoloDetailPage() {
                       <EditInput label="Nível d'água (m)" type="number" value={editForm.nivel_agua} onChange={(v) => handleFieldChange("nivel_agua", v)} />
                       <EditInput label="Prof. Total (m)" type="number" value={editForm.profundidade_total} onChange={(v) => handleFieldChange("profundidade_total", v)} />
                     </div>
+                    <label className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition ${editForm.fase_livre ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+                      <input
+                        type="checkbox"
+                        checked={!!editForm.fase_livre}
+                        onChange={(e) => handleFieldChange("fase_livre", e.target.checked)}
+                        className="w-4 h-4 accent-red-600"
+                      />
+                      <span className={`text-sm font-bold ${editForm.fase_livre ? "text-red-700" : "text-gray-600"}`}>
+                        Fase Livre encontrada
+                      </span>
+                    </label>
                   </div>
                 </Section>
 
@@ -370,6 +381,7 @@ export default function SoloDetailPage() {
                     <Info label="Hora" value={data.hora} />
                     <Info label="Nível d’água" value={data.nivel_agua ? `${data.nivel_agua} m` : "-"} />
                     <Info label="Profundidade Total" value={`${data.profundidade_total} m`} />
+                    <Info label="Fase Livre" value={<span className={data.fase_livre ? "text-red-600 font-bold" : ""}>{data.fase_livre ? "Sim" : "Não"}</span>} />
                   </Grid>
                 </Section>
                 <Section title="Dados de Instalação">

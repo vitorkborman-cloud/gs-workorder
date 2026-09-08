@@ -22,7 +22,7 @@ não sobe a cada atualização de conteúdo.
 | RDO (Relatório Diário de Obra)    | 151     | V 02          | `lib/pdf/rdo.ts` |
 | Ficha de Amostragem (PDF)         | 152     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarPDFGeral`) |
 | Excel de Amostragem               | 153     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarExcelGeral`) |
-| Ficha Descritiva de Solo          | 154     | V 01          | `lib/pdf/soil-profile.ts` |
+| Ficha Descritiva de Solo          | 154     | V 02          | `lib/pdf/soil-profile.ts` |
 | Mapa Geral do Site                | 155     | V 00          | `lib/pdf/mapa-geral.ts` |
 
 (Work Orders mantém a numeração anterior, SHEQ n° 001 — fora do escopo desta
@@ -88,3 +88,9 @@ resquício do fluxo antigo de captura por GPS) não são plotados; ficam
 listados como pendência na própria tela, com atalho pra corrigir usando o
 seletor de mapa. Ainda não inclui plumas de contaminação (Fase 2) nem
 seções de solo (fora de escopo por ora).
+
+### 2026-09-08 — Ficha Descritiva de Solo: adiciona indicação de Fase Livre (V01 → V02)
+Novo campo "Fase Livre" (Sim/Não) lançado na seção "Dados da Sondagem" do
+app (mobile e desktop), passando a aparecer também no cabeçalho do PDF, em
+destaque (vermelho) quando encontrada. Sem alteração no restante do
+layout/conteúdo.

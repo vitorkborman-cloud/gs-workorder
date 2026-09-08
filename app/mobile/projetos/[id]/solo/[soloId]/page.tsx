@@ -34,6 +34,7 @@ type FormData = {
   nivel_agua: string; tipo_sondagem: string; diametro_sondagem: string; diametro_poco: string;
   pre_filtro: string; secao_filtrante_base: string; secao_filtrante_topo: string;
   coord_x: string; coord_y: string; utm_zona: string; cota: string; profundidade_total: string;
+  fase_livre: boolean;
 };
 
 const tiposSolo = [
@@ -56,7 +57,7 @@ const emptyForm: FormData = {
   nome_sondagem: "", nomenclatura_poco: "", data: "", hora: "", nivel_agua: "",
   tipo_sondagem: "", diametro_sondagem: "", diametro_poco: "", pre_filtro: "",
   secao_filtrante_base: "", secao_filtrante_topo: "", coord_x: "", coord_y: "",
-  utm_zona: "", cota: "", profundidade_total: "",
+  utm_zona: "", cota: "", profundidade_total: "", fase_livre: false,
 };
 
 export default function SoloFormPage() {
@@ -90,6 +91,7 @@ export default function SoloFormPage() {
         secao_filtrante_base: data.secao_filtrante_base ?? "", secao_filtrante_topo: data.secao_filtrante_topo ?? "",
         coord_x: data.coord_x ?? "", coord_y: data.coord_y ?? "", utm_zona: data.utm_zona ?? "",
         cota: data.cota ?? "", profundidade_total: data.profundidade_total ?? "",
+        fase_livre: data.fase_livre ?? false,
       });
       if (data.layers?.length > 0) setLayers(data.layers);
       if (data.voc_readings?.length > 0) setVocReadings(data.voc_readings);
@@ -99,6 +101,10 @@ export default function SoloFormPage() {
 
   function setField(key: keyof FormData, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toggleFaseLivre() {
+    setForm((prev) => ({ ...prev, fase_livre: !prev.fase_livre }));
   }
 
 
@@ -164,6 +170,18 @@ export default function SoloFormPage() {
                 <Input label="Profundidade Total (m)" value={form.profundidade_total} type="number" onChange={(v: string) => setField("profundidade_total", v)} placeholder="0.00" disabled={finalized} />
               </div>
               <Input label="Nível d'água (m)" value={form.nivel_agua} type="number" onChange={(v: string) => setField("nivel_agua", v)} placeholder="0.00" disabled={finalized} />
+              <label className={`flex items-center gap-3 rounded-xl border p-3.5 transition ${form.fase_livre ? "bg-red-50 border-red-200" : "bg-white border-gray-200"} ${finalized ? "opacity-60" : "cursor-pointer active:scale-[0.98]"}`}>
+                <input
+                  type="checkbox"
+                  checked={form.fase_livre}
+                  onChange={toggleFaseLivre}
+                  disabled={finalized}
+                  className="w-5 h-5 accent-red-600 shrink-0"
+                />
+                <span className={`text-sm font-bold ${form.fase_livre ? "text-red-700" : "text-[#391e2a]"}`}>
+                  Fase Livre encontrada
+                </span>
+              </label>
             </div>
           </Section>
 

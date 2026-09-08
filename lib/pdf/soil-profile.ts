@@ -96,6 +96,7 @@ export type SoilDescription = {
   profundidade_total?: string | number;
   nivel_agua?: string | number;
   data?: string;
+  fase_livre?: boolean;
 };
 
 async function fetchLogoBase64(src: string): Promise<string> {
@@ -616,10 +617,10 @@ function buildProfileHTML(data: SoilDescription, layers: SoilLayer[], vocReading
   const sond  = data.nome_sondagem?.trim();
   const ident = (nom && sond) ? `${nom} / ${sond}` : nom || sond || "—";
 
-  const meta = (label: string, val: string) => `
+  const meta = (label: string, val: string, valColor?: string) => `
     <div style="padding:6px 10px;border-right:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;min-width:0;">
       <div style="font-size:7px;font-weight:700;color:#80b02d;text-transform:uppercase;letter-spacing:0.6px;">${label}</div>
-      <div style="font-size:10px;font-weight:600;color:#222;margin-top:2px;">${val || "—"}</div>
+      <div style="font-size:10px;font-weight:600;color:${valColor || "#222"};margin-top:2px;">${val || "—"}</div>
     </div>`;
 
   const now = new Date().toLocaleString("pt-BR");
@@ -729,6 +730,7 @@ function buildProfileHTML(data: SoilDescription, layers: SoilLayer[], vocReading
   <!-- METADATA GRID -->
   <div class="meta">
     ${meta("Data", data.data || "—")}
+    ${meta("Fase Livre", data.fase_livre ? "SIM" : "Não", data.fase_livre ? "#c0392b" : "#222")}
     ${meta("Nível d'Água (NA)", data.nivel_agua ? fmt2(data.nivel_agua) + " m" : "—")}
     ${meta("Profundidade Total", data.profundidade_total ? fmt2(data.profundidade_total) + " m" : "—")}
     ${meta("Seção Filtrante", (!isNaN(filtroTopo) && !isNaN(filtroBase)) ? `${fmt2(filtroTopo)} a ${fmt2(filtroBase)} m` : "—")}
