@@ -196,7 +196,7 @@ function formatAlarmDesc(active: ActiveAlarm[]): string {
 // acaso. Aqui gravamos cada execução e, se houver falhas seguidas por tempo
 // suficiente (10 min = 5 execuções), avisamos por push quem tem subscription —
 // e avisamos de novo quando normalizar.
-const FAILURE_ALERT_THRESHOLD = 5; // ~10 min de falhas seguidas (execução a cada 2 min)
+const FAILURE_ALERT_THRESHOLD = 2; // ~30 min de falhas seguidas (execução a cada 15 min, desde a redução de frequência por limite de API da HI Tecnologia)
 
 // Janelas de manutenção avisadas com antecedência pela própria HI Tecnologia
 // (banner no portal deles). Durante esses períodos, falha ao consultar a API
@@ -284,7 +284,7 @@ async function logRunAndCheckHealth(status: "ok" | "skipped" | "error", detail: 
 // telemetry_devices (consecutive_failures/failure_alerted) em vez de uma
 // tabela de log separada — mais simples, e o estado já mora junto do
 // dispositivo que ele descreve.
-const DEVICE_FAILURE_THRESHOLD = 5; // ~10 min de falhas seguidas (mesma janela do pipeline)
+const DEVICE_FAILURE_THRESHOLD = 2; // ~30 min de falhas seguidas (mesma janela do pipeline, ver comentário acima)
 
 async function handleDeviceFailure(device: any, errorDetail: string, subs: any[]) {
   const newCount = (device.consecutive_failures ?? 0) + 1;
