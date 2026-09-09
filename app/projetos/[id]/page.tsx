@@ -19,6 +19,7 @@ type WorkOrder = { id: string; title: string; finalized: boolean; created_at: st
 type Perfil = { id: string; nome_sondagem: string; nomenclatura_poco: string; created_at: string; };
 type RDO = { id: string; data: string; created_at: string; status?: string; draft?: boolean; scheduled_date?: string | null; };
 type CampanhaFQ = { data: string; quantidade: number; };
+type CampanhaAnalitica = { chave: string; quantidadePocos: number; quantidadeResultados: number };
 type ProjectDoc = { id: string; name: string; file_url: string; file_type: string; file_size: number; created_at: string; };
 type TelemetryDevice = { id: string; name: string; configuration_id: string; reference_id: string; status: string; last_reading: any; last_checked_at: string | null; };
 
@@ -82,6 +83,7 @@ export default function ProjetoPage() {
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [rdos, setRdos] = useState<RDO[]>([]);
   const [campanhasFQ, setCampanhasFQ] = useState<CampanhaFQ[]>([]);
+  const [campanhasAnaliticas, setCampanhasAnaliticas] = useState<CampanhaAnalitica[]>([]);
   const [docs, setDocs] = useState<ProjectDoc[]>([]);
   const [telemetryDevices, setTelemetryDevices] = useState<TelemetryDevice[]>([]);
   const [loadingTelemetry, setLoadingTelemetry] = useState<string | null>(null);
@@ -109,13 +111,14 @@ export default function ProjetoPage() {
   }, []);
 
   async function load() {
-    const [{ data: wo }, { data: sd }, { data: rdoData }, { data: fqData }, { data: docsData }, { data: telData }] = await Promise.all([
+    const [{ data: wo }, { data: sd }, { data: rdoData }, { data: fqData }, { data: docsData }, { data: telData }, { data: analiticosData }] = await Promise.all([
       supabase.from("work_orders").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
       supabase.from("soil_descriptions").select("id, nome_sondagem, nomenclatura_poco, created_at").eq("project_id", projectId).eq("finalized", true).order("created_at", { ascending: false }),
       supabase.from("rdo_reports").select("id, data, created_at, status, draft, scheduled_date").eq("project_id", projectId).order("created_at", { ascending: false }),
       supabase.from("water_samplings").select("id, data").eq("project_id", projectId).eq("finalized", true),
       supabase.from("project_documents").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
       supabase.from("telemetry_devices").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
+      supabase.from("analytical_results").select("soil_description_id, data_coleta, campanha").eq("project_id", projectId),
     ]);
 
     if (wo) setWorkOrders(wo);
@@ -126,6 +129,21 @@ export default function ProjetoPage() {
     if (fqData) {
       const grouped = fqData.reduce((acc: any, curr: any) => { acc[curr.data] = (acc[curr.data] || 0) + 1; return acc; }, {});
       setCampanhasFQ(Object.keys(grouped).map(d => ({ data: d, quantidade: grouped[d] })).sort((a, b) => b.data.localeCompare(a.data)));
+    }
+    if (analiticosData) {
+      const grupos = new Map<string, { pocos: Set<string>; resultados: number }>();
+      analiticosData.forEach((r: any) => {
+        const chave = r.campanha?.trim() || r.data_coleta;
+        const atual = grupos.get(chave) || { pocos: new Set<string>(), resultados: 0 };
+        atual.pocos.add(r.soil_description_id);
+        atual.resultados += 1;
+        grupos.set(chave, atual);
+      });
+      setCampanhasAnaliticas(
+        Array.from(grupos.entries())
+          .map(([chave, info]) => ({ chave, quantidadePocos: info.pocos.size, quantidadeResultados: info.resultados }))
+          .sort((a, b) => b.chave.localeCompare(a.chave))
+      );
     }
     setLoading(false);
   }
@@ -354,20 +372,7 @@ export default function ProjetoPage() {
 
         {/* ── FÍSICO-QUÍMICOS ── */}
         <section>
-          <SectionHeader
-            title="Físico-Químicos"
-            subtitle="Amostragens de água subterrânea"
-            count={campanhasFQ.length}
-            action={
-              <button
-                onClick={() => router.push(`/projetos/${projectId}/resultados-analiticos`)}
-                className="flex items-center gap-2 bg-[#391e2a] hover:bg-[#2a161f] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M5 8h14M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M5 8l1.5-3.5A2 2 0 018.34 3h7.32a2 2 0 011.84 1.5L19 8" /></svg>
-                Resultados Analíticos
-              </button>
-            }
-          />
+          <SectionHeader title="Físico-Químicos" subtitle="Amostragens de água subterrânea" count={campanhasFQ.length} />
           {campanhasFQ.length === 0 ? <EmptyState message="Nenhuma amostragem recebida." /> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {campanhasFQ.map((c) => (
@@ -387,6 +392,45 @@ export default function ProjetoPage() {
                     </div>
                   </button>
                 </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <div className="border-t border-gray-100" />
+
+        {/* ── RESULTADOS ANALÍTICOS ── */}
+        <section>
+          <SectionHeader
+            title="Resultados Analíticos"
+            subtitle="Concentração de contaminantes por ponto de amostragem"
+            count={campanhasAnaliticas.length}
+            action={
+              <button
+                onClick={() => router.push(`/projetos/${projectId}/resultados-analiticos`)}
+                className="flex items-center gap-2 bg-[#391e2a] hover:bg-[#2a161f] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M5 8h14M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M5 8l1.5-3.5A2 2 0 018.34 3h7.32a2 2 0 011.84 1.5L19 8" /></svg>
+                {campanhasAnaliticas.length === 0 ? "Lançar resultados" : "Ver resultados"}
+              </button>
+            }
+          />
+          {campanhasAnaliticas.length === 0 ? <EmptyState message="Nenhum resultado analítico lançado ainda." /> : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {campanhasAnaliticas.map((c) => (
+                <button
+                  key={c.chave}
+                  onClick={() => router.push(`/projetos/${projectId}/resultados-analiticos`)}
+                  className="w-full text-left bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-[#80b02d]/10 flex items-center justify-center text-[#80b02d] mb-3">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M5 8h14M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M5 8l1.5-3.5A2 2 0 018.34 3h7.32a2 2 0 011.84 1.5L19 8" /></svg>
+                  </div>
+                  <p className="font-bold text-[#391e2a] text-sm truncate">{c.chave}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {c.quantidadePocos} {c.quantidadePocos === 1 ? "poço" : "poços"} · {c.quantidadeResultados} resultado{c.quantidadeResultados === 1 ? "" : "s"}
+                  </p>
+                </button>
               ))}
             </div>
           )}
