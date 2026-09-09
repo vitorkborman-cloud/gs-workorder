@@ -100,17 +100,18 @@ export function CoordinatePickerModal({
         maxZoom: 19,
       }).addTo(map);
 
-      // Pino pequeno de propósito — grande demais escondia o que tem embaixo
-      // dele bem no momento em que mais importa ver com precisão (marcando
-      // o ponto exato sobre a imagem de satélite).
+      // Alfinete de ponta fina (estilo push-pin) em vez do pino tipo balão —
+      // a ponta reta e afiada marca o ponto exato sem cobrir o entorno, e
+      // fica claro qual pixel exatamente é a coordenada.
       const pinIcon = L.divIcon({
         className: "",
-        html: `<svg width="16" height="21" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
-          <path d="M16 0C7.163 0 0 7.163 0 16c0 11 16 26 16 26s16-15 16-26C32 7.163 24.837 0 16 0z" fill="#391e2a" stroke="#80b02d" stroke-width="2"/>
-          <circle cx="16" cy="16" r="6" fill="#fff"/>
+        html: `<svg width="14" height="34" viewBox="0 0 24 58" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="11,21 13,21 12,55" fill="#9a9a9a"/>
+          <circle cx="12" cy="11" r="11" fill="#c0392b"/>
+          <ellipse cx="8.2" cy="7.5" rx="3.6" ry="2.6" fill="#fff" opacity="0.45"/>
         </svg>`,
-        iconSize: [16, 21],
-        iconAnchor: [8, 21],
+        iconSize: [14, 34],
+        iconAnchor: [7, 34],
       });
 
       function placeMarker(lat: number, lon: number) {
