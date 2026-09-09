@@ -85,7 +85,9 @@ export default function MapaGeralPage() {
         bounds.push([p.lat, p.lon]);
       });
 
-      if (bounds.length > 1) map.fitBounds(bounds as any, { padding: [40, 40], maxZoom: 19 });
+      // Padding pequeno de propósito — a prioridade é dar o máximo de zoom
+      // que ainda cabe todos os poços, não sobrar moldura em volta deles.
+      if (bounds.length > 1) map.fitBounds(bounds as any, { padding: [12, 12], maxZoom: 19 });
 
       L.control.scale({ metric: true, imperial: false, position: "bottomleft" }).addTo(map);
 
@@ -166,7 +168,7 @@ export default function MapaGeralPage() {
         ) : (
           <div
             ref={mapContainerRef}
-            className="w-full h-[600px]"
+            className="w-full h-[780px]"
             style={{ borderRadius: 16, border: "1px solid #e5e7eb", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}
           />
         )}
