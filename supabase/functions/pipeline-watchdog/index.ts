@@ -17,10 +17,11 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY")!;
 
-// 5x o intervalo normal do check-alarms (15 min desde a redução de
-// frequência por limite de API da HI Tecnologia) sem nenhum log — folga
-// suficiente pra não disparar por uma execução isolada demorando um pouco.
-const STALE_AFTER_MS = 75 * 60 * 1000;
+// 5x o intervalo normal do check-alarms (10 min — ver
+// supabase/migrations/0012_check_alarms_10min_roundrobin.sql) sem nenhum
+// log — folga suficiente pra não disparar por uma execução isolada
+// demorando um pouco.
+const STALE_AFTER_MS = 50 * 60 * 1000;
 // Durante uma queda longa, não repete o alerta a cada disparo do watchdog
 // (20 min) — só reavisa depois de 1h ainda parado.
 const REALERT_AFTER_MS = 60 * 60 * 1000;

@@ -1,9 +1,13 @@
 import webpush from "npm:web-push@3.6.7";
 
 // Edge Function: verifica mudanças de alarme via /connectors/ e envia push notifications
-// Chamada a cada 15 minutos direto pelo pg_cron do próprio Supabase (job
+// Chamada a cada 10 minutos direto pelo pg_cron do próprio Supabase (job
 // 'check-telemetry-alarms', ver scripts/push_subscriptions.sql e
-// supabase/migrations/0010_check_alarms_15min.sql) via net.http_post.
+// supabase/migrations/0012_check_alarms_10min_roundrobin.sql) via
+// net.http_post. Status de conexão é checado pra todos os equipamentos
+// toda rodada; o endpoint de alarmes (mais restrito na API da HI
+// Tecnologia) é revezado, um equipamento por rodada — ver
+// ROUND_INTERVAL_MIN mais abaixo.
 //
 // Existiu uma rota Next.js (app/api/cron/check-alarms) chamada por um
 // serviço externo (cron-job.org) a cada 2 minutos, de antes do pg_cron
@@ -96,7 +100,8 @@ interface AlarmEvent extends ActiveAlarm {
 
 // Busca TODOS os alarmes cadastrados no conector (ativos ou não). É importante
 // não filtrar só os ativos: um alarme pode ativar e voltar ao normal entre duas
-// checagens (2 min) e ainda assim precisa ser detectado e notificado.
+// checagens deste equipamento (só acontece na sua vez do revezamento, ~80
+// min de intervalo com 8 equipamentos) e ainda assim precisa ser detectado.
 async function fetchAllAlarms(configId: string, token: string): Promise<ActiveAlarm[]> {
   try {
     const r = await fetch(`${HITEC_BASE_URL}/alarms/?configurationId=${configId}`, {
@@ -167,11 +172,15 @@ async function markNotified(historyIds: string[]) {
 
 // Alarmes muito antigos (ex: backlog na primeira execução após o deploy desta
 // tabela) são registrados no histórico mas não disparam push — só notificamos
-// ativações recentes de fato.
-const NOTIFY_WINDOW_MS = 15 * 60 * 1000;
-function isRecentActivation(iso: string | null): boolean {
+// ativações recentes de fato. A janela precisa ser MAIOR que o ciclo
+// completo do revezamento de alarmes (devices.length × ROUND_INTERVAL_MIN) —
+// senão um alarme genuinamente novo, mas ativado pouco antes da vez do seu
+// equipamento ser checado, seria classificado como "backlog" por engano e
+// nunca dispararia push. Por isso o valor é calculado no handler (onde já
+// se sabe quantos equipamentos existem), não fixo aqui.
+function isRecentActivation(iso: string | null, windowMs: number): boolean {
   if (!iso) return false;
-  return Date.now() - new Date(iso).getTime() < NOTIFY_WINDOW_MS;
+  return Date.now() - new Date(iso).getTime() < windowMs;
 }
 
 function formatTime(iso: string | null): string {
@@ -198,14 +207,24 @@ function formatAlarmDesc(active: ActiveAlarm[]): string {
   return desc;
 }
 
-// Intervalo real entre execuções — usado só pra compor o texto das
-// mensagens de alerta ("~X min"). Mantenha em sincronia com o agendamento
-// pg_cron de fato (job 'check-telemetry-alarms', hoje */15 — ver
-// supabase/migrations/0010_check_alarms_15min.sql). Sem essa constante
-// central, os textos de alerta ficavam com "min" errado sempre que o
-// intervalo mudava mas o multiplicador ficava hardcoded (aconteceu na
-// própria redução de 2 pra 15 min).
-const CHECK_INTERVAL_MIN = 15;
+// Intervalo real entre execuções — usado pro texto das mensagens de alerta
+// ("~X min") E pra calcular de quem é a vez de checar alarmes (ver
+// alarmsCheckDeviceId no handler principal). Mantenha em sincronia com o
+// agendamento pg_cron de fato (job 'check-telemetry-alarms' — ver
+// supabase/migrations/0012_check_alarms_10min_roundrobin.sql).
+const ROUND_INTERVAL_MIN = 10;
+
+// O endpoint de alarmes (`/alarms/`) da HI Tecnologia é categorizado como
+// "Histórico de Dados, Alarmes e Eventos" pelo portal deles: limite de
+// 288 requisições/dia NA CONTA INTEIRA (não por equipamento) e 1/minuto —
+// ou seja, no máximo 1 requisição a cada 5 min, em média. Com 8
+// equipamentos, checar o alarme de todos numa mesma rodada estoura esse
+// limite tanto no burst (8 GETs quase juntos) quanto no total diário. Por
+// isso só o status de conexão (`/connectors/`, endpoint bem mais permissivo
+// — 1.440/dia) é checado pra todos a cada rodada; o endpoint de alarmes é
+// revezado, um equipamento por rodada, dando ~80 min de ciclo completo por
+// equipamento com rodadas de 10 min (144 alarmes/dia, folgado dentro dos
+// 288 permitidos).
 
 // ── Saúde do pipeline: log de execuções + alerta em caso de falha sustentada ───
 // O pipeline falha de forma silenciosa (HTTP 200 mesmo sem checar nada) sempre que
@@ -214,7 +233,7 @@ const CHECK_INTERVAL_MIN = 15;
 // acaso. Aqui gravamos cada execução e, se houver falhas seguidas por tempo
 // suficiente, avisamos por push quem tem subscription — e avisamos de novo
 // quando normalizar.
-const FAILURE_ALERT_THRESHOLD = 2; // ~30 min de falhas seguidas (execução a cada 15 min, desde a redução de frequência por limite de API da HI Tecnologia)
+const FAILURE_ALERT_THRESHOLD = 2; // ~20 min de falhas seguidas (execução a cada 10 min, desde a redução de frequência por limite de API da HI Tecnologia)
 
 // Janelas de manutenção avisadas com antecedência pela própria HI Tecnologia
 // (banner no portal deles). Durante esses períodos, falha ao consultar a API
@@ -280,7 +299,7 @@ async function logRunAndCheckHealth(status: "ok" | "skipped" | "error", detail: 
     await sendAlertPush(
       subs,
       "⚠️ Monitoramento de alarmes falhando",
-      `${FAILURE_ALERT_THRESHOLD} verificações seguidas falharam (~${FAILURE_ALERT_THRESHOLD * CHECK_INTERVAL_MIN} min). Causa: ${detail ?? status}`
+      `${FAILURE_ALERT_THRESHOLD} verificações seguidas falharam (~${FAILURE_ALERT_THRESHOLD * ROUND_INTERVAL_MIN} min). Causa: ${detail ?? status}`
     );
   } else if (status === "ok") {
     const previousStreak = recent.slice(1).filter((r) => r.status !== "ok").length;
@@ -302,7 +321,7 @@ async function logRunAndCheckHealth(status: "ok" | "skipped" | "error", detail: 
 // telemetry_devices (consecutive_failures/failure_alerted) em vez de uma
 // tabela de log separada — mais simples, e o estado já mora junto do
 // dispositivo que ele descreve.
-const DEVICE_FAILURE_THRESHOLD = 2; // ~30 min de falhas seguidas (mesma janela do pipeline, ver comentário acima)
+const DEVICE_FAILURE_THRESHOLD = 2; // ~20 min de falhas seguidas (mesma janela do pipeline, ver comentário acima)
 
 async function handleDeviceFailure(device: any, errorDetail: string, subs: any[]) {
   const newCount = (device.consecutive_failures ?? 0) + 1;
@@ -326,7 +345,7 @@ async function handleDeviceFailure(device: any, errorDetail: string, subs: any[]
     await sendAlertPush(
       subs,
       `⚠️ ${device.name} sem resposta`,
-      `${DEVICE_FAILURE_THRESHOLD}+ verificações seguidas falharam (~${DEVICE_FAILURE_THRESHOLD * CHECK_INTERVAL_MIN} min ou mais). Última causa: ${errorDetail}`
+      `${DEVICE_FAILURE_THRESHOLD}+ verificações seguidas falharam (~${DEVICE_FAILURE_THRESHOLD * ROUND_INTERVAL_MIN} min ou mais). Última causa: ${errorDetail}`
     );
   }
 }
@@ -359,9 +378,22 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Busca dispositivos e preferências
-    const devices: any[] = await sbGet("telemetry_devices?select=*");
+    // Busca dispositivos e preferências. Ordem estável (por id) é essencial
+    // pro revezamento do endpoint de alarmes fazer sentido rodada a rodada.
+    const devices: any[] = await sbGet("telemetry_devices?select=*&order=id");
     const results: any[] = [];
+
+    // De quem é a vez de checar alarmes nesta rodada — derivado do relógio,
+    // não de estado salvo (a function não guarda memória entre execuções).
+    // A cada ROUND_INTERVAL_MIN minutos o índice avança 1, ciclando pelos
+    // equipamentos na mesma ordem da query acima.
+    const roundIndex = Math.floor(Date.now() / (ROUND_INTERVAL_MIN * 60 * 1000));
+    const alarmsCheckDeviceId = devices.length > 0 ? devices[roundIndex % devices.length].id : null;
+
+    // Janela de "ativação recente" pra decidir se um alarme dispara push —
+    // 1.5x o ciclo completo do revezamento, com piso de 15 min (caso haja
+    // só 1 equipamento, onde o revezamento não atrasa nada).
+    const notifyWindowMs = Math.max(15, devices.length * ROUND_INTERVAL_MIN * 1.5) * 60 * 1000;
 
     // Carrega preferências de todos os usuários com subscription
     const userIds = [...new Set(subs.filter((s: any) => s.user_id).map((s: any) => s.user_id as string))];
@@ -396,18 +428,36 @@ Deno.serve(async (req: Request) => {
       const lastActivity = conn.last_activity_at ?? null;
       const status = isConnected ? "online" : "offline";
 
-      // Busca TODOS os alarmes do conector (ativos ou não) — necessário para não
-      // perder alarmes que ativaram e voltaram ao normal entre duas checagens.
-      const allAlarms: ActiveAlarm[] = await fetchAllAlarms(device.configuration_id, token);
-      const currentActive = allAlarms.filter((a) => a.state);
-      const currentIds = currentActive.map((a) => a.refId);
+      // Endpoint de alarmes só é chamado pro equipamento da vez nesta
+      // rodada (ver ROUND_INTERVAL_MIN acima) — pros demais, atualiza só o
+      // status de conexão, sem tocar no histórico/notificação de alarme.
+      const isAlarmsTurn = device.id === alarmsCheckDeviceId;
 
-      // Registra no histórico; a tabela devolve só os eventos genuinamente novos.
-      const newEvents = await insertNewAlarmEvents(device.id, allAlarms);
-      // Eventos antigos (backlog) ficam só no histórico, sem gerar notificação.
-      const newAlarms = newEvents.filter((a) => isRecentActivation(a.activatedAt));
+      // Fora da vez do alarme, preserva a última lista de IDs conhecida em
+      // vez de zerar — a checagem de conector não sabe quais alarmes estão
+      // ativos, só o endpoint de alarmes sabe (por isso não perguntamos toda
+      // rodada).
+      let currentIds: string[] = device.last_reading?.active_alarm_ids ?? [];
+      let newAlarms: AlarmEvent[] = [];
+      let newEventsCount = 0;
 
-      // Atualiza status, leitura e IDs de alarmes no banco
+      if (isAlarmsTurn) {
+        // Busca TODOS os alarmes do conector (ativos ou não) — necessário para não
+        // perder alarmes que ativaram e voltaram ao normal entre duas checagens.
+        const allAlarms: ActiveAlarm[] = await fetchAllAlarms(device.configuration_id, token);
+        const currentActive = allAlarms.filter((a) => a.state);
+        currentIds = currentActive.map((a) => a.refId);
+
+        // Registra no histórico; a tabela devolve só os eventos genuinamente novos.
+        const newEvents = await insertNewAlarmEvents(device.id, allAlarms);
+        newEventsCount = newEvents.length;
+        // Eventos antigos (backlog) ficam só no histórico, sem gerar notificação.
+        newAlarms = newEvents.filter((a) => isRecentActivation(a.activatedAt, notifyWindowMs));
+      }
+
+      // Atualiza status e leitura no banco — todo round, pra todo mundo.
+      // Quando não é a vez do alarme, mantém os IDs de alarme já conhecidos
+      // (currentIds acima cai no fallback do último last_reading salvo).
       await fetch(`${SUPABASE_URL}/rest/v1/telemetry_devices?id=eq.${device.id}`, {
         method: "PATCH",
         headers: sbHeaders(),
@@ -426,6 +476,11 @@ Deno.serve(async (req: Request) => {
           failure_alerted: false,
         }),
       });
+
+      if (!isAlarmsTurn) {
+        results.push({ device: device.name, status, alarmsCheckedThisRound: false });
+        continue;
+      }
 
       // Envia push apenas para alarmes realmente novos
       if (newAlarms.length > 0) {
@@ -466,10 +521,10 @@ Deno.serve(async (req: Request) => {
           status,
           newAlarms: newAlarms.map((a) => a.name),
           pushed: pushCount,
-          loggedOnly: newEvents.length - newAlarms.length,
+          loggedOnly: newEventsCount - newAlarms.length,
         });
       } else {
-        results.push({ device: device.name, status, alarms: numAlarms, activeIds: currentIds, loggedOnly: newEvents.length });
+        results.push({ device: device.name, status, alarms: numAlarms, activeIds: currentIds, loggedOnly: newEventsCount });
       }
     }
 
