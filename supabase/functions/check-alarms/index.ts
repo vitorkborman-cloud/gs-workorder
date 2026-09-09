@@ -1,8 +1,17 @@
 import webpush from "npm:web-push@3.6.7";
 
 // Edge Function: verifica mudanças de alarme via /connectors/ e envia push notifications
-// Chamada a cada 2 minutos via HTTP POST pela rota app/api/cron/check-alarms,
-// que por sua vez é disparada pelo cron-job.org (ver comentário nesse arquivo).
+// Chamada a cada 15 minutos direto pelo pg_cron do próprio Supabase (job
+// 'check-telemetry-alarms', ver scripts/push_subscriptions.sql e
+// supabase/migrations/0010_check_alarms_15min.sql) via net.http_post.
+//
+// Existiu uma rota Next.js (app/api/cron/check-alarms) chamada por um
+// serviço externo (cron-job.org) a cada 2 minutos, de antes do pg_cron
+// direto — foi removida em 2026-09-09 porque os dois gatilhos rodando
+// juntos duplicavam as chamadas (checagem de fato a cada ~2 min em vez de
+// 15, disparando alertas de falha/normalização em rajada). Se algum
+// serviço externo de cron ainda estiver configurado pra chamar aquela URL,
+// cancele-o — a rota não existe mais.
 
 const HITEC_BASE_URL = "https://api.telemetria.hitecnologia.com.br/rest/v1";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
