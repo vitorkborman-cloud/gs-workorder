@@ -36,9 +36,46 @@ export type PontoPluma = { x: number; y: number; valor: number };
 // Direção do fluxo de água subterrânea — desenhada pelo usuário como uma
 // seta sobre o mapa (ver groundwater_flow_directions), não digitada em
 // graus. Usada pra alongar a interpolação na direção do fluxo em vez de
-// espalhar em círculo. Sem isso (fluxo undefined), o cálculo continua
-// isotrópico como antes.
+// espalhar em círculo. Sem isso (fluxos vazio/undefined), o cálculo
+// continua isotrópico como antes.
+//
+// Um site pode ter mais de um sentido de fluxo — confirmado por um laudo
+// potenciométrico real (mapa não é um vetor único, é uma superfície de
+// carga hidráulica; o fluxo local varia de sub-região pra sub-região). Por
+// isso cada seta carrega sua própria âncora (x, y — o ponto do site que ela
+// representa); a direção usada em cada célula da grade é uma mistura das
+// setas próximas, ponderada por distância (mesma filosofia do IDW aplicada
+// ao vetor de direção em vez de à concentração) — perto de uma seta ela
+// domina, entre duas setas a direção transiciona suavemente.
 export type FluxoDirecao = { direcaoGraus: number; razaoAnisotropia: number };
+export type FluxoDirecaoAncorado = FluxoDirecao & { x: number; y: number };
+
+// Mistura as setas de fluxo próximas a um ponto (x, y) numa única direção
+// local — média dos vetores unitários (não dos graus direto, que não dá pra
+// somar) ponderada por 1/distância a cada âncora.
+function fluxoLocal(x: number, y: number, fluxos: FluxoDirecaoAncorado[]): FluxoDirecao | null {
+  if (fluxos.length === 0) return null;
+  if (fluxos.length === 1) return fluxos[0];
+
+  let somaSeno = 0;
+  let somaCosseno = 0;
+  let somaRazao = 0;
+  let somaPeso = 0;
+  for (const f of fluxos) {
+    const dx = f.x - x;
+    const dy = f.y - y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < 1e-4) return f; // célula bem em cima da âncora — usa direto, sem mistura
+    const peso = 1 / Math.sqrt(distSq);
+    const rad = (f.direcaoGraus * Math.PI) / 180;
+    somaSeno += peso * Math.sin(rad);
+    somaCosseno += peso * Math.cos(rad);
+    somaRazao += peso * f.razaoAnisotropia;
+    somaPeso += peso;
+  }
+  const direcaoGraus = ((Math.atan2(somaSeno / somaPeso, somaCosseno / somaPeso) * 180) / Math.PI + 360) % 360;
+  return { direcaoGraus, razaoAnisotropia: somaRazao / somaPeso };
+}
 
 // Distância "esticada": no eixo perpendicular ao fluxo, multiplica a
 // distância real pela razão de anisotropia antes de elevar ao quadrado —
@@ -46,7 +83,7 @@ export type FluxoDirecao = { direcaoGraus: number; razaoAnisotropia: number };
 // longe do que está de verdade, enquanto um ponto na mesma direção do fluxo
 // continua contando pela distância real. O resultado é uma elipse de
 // influência alongada no sentido do fluxo, em vez do círculo do IDW puro.
-function distanciaAnisotropicaSq(dx: number, dy: number, fluxo?: FluxoDirecao): number {
+function distanciaAnisotropicaSq(dx: number, dy: number, fluxo: FluxoDirecao | null): number {
   if (!fluxo) return dx * dx + dy * dy;
   const rad = (fluxo.direcaoGraus * Math.PI) / 180;
   const senT = Math.sin(rad);
@@ -94,13 +131,13 @@ function distanciaMediaVizinhoMaisProximo(pontos: PontoPluma[]): number {
 
 export function interpolarIDW(
   pontos: PontoPluma[],
-  opts: { potencia?: number; resolucaoCols?: number; margem?: number; fluxo?: FluxoDirecao } = {}
+  opts: { potencia?: number; resolucaoCols?: number; margem?: number; fluxos?: FluxoDirecaoAncorado[] } = {}
 ): GradeIDW | null {
   if (pontos.length < 2) return null;
   const potencia = opts.potencia ?? 2;
   const resolucaoCols = opts.resolucaoCols ?? 160;
   const margem = opts.margem ?? 0.25;
-  const fluxo = opts.fluxo;
+  const fluxos = opts.fluxos ?? [];
 
   let minX = Math.min(...pontos.map((p) => p.x));
   let maxX = Math.max(...pontos.map((p) => p.x));
@@ -134,6 +171,11 @@ export function interpolarIDW(
     const y = minY + (altura * (j + 0.5)) / rows;
     for (let i = 0; i < cols; i++) {
       const x = minX + (largura * (i + 0.5)) / cols;
+      // Direção local dessa célula — mistura das setas de fluxo próximas
+      // (ver fluxoLocal). Calculada uma vez por célula e reaplicada pra
+      // todos os poços amostrados, já que é uma propriedade do lugar, não
+      // do par célula↔poço.
+      const fluxo = fluxos.length > 0 ? fluxoLocal(x, y, fluxos) : null;
       let somaPesos = 0;
       let somaValores = 0;
       let exato: number | null = null;

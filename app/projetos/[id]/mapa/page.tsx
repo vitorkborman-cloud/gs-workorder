@@ -21,6 +21,7 @@ import {
   latLonParaUtm,
   anguloEntrePontos,
   type FaixaPluma,
+  type FluxoDirecaoAncorado,
 } from "@/lib/geo/plume";
 import "leaflet/dist/leaflet.css";
 
@@ -36,7 +37,9 @@ type ResultadoPluma = {
 };
 
 type FluxoSalvo = {
+  id: string;
   rodada: string;
+  rotulo: string | null;
   origemX: number;
   origemY: number;
   pontaX: number;
@@ -84,11 +87,15 @@ export default function MapaGeralPage() {
   const [plumaFaixas, setPlumaFaixas] = useState<FaixaPluma[]>([]);
   const [plumaErro, setPlumaErro] = useState("");
 
-  // ── Direção do fluxo (desenhada como seta no mapa, não digitada) ────────
-  const [fluxosPorRodada, setFluxosPorRodada] = useState<Map<string, FluxoSalvo>>(new Map());
+  // ── Direção do fluxo — várias setas por rodada, uma por sub-região do
+  // site (um mapa potenciométrico real não é um vetor único; ver laudo
+  // citado na migração 0017). Desenhada no mapa, não digitada em graus.
+  const [fluxosPorRodada, setFluxosPorRodada] = useState<Map<string, FluxoSalvo[]>>(new Map());
   const [fluxoEtapa, setFluxoEtapa] = useState<"inativo" | "aguardando_origem" | "aguardando_ponta" | "editando">("inativo");
+  const [fluxoEditandoId, setFluxoEditandoId] = useState<string | null>(null);
   const [fluxoOrigemLatLon, setFluxoOrigemLatLon] = useState<[number, number] | null>(null);
   const [fluxoPontaLatLon, setFluxoPontaLatLon] = useState<[number, number] | null>(null);
+  const [fluxoRotulo, setFluxoRotulo] = useState("");
   const [razaoAnisotropia, setRazaoAnisotropia] = useState("2.5");
   const [fluxoArquivo, setFluxoArquivo] = useState<File | null>(null);
   const [salvandoFluxo, setSalvandoFluxo] = useState(false);
@@ -96,6 +103,7 @@ export default function MapaGeralPage() {
   const fluxoOrigemMarkerRef = useRef<any>(null);
   const fluxoPontaMarkerRef = useRef<any>(null);
   const fluxoLinhaRef = useRef<any>(null);
+  const outrasSetasLayerRef = useRef<any>(null);
 
   const pocoPorId = useMemo(() => new Map(validos.map((p) => [p.id, p])), [validos]);
 
@@ -138,6 +146,8 @@ export default function MapaGeralPage() {
       .sort((a, b) => b.maisRecente.localeCompare(a.maisRecente));
   }, [resultadosComPonto, plumaMatriz, plumaContaminante]);
 
+  const setasDaRodada = plumaRodada ? fluxosPorRodada.get(plumaRodada) || [] : [];
+
   useEffect(() => {
     load();
   }, []);
@@ -155,7 +165,7 @@ export default function MapaGeralPage() {
         .eq("project_id", projectId),
       supabase
         .from("groundwater_flow_directions")
-        .select("rodada, origem_x, origem_y, ponta_x, ponta_y, utm_zona, direcao_graus, razao_anisotropia, mapa_referencia_url, mapa_referencia_nome")
+        .select("id, rodada, rotulo, origem_x, origem_y, ponta_x, ponta_y, utm_zona, direcao_graus, razao_anisotropia, mapa_referencia_url, mapa_referencia_nome")
         .eq("project_id", projectId),
     ]);
     if (proj) setProjectName(proj.name);
@@ -165,10 +175,12 @@ export default function MapaGeralPage() {
       setPendentes(pendentes);
     }
     setResultados((resultadosData as ResultadoPluma[]) || []);
-    const mapaFluxos = new Map<string, FluxoSalvo>();
+    const mapaFluxos = new Map<string, FluxoSalvo[]>();
     (fluxosData || []).forEach((f: any) => {
-      mapaFluxos.set(f.rodada, {
+      const item: FluxoSalvo = {
+        id: f.id,
         rodada: f.rodada,
+        rotulo: f.rotulo,
         origemX: f.origem_x,
         origemY: f.origem_y,
         pontaX: f.ponta_x,
@@ -178,7 +190,10 @@ export default function MapaGeralPage() {
         razaoAnisotropia: f.razao_anisotropia,
         mapaReferenciaUrl: f.mapa_referencia_url,
         mapaReferenciaNome: f.mapa_referencia_nome,
-      });
+      };
+      const lista = mapaFluxos.get(f.rodada) || [];
+      lista.push(item);
+      mapaFluxos.set(f.rodada, lista);
     });
     setFluxosPorRodada(mapaFluxos);
     setLoading(false);
@@ -253,30 +268,24 @@ export default function MapaGeralPage() {
     return anguloEntrePontos(o.x, o.y, p.x, p.y);
   }
 
-  // Sincroniza a seta exibida com a rodada escolhida — carrega a direção já
-  // salva (se houver) ou limpa o desenho, sempre que o usuário troca de
-  // rodada no seletor.
+  function rotuloOuIndice(f: FluxoSalvo, lista: FluxoSalvo[]): string {
+    if (f.rotulo?.trim()) return f.rotulo.trim();
+    const idx = lista.findIndex((x) => x.id === f.id);
+    return `Seta ${idx + 1}`;
+  }
+
+  // Zera o estado de edição sempre que a rodada muda — as setas já salvas
+  // dessa rodada aparecem via o efeito de "outras setas" abaixo, não
+  // precisa carregar nada aqui.
   useEffect(() => {
-    if (!plumaRodada) {
-      setFluxoOrigemLatLon(null);
-      setFluxoPontaLatLon(null);
-      setFluxoEtapa("inativo");
-      setRazaoAnisotropia("2.5");
-      return;
-    }
-    const salvo = fluxosPorRodada.get(plumaRodada);
-    if (salvo) {
-      setFluxoOrigemLatLon(utmParaLatLon(salvo.origemX, salvo.origemY, salvo.utmZona));
-      setFluxoPontaLatLon(utmParaLatLon(salvo.pontaX, salvo.pontaY, salvo.utmZona));
-      setRazaoAnisotropia(String(salvo.razaoAnisotropia));
-    } else {
-      setFluxoOrigemLatLon(null);
-      setFluxoPontaLatLon(null);
-      setRazaoAnisotropia("2.5");
-    }
     setFluxoEtapa("inativo");
+    setFluxoEditandoId(null);
+    setFluxoOrigemLatLon(null);
+    setFluxoPontaLatLon(null);
+    setFluxoRotulo("");
+    setRazaoAnisotropia("2.5");
     setFluxoArquivo(null);
-  }, [plumaRodada, fluxosPorRodada]);
+  }, [plumaRodada]);
 
   // Clique no mapa pra desenhar a seta — só ativo enquanto aguardando os
   // dois pontos (origem/ponta); fora disso não interfere no mapa normal.
@@ -298,8 +307,8 @@ export default function MapaGeralPage() {
     return () => { map.off("click", aoClicar); };
   }, [fluxoEtapa]);
 
-  // Desenha/atualiza a seta (origem, ponta, linha) no mapa sempre que os
-  // pontos ou o modo de edição mudam. Arrastável só em modo "editando".
+  // Desenha/atualiza a seta ATIVA (a que está sendo desenhada ou ajustada)
+  // — origem, ponta, linha. Arrastável só em modo "editando".
   useEffect(() => {
     const map = mapInstanceRef.current;
     const L = leafletRef.current;
@@ -350,24 +359,63 @@ export default function MapaGeralPage() {
     }
   }, [fluxoOrigemLatLon, fluxoPontaLatLon, fluxoEtapa]);
 
+  // Desenha as OUTRAS setas já salvas dessa rodada (tudo exceto a que está
+  // sendo editada agora) — mais discretas, não arrastáveis, só pra dar
+  // contexto de onde as outras zonas já apontam enquanto se ajusta uma.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const L = leafletRef.current;
+    if (!map || !L) return;
+
+    if (outrasSetasLayerRef.current) { outrasSetasLayerRef.current.remove(); outrasSetasLayerRef.current = null; }
+    if (!plumaRodada) return;
+
+    const grupo = L.layerGroup().addTo(map);
+    setasDaRodada
+      .filter((f) => f.id !== fluxoEditandoId)
+      .forEach((f) => {
+        const origem = utmParaLatLon(f.origemX, f.origemY, f.utmZona);
+        const ponta = utmParaLatLon(f.pontaX, f.pontaY, f.utmZona);
+        L.polyline([origem, ponta], { color: "#9a8f95", weight: 1.5, dashArray: "2 5" }).addTo(grupo);
+        const icone = L.divIcon({
+          className: "",
+          html: `<div style="width:16px;height:16px;transform:rotate(${f.direcaoGraus}deg);transform-origin:center;">
+            <svg width="16" height="16" viewBox="0 0 22 22"><path d="M11 1 L18 20 L11 15 L4 20 Z" fill="#9a8f95" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>
+          </div>`,
+          iconSize: [16, 16],
+          iconAnchor: [8, 8],
+        });
+        L.marker(ponta, { icon: icone, interactive: false }).addTo(grupo);
+      });
+    outrasSetasLayerRef.current = grupo;
+  }, [plumaRodada, fluxosPorRodada, fluxoEditandoId, mapReady]);
+
   function iniciarDesenhoFluxo() {
+    setFluxoEditandoId(null);
     setFluxoOrigemLatLon(null);
     setFluxoPontaLatLon(null);
+    setFluxoRotulo("");
+    setRazaoAnisotropia("2.5");
+    setFluxoArquivo(null);
     setFluxoEtapa("aguardando_origem");
   }
 
+  function ajustarFluxo(f: FluxoSalvo) {
+    setFluxoEditandoId(f.id);
+    setFluxoOrigemLatLon(utmParaLatLon(f.origemX, f.origemY, f.utmZona));
+    setFluxoPontaLatLon(utmParaLatLon(f.pontaX, f.pontaY, f.utmZona));
+    setFluxoRotulo(f.rotulo || "");
+    setRazaoAnisotropia(String(f.razaoAnisotropia));
+    setFluxoArquivo(null);
+    setFluxoEtapa("editando");
+  }
+
   function cancelarDesenhoFluxo() {
-    const salvo = plumaRodada ? fluxosPorRodada.get(plumaRodada) : null;
-    if (salvo) {
-      setFluxoOrigemLatLon(utmParaLatLon(salvo.origemX, salvo.origemY, salvo.utmZona));
-      setFluxoPontaLatLon(utmParaLatLon(salvo.pontaX, salvo.pontaY, salvo.utmZona));
-      setRazaoAnisotropia(String(salvo.razaoAnisotropia));
-    } else {
-      setFluxoOrigemLatLon(null);
-      setFluxoPontaLatLon(null);
-      setRazaoAnisotropia("2.5");
-    }
     setFluxoEtapa("inativo");
+    setFluxoEditandoId(null);
+    setFluxoOrigemLatLon(null);
+    setFluxoPontaLatLon(null);
+    setFluxoRotulo("");
     setFluxoArquivo(null);
   }
 
@@ -380,7 +428,7 @@ export default function MapaGeralPage() {
       const direcaoGraus = anguloEntrePontos(origem.x, origem.y, ponta.x, ponta.y);
       const razao = parseFloat(razaoAnisotropia) || 2.5;
 
-      const existente = fluxosPorRodada.get(plumaRodada);
+      const existente = fluxoEditandoId ? setasDaRodada.find((f) => f.id === fluxoEditandoId) : null;
       let mapaReferenciaUrl = existente?.mapaReferenciaUrl || null;
       let mapaReferenciaNome = existente?.mapaReferenciaNome || null;
       if (fluxoArquivo) {
@@ -392,43 +440,55 @@ export default function MapaGeralPage() {
         mapaReferenciaNome = fluxoArquivo.name;
       }
 
-      const { error } = await supabase.from("groundwater_flow_directions").upsert(
-        {
-          project_id: projectId,
-          rodada: plumaRodada,
-          origem_x: origem.x,
-          origem_y: origem.y,
-          ponta_x: ponta.x,
-          ponta_y: ponta.y,
-          utm_zona: utmZonaReferencia,
-          direcao_graus: direcaoGraus,
-          razao_anisotropia: razao,
-          mapa_referencia_url: mapaReferenciaUrl,
-          mapa_referencia_nome: mapaReferenciaNome,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "project_id,rodada" }
-      );
-      if (error) throw error;
+      const payload = {
+        project_id: projectId,
+        rodada: plumaRodada,
+        rotulo: fluxoRotulo.trim() || null,
+        origem_x: origem.x,
+        origem_y: origem.y,
+        ponta_x: ponta.x,
+        ponta_y: ponta.y,
+        utm_zona: utmZonaReferencia,
+        direcao_graus: direcaoGraus,
+        razao_anisotropia: razao,
+        mapa_referencia_url: mapaReferenciaUrl,
+        mapa_referencia_nome: mapaReferenciaNome,
+        updated_at: new Date().toISOString(),
+      };
 
+      let idFinal = fluxoEditandoId;
+      if (fluxoEditandoId) {
+        const { error } = await supabase.from("groundwater_flow_directions").update(payload).eq("id", fluxoEditandoId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from("groundwater_flow_directions").insert(payload).select("id").single();
+        if (error) throw error;
+        idFinal = data.id;
+      }
+
+      const novoItem: FluxoSalvo = {
+        id: idFinal!,
+        rodada: plumaRodada,
+        rotulo: payload.rotulo,
+        origemX: origem.x,
+        origemY: origem.y,
+        pontaX: ponta.x,
+        pontaY: ponta.y,
+        utmZona: utmZonaReferencia,
+        direcaoGraus,
+        razaoAnisotropia: razao,
+        mapaReferenciaUrl,
+        mapaReferenciaNome,
+      };
       setFluxosPorRodada((prev) => {
         const next = new Map(prev);
-        next.set(plumaRodada, {
-          rodada: plumaRodada,
-          origemX: origem.x,
-          origemY: origem.y,
-          pontaX: ponta.x,
-          pontaY: ponta.y,
-          utmZona: utmZonaReferencia,
-          direcaoGraus,
-          razaoAnisotropia: razao,
-          mapaReferenciaUrl,
-          mapaReferenciaNome,
-        });
+        const lista = [...(next.get(plumaRodada) || [])];
+        const idx = lista.findIndex((f) => f.id === idFinal);
+        if (idx >= 0) lista[idx] = novoItem; else lista.push(novoItem);
+        next.set(plumaRodada, lista);
         return next;
       });
-      setFluxoEtapa("inativo");
-      setFluxoArquivo(null);
+      cancelarDesenhoFluxo();
     } catch (err) {
       alert("Erro ao salvar a direção do fluxo. Verifique o console.");
       console.error(err);
@@ -437,18 +497,15 @@ export default function MapaGeralPage() {
     }
   }
 
-  async function removerFluxo() {
-    if (!plumaRodada) return;
-    if (!confirm("Remover a direção do fluxo salva pra essa rodada?")) return;
-    await supabase.from("groundwater_flow_directions").delete().eq("project_id", projectId).eq("rodada", plumaRodada);
+  async function removerFluxo(id: string) {
+    if (!confirm("Remover essa seta de fluxo?")) return;
+    await supabase.from("groundwater_flow_directions").delete().eq("id", id);
     setFluxosPorRodada((prev) => {
       const next = new Map(prev);
-      next.delete(plumaRodada);
+      next.set(plumaRodada, (next.get(plumaRodada) || []).filter((f) => f.id !== id));
       return next;
     });
-    setFluxoOrigemLatLon(null);
-    setFluxoPontaLatLon(null);
-    setFluxoEtapa("inativo");
+    if (fluxoEditandoId === id) cancelarDesenhoFluxo();
   }
 
   function removerPluma() {
@@ -500,11 +557,18 @@ export default function MapaGeralPage() {
       return;
     }
 
-    const fluxoSalvo = fluxosPorRodada.get(plumaRodada);
-    const grade = interpolarIDW(
-      pontos,
-      fluxoSalvo ? { fluxo: { direcaoGraus: fluxoSalvo.direcaoGraus, razaoAnisotropia: fluxoSalvo.razaoAnisotropia } } : undefined
-    );
+    // Cada seta salva vira uma direção ancorada no meio do próprio traço —
+    // a interpolação mistura as setas próximas por distância, então o
+    // sentido do fluxo pode variar de uma sub-região do site pra outra em
+    // vez de forçar um vetor único (ver migração 0017).
+    const fluxosAncorados: FluxoDirecaoAncorado[] = setasDaRodada.map((f) => ({
+      x: (f.origemX + f.pontaX) / 2,
+      y: (f.origemY + f.pontaY) / 2,
+      direcaoGraus: f.direcaoGraus,
+      razaoAnisotropia: f.razaoAnisotropia,
+    }));
+
+    const grade = interpolarIDW(pontos, fluxosAncorados.length > 0 ? { fluxos: fluxosAncorados } : undefined);
     if (!grade) {
       setPlumaErro("Não foi possível interpolar com esses pontos.");
       return;
@@ -652,45 +716,44 @@ export default function MapaGeralPage() {
 
             {plumaRodada && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-gray-500">Direção do fluxo de água subterrânea (opcional)</p>
-                  {fluxosPorRodada.has(plumaRodada) && fluxoEtapa === "inativo" && (
-                    <span className="text-[10px] font-bold text-[#80b02d]">
-                      {Math.round(fluxosPorRodada.get(plumaRodada)!.direcaoGraus)}° salva
-                    </span>
-                  )}
-                </div>
+                <p className="text-xs font-bold text-gray-500 mb-2">
+                  Direção do fluxo de água subterrânea (opcional) — pode ter mais de uma, uma por sub-região do site
+                </p>
+
+                {setasDaRodada.length > 0 && fluxoEtapa !== "editando" && (
+                  <div className="space-y-1.5 mb-3">
+                    {setasDaRodada.map((f) => (
+                      <div key={f.id} className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#391e2a] truncate">{rotuloOuIndice(f, setasDaRodada)}</p>
+                          <p className="text-[11px] text-gray-400">{Math.round(f.direcaoGraus)}° · alongamento {f.razaoAnisotropia}x</p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          {f.mapaReferenciaUrl && (
+                            <a href={f.mapaReferenciaUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-[#2f7ea1] hover:underline">
+                              Ver referência
+                            </a>
+                          )}
+                          <button type="button" onClick={() => ajustarFluxo(f)} className="text-[11px] font-bold text-gray-500 hover:text-[#391e2a] transition">
+                            Ajustar
+                          </button>
+                          <button type="button" onClick={() => removerFluxo(f.id)} className="text-[11px] font-bold text-gray-400 hover:text-red-500 transition">
+                            Remover
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {fluxoEtapa === "inativo" && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={iniciarDesenhoFluxo}
-                      className="text-xs font-bold text-[#391e2a] border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition"
-                    >
-                      {fluxosPorRodada.has(plumaRodada) ? "Redesenhar seta" : "Definir direção do fluxo"}
-                    </button>
-                    {fluxosPorRodada.has(plumaRodada) && (
-                      <>
-                        <button type="button" onClick={() => setFluxoEtapa("editando")} className="text-xs font-bold text-gray-500 hover:text-[#391e2a] transition">
-                          Ajustar seta
-                        </button>
-                        <button type="button" onClick={removerFluxo} className="text-xs font-bold text-gray-400 hover:text-red-500 transition">
-                          Remover
-                        </button>
-                        {fluxosPorRodada.get(plumaRodada)!.mapaReferenciaUrl && (
-                          <a
-                            href={fluxosPorRodada.get(plumaRodada)!.mapaReferenciaUrl!}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs font-bold text-[#2f7ea1] hover:underline"
-                          >
-                            Ver mapa de referência do cliente
-                          </a>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={iniciarDesenhoFluxo}
+                    className="text-xs font-bold text-[#391e2a] border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition"
+                  >
+                    + Adicionar seta de fluxo
+                  </button>
                 )}
 
                 {fluxoEtapa === "aguardando_origem" && (
@@ -710,6 +773,16 @@ export default function MapaGeralPage() {
                       Direção calculada: <strong className="text-[#391e2a]">{Math.round(calcularGrausFluxo(fluxoOrigemLatLon, fluxoPontaLatLon))}°</strong> — arraste os pontos no mapa pra ajustar a seta.
                     </p>
                     <div className="flex flex-wrap items-end gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">Rótulo da zona (opcional)</label>
+                        <input
+                          type="text"
+                          placeholder="Ex.: Galpão/Administração"
+                          value={fluxoRotulo}
+                          onChange={(e) => setFluxoRotulo(e.target.value)}
+                          className="border rounded-lg px-2.5 py-2 text-sm w-52 focus:ring-2 focus:ring-[#80b02d] outline-none"
+                        />
+                      </div>
                       <div>
                         <label className="text-xs font-bold text-gray-500 block mb-1">Razão de alongamento</label>
                         <input
@@ -731,7 +804,7 @@ export default function MapaGeralPage() {
                         />
                       </div>
                       <Button onClick={salvarFluxo} disabled={salvandoFluxo || !fluxoPontaLatLon} className="bg-[#80b02d] hover:bg-[#6c9526] text-white font-bold h-[38px]">
-                        {salvandoFluxo ? "Salvando..." : "Salvar direção"}
+                        {salvandoFluxo ? "Salvando..." : "Salvar seta"}
                       </Button>
                       <button type="button" onClick={cancelarDesenhoFluxo} className="text-xs font-bold text-gray-400 hover:text-red-500 transition h-[38px]">
                         Cancelar
@@ -744,8 +817,8 @@ export default function MapaGeralPage() {
 
             <p className="text-[11px] text-gray-400 mt-3 max-w-2xl">
               Interpolação por distância inversa (IDW), não krigagem.{" "}
-              {plumaRodada && fluxosPorRodada.has(plumaRodada)
-                ? "Direção do fluxo aplicada — a interpolação está alongada nesse sentido."
+              {setasDaRodada.length > 0
+                ? `${setasDaRodada.length} seta${setasDaRodada.length === 1 ? "" : "s"} de fluxo aplicada${setasDaRodada.length === 1 ? "" : "s"} — a interpolação alonga conforme a mais próxima de cada ponto.`
                 : "Sem direção de fluxo definida, o cálculo é isotrópico (círculo)."}{" "}
               De qualquer forma, é uma aproximação visual, não uma delimitação hidrogeológica formal.
             </p>
