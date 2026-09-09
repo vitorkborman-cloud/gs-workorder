@@ -13,7 +13,19 @@ import {
   type PocoMapa,
   type PocoPendente,
 } from "@/lib/pdf/mapa-geral";
+import { interpolarIDW, construirFaixas, gradeParaCanvas, utmParaLatLon, type FaixaPluma } from "@/lib/geo/plume";
 import "leaflet/dist/leaflet.css";
+
+type ResultadoPluma = {
+  soil_description_id: string;
+  matriz: "agua_subterranea" | "solo";
+  contaminante: string;
+  concentracao: number;
+  unidade: string;
+  vmp: number | null;
+  campanha: string | null;
+  data_coleta: string;
+};
 
 const MOTIVO_LABEL: Record<PocoPendente["motivo"], string> = {
   sem_coordenada: "Sem coordenada cadastrada",
@@ -31,8 +43,11 @@ export default function MapaGeralPage() {
   const [validos, setValidos] = useState<PocoMapa[]>([]);
   const [pendentes, setPendentes] = useState<PocoPendente[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [resultados, setResultados] = useState<ResultadoPluma[]>([]);
 
   const mapInstanceRef = useRef<any>(null);
+  const leafletRef = useRef<any>(null);
+  const plumaOverlayRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
@@ -40,16 +55,69 @@ export default function MapaGeralPage() {
   // no PDF, pra tela e documento exportado mostrarem sempre a mesma legenda.
   const legendaGrupos = useMemo(() => construirLegendaGrupos(validos), [validos]);
 
+  // ── Pluma de contaminação (IDW) ──────────────────────────────────────
+  const [plumaMatriz, setPlumaMatriz] = useState<"agua_subterranea" | "solo">("agua_subterranea");
+  const [plumaContaminante, setPlumaContaminante] = useState("");
+  const [plumaRodada, setPlumaRodada] = useState("");
+  const [plumaAtiva, setPlumaAtiva] = useState(false);
+  const [plumaFaixas, setPlumaFaixas] = useState<FaixaPluma[]>([]);
+  const [plumaErro, setPlumaErro] = useState("");
+
+  const pocoPorId = useMemo(() => new Map(validos.map((p) => [p.id, p])), [validos]);
+
+  // Só entram resultados de poços que aparecem no mapa (coordenada válida) —
+  // um resultado num poço pendente não tem onde ser plotado.
+  const resultadosComPonto = useMemo(
+    () => resultados.filter((r) => pocoPorId.has(r.soil_description_id)),
+    [resultados, pocoPorId]
+  );
+
+  const matrizesComDados = useMemo(
+    () => Array.from(new Set(resultadosComPonto.map((r) => r.matriz))),
+    [resultadosComPonto]
+  );
+
+  const contaminantesDisponiveis = useMemo(
+    () => Array.from(new Set(resultadosComPonto.filter((r) => r.matriz === plumaMatriz).map((r) => r.contaminante))).sort(),
+    [resultadosComPonto, plumaMatriz]
+  );
+
+  function rodadaDe(r: ResultadoPluma) {
+    return r.campanha?.trim() || r.data_coleta;
+  }
+
+  const rodadasDisponiveis = useMemo(() => {
+    const porRodada = new Map<string, { count: number; maisRecente: string }>();
+    resultadosComPonto
+      .filter((r) => r.matriz === plumaMatriz && r.contaminante === plumaContaminante)
+      .forEach((r) => {
+        const key = rodadaDe(r);
+        const atual = porRodada.get(key);
+        if (!atual) porRodada.set(key, { count: 1, maisRecente: r.data_coleta });
+        else {
+          atual.count += 1;
+          if (r.data_coleta > atual.maisRecente) atual.maisRecente = r.data_coleta;
+        }
+      });
+    return Array.from(porRodada.entries())
+      .map(([rodada, info]) => ({ rodada, ...info }))
+      .sort((a, b) => b.maisRecente.localeCompare(a.maisRecente));
+  }, [resultadosComPonto, plumaMatriz, plumaContaminante]);
+
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
-    const [{ data: proj }, { data: solos }] = await Promise.all([
+    const [{ data: proj }, { data: solos }, { data: resultadosData }] = await Promise.all([
       supabase.from("projects").select("name").eq("id", projectId).single(),
       supabase
         .from("soil_descriptions")
         .select("id, nomenclatura_poco, nome_sondagem, coord_x, coord_y, utm_zona")
+        .eq("project_id", projectId),
+      supabase
+        .from("analytical_results")
+        .select("soil_description_id, matriz, contaminante, concentracao, unidade, vmp, campanha, data_coleta")
         .eq("project_id", projectId),
     ]);
     if (proj) setProjectName(proj.name);
@@ -58,6 +126,7 @@ export default function MapaGeralPage() {
       setValidos(validos);
       setPendentes(pendentes);
     }
+    setResultados((resultadosData as ResultadoPluma[]) || []);
     setLoading(false);
   }
 
@@ -69,6 +138,7 @@ export default function MapaGeralPage() {
     (async () => {
       const { default: L } = await import("leaflet");
       if (cancelled || !mapContainerRef.current) return;
+      leafletRef.current = L;
 
       const map = L.map(mapContainerRef.current, { center: [validos[0].lat, validos[0].lon], zoom: 19 });
       mapInstanceRef.current = map;
@@ -120,6 +190,79 @@ export default function MapaGeralPage() {
       cancelled = true;
     };
   }, [validos]);
+
+  function removerPluma() {
+    if (plumaOverlayRef.current) {
+      plumaOverlayRef.current.remove();
+      plumaOverlayRef.current = null;
+    }
+    setPlumaAtiva(false);
+    setPlumaErro("");
+  }
+
+  function gerarPluma() {
+    const L = leafletRef.current;
+    const map = mapInstanceRef.current;
+    if (!L || !map || !plumaContaminante || !plumaRodada) return;
+
+    const linhas = resultadosComPonto.filter(
+      (r) => r.matriz === plumaMatriz && r.contaminante === plumaContaminante && rodadaDe(r) === plumaRodada
+    );
+
+    // Um poço pode ter mais de uma linha na mesma rodada só por erro de
+    // digitação duplicada — agrega por média em vez de contar duas vezes o
+    // mesmo ponto espacial.
+    const porPoco = new Map<string, { soma: number; n: number; vmp: number | null }>();
+    linhas.forEach((r) => {
+      const atual = porPoco.get(r.soil_description_id);
+      if (atual) {
+        atual.soma += r.concentracao;
+        atual.n += 1;
+        if (atual.vmp == null) atual.vmp = r.vmp;
+      } else {
+        porPoco.set(r.soil_description_id, { soma: r.concentracao, n: 1, vmp: r.vmp });
+      }
+    });
+
+    const pontos: { x: number; y: number; valor: number }[] = [];
+    let vmp: number | null = null;
+    let utmZona = "";
+    porPoco.forEach((info, soilId) => {
+      const poco = pocoPorId.get(soilId);
+      if (!poco) return;
+      pontos.push({ x: poco.coordX, y: poco.coordY, valor: info.soma / info.n });
+      if (vmp == null) vmp = info.vmp;
+      utmZona = poco.utmZona;
+    });
+
+    if (pontos.length < 2) {
+      setPlumaErro("Precisa de pelo menos 2 poços com esse contaminante nessa rodada pra interpolar.");
+      return;
+    }
+
+    const grade = interpolarIDW(pontos);
+    if (!grade) {
+      setPlumaErro("Não foi possível interpolar com esses pontos.");
+      return;
+    }
+
+    const valorMax = Math.max(...pontos.map((p) => p.valor));
+    const faixas = construirFaixas(vmp, valorMax);
+    const canvas = gradeParaCanvas(grade, faixas, 0.6);
+
+    const [swLat, swLon] = utmParaLatLon(grade.minX, grade.minY, utmZona);
+    const [neLat, neLon] = utmParaLatLon(grade.maxX, grade.maxY, utmZona);
+
+    if (plumaOverlayRef.current) plumaOverlayRef.current.remove();
+    plumaOverlayRef.current = L.imageOverlay(canvas.toDataURL(), [
+      [swLat, swLon],
+      [neLat, neLon],
+    ], { opacity: 1, interactive: false }).addTo(map);
+
+    setPlumaFaixas(faixas);
+    setPlumaAtiva(true);
+    setPlumaErro("");
+  }
 
   async function baixarPdf() {
     if (!mapContainerRef.current || validos.length === 0) return;
@@ -184,6 +327,70 @@ export default function MapaGeralPage() {
           </Button>
         </div>
 
+        {resultadosComPonto.length > 0 && (
+          <div className="mb-6 bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Pluma de contaminação (interpolação IDW)</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">Matriz</label>
+                <select
+                  value={plumaMatriz}
+                  onChange={(e) => {
+                    setPlumaMatriz(e.target.value as "agua_subterranea" | "solo");
+                    setPlumaContaminante("");
+                    setPlumaRodada("");
+                  }}
+                  className="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#80b02d] outline-none min-w-[160px]"
+                >
+                  {matrizesComDados.includes("agua_subterranea") && <option value="agua_subterranea">Água subterrânea</option>}
+                  {matrizesComDados.includes("solo") && <option value="solo">Solo</option>}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">Contaminante</label>
+                <select
+                  value={plumaContaminante}
+                  onChange={(e) => { setPlumaContaminante(e.target.value); setPlumaRodada(""); }}
+                  className="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#80b02d] outline-none min-w-[180px]"
+                >
+                  <option value="">Selecione...</option>
+                  {contaminantesDisponiveis.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">Rodada</label>
+                <select
+                  value={plumaRodada}
+                  onChange={(e) => setPlumaRodada(e.target.value)}
+                  disabled={!plumaContaminante}
+                  className="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#80b02d] outline-none min-w-[180px] disabled:opacity-50"
+                >
+                  <option value="">Selecione...</option>
+                  {rodadasDisponiveis.map((r) => (
+                    <option key={r.rodada} value={r.rodada}>{r.rodada} ({r.count} poços)</option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                onClick={gerarPluma}
+                disabled={!plumaContaminante || !plumaRodada}
+                className="bg-[#391e2a] hover:bg-[#2a161f] text-white font-bold h-[38px]"
+              >
+                Gerar pluma
+              </Button>
+              {plumaAtiva && (
+                <button onClick={removerPluma} className="text-xs font-bold text-gray-400 hover:text-red-500 transition h-[38px]">
+                  Remover pluma
+                </button>
+              )}
+            </div>
+            {plumaErro && <p className="text-xs text-red-500 font-medium mt-2">{plumaErro}</p>}
+            <p className="text-[11px] text-gray-400 mt-3 max-w-2xl">
+              Interpolação por distância inversa (IDW), não krigagem — não modela direção de fluxo de água subterrânea. É uma aproximação visual, não uma delimitação hidrogeológica formal.
+            </p>
+          </div>
+        )}
+
         {validos.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-gray-400">
             Nenhum poço com coordenada válida neste projeto ainda. Corrija as pendências abaixo pra o mapa aparecer aqui.
@@ -208,6 +415,21 @@ export default function MapaGeralPage() {
                       <span className="text-xs text-gray-700 truncate">
                         {g.grupo} <span className="text-gray-400">({g.count})</span>
                       </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {plumaAtiva && plumaFaixas.length > 0 && (
+              <div className="absolute bottom-3 right-3 z-[1000] bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 px-3 py-2.5 max-w-[220px]">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+                  {plumaContaminante} — {plumaMatriz === "agua_subterranea" ? "água subterrânea" : "solo"}
+                </p>
+                <div className="space-y-1">
+                  {plumaFaixas.map((f) => (
+                    <div key={f.label} className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: f.cor }} />
+                      <span className="text-[11px] text-gray-700">{f.label}</span>
                     </div>
                   ))}
                 </div>

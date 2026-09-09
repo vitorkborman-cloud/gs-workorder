@@ -32,7 +32,7 @@ function formatDateBr(d: string) {
 
 function SectionHeader({ title, subtitle, count, action }: { title: string; subtitle: string; count: number; action?: React.ReactNode }) {
   return (
-    <div className="flex items-end justify-between mb-5">
+    <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
       <div>
         <h2 className="text-xl font-bold text-[#391e2a] tracking-tight flex items-center gap-2">
           {title}
@@ -354,7 +354,20 @@ export default function ProjetoPage() {
 
         {/* ── FÍSICO-QUÍMICOS ── */}
         <section>
-          <SectionHeader title="Físico-Químicos" subtitle="Amostragens de água subterrânea" count={campanhasFQ.length} />
+          <SectionHeader
+            title="Físico-Químicos"
+            subtitle="Amostragens de água subterrânea"
+            count={campanhasFQ.length}
+            action={
+              <button
+                onClick={() => router.push(`/projetos/${projectId}/resultados-analiticos`)}
+                className="flex items-center gap-2 bg-[#391e2a] hover:bg-[#2a161f] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M5 8h14M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M5 8l1.5-3.5A2 2 0 018.34 3h7.32a2 2 0 011.84 1.5L19 8" /></svg>
+                Resultados Analíticos
+              </button>
+            }
+          />
           {campanhasFQ.length === 0 ? <EmptyState message="Nenhuma amostragem recebida." /> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {campanhasFQ.map((c) => (
