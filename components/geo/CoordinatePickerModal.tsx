@@ -100,14 +100,17 @@ export function CoordinatePickerModal({
         maxZoom: 19,
       }).addTo(map);
 
+      // Pino pequeno de propósito — grande demais escondia o que tem embaixo
+      // dele bem no momento em que mais importa ver com precisão (marcando
+      // o ponto exato sobre a imagem de satélite).
       const pinIcon = L.divIcon({
         className: "",
-        html: `<svg width="30" height="40" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
+        html: `<svg width="16" height="21" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
           <path d="M16 0C7.163 0 0 7.163 0 16c0 11 16 26 16 26s16-15 16-26C32 7.163 24.837 0 16 0z" fill="#391e2a" stroke="#80b02d" stroke-width="2"/>
           <circle cx="16" cy="16" r="6" fill="#fff"/>
         </svg>`,
-        iconSize: [30, 40],
-        iconAnchor: [15, 40],
+        iconSize: [16, 21],
+        iconAnchor: [8, 21],
       });
 
       function placeMarker(lat: number, lon: number) {
