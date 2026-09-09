@@ -106,7 +106,7 @@ export function CoordinatePickerModal({
       const pinIcon = L.divIcon({
         className: "",
         html: `<svg width="14" height="34" viewBox="0 0 24 58" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="11,21 13,21 12,55" fill="#9a9a9a"/>
+          <polygon points="11,21 13,21 12,55" fill="#c0392b" stroke="#fff" stroke-width="0.6"/>
           <circle cx="12" cy="11" r="11" fill="#c0392b"/>
           <ellipse cx="8.2" cy="7.5" rx="3.6" ry="2.6" fill="#fff" opacity="0.45"/>
         </svg>`,
