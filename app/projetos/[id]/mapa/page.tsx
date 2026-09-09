@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
-import { classificarPocos, buildMapaGeralPdf, type PocoMapa, type PocoPendente } from "@/lib/pdf/mapa-geral";
+import {
+  classificarPocos,
+  buildMapaGeralPdf,
+  construirMapaCores,
+  construirLegendaGrupos,
+  type PocoMapa,
+  type PocoPendente,
+} from "@/lib/pdf/mapa-geral";
 import "leaflet/dist/leaflet.css";
 
 const MOTIVO_LABEL: Record<PocoPendente["motivo"], string> = {
@@ -28,6 +35,10 @@ export default function MapaGeralPage() {
   const mapInstanceRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
+
+  // Cor por tipo de poço (prefixo do nome) + contagem — mesma lógica usada
+  // no PDF, pra tela e documento exportado mostrarem sempre a mesma legenda.
+  const legendaGrupos = useMemo(() => construirLegendaGrupos(validos), [validos]);
 
   useEffect(() => {
     load();
@@ -68,19 +79,30 @@ export default function MapaGeralPage() {
         crossOrigin: true,
       }).addTo(map);
 
-      // Marcação técnica neutra (ponto centrado no local exato, sem cor de
-      // marca) — mais perto de convenção de planta topográfica do que de
-      // pino de mapa de app.
-      const pocoIcon = L.divIcon({
-        className: "",
-        html: `<div style="width:9px;height:9px;border-radius:50%;background:#000;border:1.6px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,0.7);"></div>`,
-        iconSize: [9, 9],
-        iconAnchor: [4.5, 4.5],
-      });
+      // Marcação técnica neutra (ponto centrado no local exato) — mais perto
+      // de convenção de planta topográfica do que de pino de mapa de app.
+      // A cor identifica o tipo do poço (prefixo do nome); ver legenda.
+      const corPorGrupo = construirMapaCores(validos.map((p) => p.grupo));
+      const iconCache = new Map<string, any>();
+      function iconeParaGrupo(grupo: string) {
+        const cor = corPorGrupo.get(grupo) || "#000";
+        if (!iconCache.has(cor)) {
+          iconCache.set(
+            cor,
+            L.divIcon({
+              className: "",
+              html: `<div style="width:9px;height:9px;border-radius:50%;background:${cor};border:1.6px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,0.7);"></div>`,
+              iconSize: [9, 9],
+              iconAnchor: [4.5, 4.5],
+            })
+          );
+        }
+        return iconCache.get(cor);
+      }
 
       const bounds: [number, number][] = [];
       validos.forEach((p) => {
-        const marker = L.marker([p.lat, p.lon], { icon: pocoIcon }).addTo(map);
+        const marker = L.marker([p.lat, p.lon], { icon: iconeParaGrupo(p.grupo) }).addTo(map);
         marker.bindTooltip(p.nomenclatura, { permanent: true, direction: "top", offset: [0, -8], className: "poco-label" });
         bounds.push([p.lat, p.lon]);
       });
@@ -112,6 +134,7 @@ export default function MapaGeralPage() {
         mapImageAspect: canvas.width / canvas.height,
         totalValidos: validos.length,
         totalPendentes: pendentes.length,
+        legendaGrupos,
       });
       pdf.save(`Mapa_Geral_${projectName}.pdf`);
     } catch (err) {
@@ -166,11 +189,31 @@ export default function MapaGeralPage() {
             Nenhum poço com coordenada válida neste projeto ainda. Corrija as pendências abaixo pra o mapa aparecer aqui.
           </div>
         ) : (
-          <div
-            ref={mapContainerRef}
-            className="w-full h-[780px]"
-            style={{ borderRadius: 16, border: "1px solid #e5e7eb", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}
-          />
+          <div className="relative">
+            <div
+              ref={mapContainerRef}
+              className="w-full h-[780px]"
+              style={{ borderRadius: 16, border: "1px solid #e5e7eb", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}
+            />
+            {mapReady && legendaGrupos.length > 0 && (
+              <div className="absolute top-3 right-3 z-[1000] bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 px-3 py-2.5 max-w-[170px]">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Tipo de poço</p>
+                <div className="space-y-1">
+                  {legendaGrupos.map((g) => (
+                    <div key={g.grupo} className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ background: g.cor, border: "1.5px solid #fff", boxShadow: "0 0 0 1px rgba(0,0,0,0.6)" }}
+                      />
+                      <span className="text-xs text-gray-700 truncate">
+                        {g.grupo} <span className="text-gray-400">({g.count})</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {pendentes.length > 0 && (

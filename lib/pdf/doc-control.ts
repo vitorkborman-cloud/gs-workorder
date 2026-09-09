@@ -11,7 +11,7 @@ export const DOC_CONTROL = {
   fichaAmostragem: { sheq: "152", versao: 0 },
   excelAmostragem: { sheq: "153", versao: 0 },
   fichaSolo:       { sheq: "154", versao: 2 },
-  mapaGeral:       { sheq: "155", versao: 0 },
+  mapaGeral:       { sheq: "155", versao: 1 },
 } as const satisfies Record<string, DocControl>;
 
 export function formatDocControl(doc: DocControl): string {

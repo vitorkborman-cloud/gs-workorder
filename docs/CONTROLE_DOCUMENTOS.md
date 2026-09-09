@@ -23,7 +23,7 @@ não sobe a cada atualização de conteúdo.
 | Ficha de Amostragem (PDF)         | 152     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarPDFGeral`) |
 | Excel de Amostragem               | 153     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarExcelGeral`) |
 | Ficha Descritiva de Solo          | 154     | V 02          | `lib/pdf/soil-profile.ts` |
-| Mapa Geral do Site                | 155     | V 00          | `lib/pdf/mapa-geral.ts` |
+| Mapa Geral do Site                | 155     | V 01          | `lib/pdf/mapa-geral.ts` |
 
 (Work Orders mantém a numeração anterior, SHEQ n° 001 — fora do escopo desta
 atualização.)
@@ -94,3 +94,14 @@ Novo campo "Fase Livre" (Sim/Não) lançado na seção "Dados da Sondagem" do
 app (mobile e desktop), passando a aparecer também no cabeçalho do PDF, em
 destaque (vermelho) quando encontrada. Sem alteração no restante do
 layout/conteúdo.
+
+### 2026-09-09 — Mapa Geral do Site: marcação por tipo de poço + legenda por grupo (V00 → V01)
+Os pontos passam a ser coloridos pelo prefixo alfabético do nome do poço
+(ex.: todos os "SD-xx" numa cor, todos os "PM-xx" noutra) em vez de um único
+marcador preto uniforme — mesma lógica usada na tela (mapa ao vivo, com
+legenda flutuante no canto do mapa) e no PDF exportado, cuja legenda lateral
+passou a listar cada tipo com sua cor e contagem, no lugar do bloco genérico
+"Poço / Perfil Descritivo" anterior. Cores atribuídas em ordem alfabética dos
+tipos presentes a partir de uma paleta categórica fixa (mesma ordem sempre,
+nunca sorteada); a partir do 9° tipo distinto num mesmo projeto, os
+excedentes caem num cinza neutro ("Outros") em vez de inventar mais cores.
