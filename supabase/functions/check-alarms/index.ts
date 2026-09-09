@@ -198,13 +198,22 @@ function formatAlarmDesc(active: ActiveAlarm[]): string {
   return desc;
 }
 
+// Intervalo real entre execuções — usado só pra compor o texto das
+// mensagens de alerta ("~X min"). Mantenha em sincronia com o agendamento
+// pg_cron de fato (job 'check-telemetry-alarms', hoje */15 — ver
+// supabase/migrations/0010_check_alarms_15min.sql). Sem essa constante
+// central, os textos de alerta ficavam com "min" errado sempre que o
+// intervalo mudava mas o multiplicador ficava hardcoded (aconteceu na
+// própria redução de 2 pra 15 min).
+const CHECK_INTERVAL_MIN = 15;
+
 // ── Saúde do pipeline: log de execuções + alerta em caso de falha sustentada ───
 // O pipeline falha de forma silenciosa (HTTP 200 mesmo sem checar nada) sempre que
 // getHitecToken() não consegue logar na API HI Tecnologia, ou quando ocorre uma
 // exceção não tratada. Sem isso, uma parada de vários dias só é percebida por
 // acaso. Aqui gravamos cada execução e, se houver falhas seguidas por tempo
-// suficiente (10 min = 5 execuções), avisamos por push quem tem subscription —
-// e avisamos de novo quando normalizar.
+// suficiente, avisamos por push quem tem subscription — e avisamos de novo
+// quando normalizar.
 const FAILURE_ALERT_THRESHOLD = 2; // ~30 min de falhas seguidas (execução a cada 15 min, desde a redução de frequência por limite de API da HI Tecnologia)
 
 // Janelas de manutenção avisadas com antecedência pela própria HI Tecnologia
@@ -271,7 +280,7 @@ async function logRunAndCheckHealth(status: "ok" | "skipped" | "error", detail: 
     await sendAlertPush(
       subs,
       "⚠️ Monitoramento de alarmes falhando",
-      `${FAILURE_ALERT_THRESHOLD} verificações seguidas falharam (~${FAILURE_ALERT_THRESHOLD * 2} min). Causa: ${detail ?? status}`
+      `${FAILURE_ALERT_THRESHOLD} verificações seguidas falharam (~${FAILURE_ALERT_THRESHOLD * CHECK_INTERVAL_MIN} min). Causa: ${detail ?? status}`
     );
   } else if (status === "ok") {
     const previousStreak = recent.slice(1).filter((r) => r.status !== "ok").length;
@@ -317,7 +326,7 @@ async function handleDeviceFailure(device: any, errorDetail: string, subs: any[]
     await sendAlertPush(
       subs,
       `⚠️ ${device.name} sem resposta`,
-      `${DEVICE_FAILURE_THRESHOLD}+ verificações seguidas falharam (~${DEVICE_FAILURE_THRESHOLD * 2} min ou mais). Última causa: ${errorDetail}`
+      `${DEVICE_FAILURE_THRESHOLD}+ verificações seguidas falharam (~${DEVICE_FAILURE_THRESHOLD * CHECK_INTERVAL_MIN} min ou mais). Última causa: ${errorDetail}`
     );
   }
 }
