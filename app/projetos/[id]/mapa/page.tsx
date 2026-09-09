@@ -22,7 +22,7 @@ type ResultadoPluma = {
   contaminante: string;
   concentracao: number;
   unidade: string;
-  vmp: number | null;
+  cma: number | null;
   campanha: string | null;
   data_coleta: string;
 };
@@ -117,7 +117,7 @@ export default function MapaGeralPage() {
         .eq("project_id", projectId),
       supabase
         .from("analytical_results")
-        .select("soil_description_id, matriz, contaminante, concentracao, unidade, vmp, campanha, data_coleta")
+        .select("soil_description_id, matriz, contaminante, concentracao, unidade, cma, campanha, data_coleta")
         .eq("project_id", projectId),
     ]);
     if (proj) setProjectName(proj.name);
@@ -212,26 +212,26 @@ export default function MapaGeralPage() {
     // Um poço pode ter mais de uma linha na mesma rodada só por erro de
     // digitação duplicada — agrega por média em vez de contar duas vezes o
     // mesmo ponto espacial.
-    const porPoco = new Map<string, { soma: number; n: number; vmp: number | null }>();
+    const porPoco = new Map<string, { soma: number; n: number; cma: number | null }>();
     linhas.forEach((r) => {
       const atual = porPoco.get(r.soil_description_id);
       if (atual) {
         atual.soma += r.concentracao;
         atual.n += 1;
-        if (atual.vmp == null) atual.vmp = r.vmp;
+        if (atual.cma == null) atual.cma = r.cma;
       } else {
-        porPoco.set(r.soil_description_id, { soma: r.concentracao, n: 1, vmp: r.vmp });
+        porPoco.set(r.soil_description_id, { soma: r.concentracao, n: 1, cma: r.cma });
       }
     });
 
     const pontos: { x: number; y: number; valor: number }[] = [];
-    let vmp: number | null = null;
+    let cma: number | null = null;
     let utmZona = "";
     porPoco.forEach((info, soilId) => {
       const poco = pocoPorId.get(soilId);
       if (!poco) return;
       pontos.push({ x: poco.coordX, y: poco.coordY, valor: info.soma / info.n });
-      if (vmp == null) vmp = info.vmp;
+      if (cma == null) cma = info.cma;
       utmZona = poco.utmZona;
     });
 
@@ -247,7 +247,7 @@ export default function MapaGeralPage() {
     }
 
     const valorMax = Math.max(...pontos.map((p) => p.valor));
-    const faixas = construirFaixas(vmp, valorMax);
+    const faixas = construirFaixas(cma, valorMax);
     const canvas = gradeParaCanvas(grade, faixas, 0.6);
 
     const [swLat, swLon] = utmParaLatLon(grade.minX, grade.minY, utmZona);

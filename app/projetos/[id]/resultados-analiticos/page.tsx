@@ -32,8 +32,8 @@ type ResultRow = {
   contaminante: string;
   concentracao: number;
   unidade: string;
-  vmp: number | null;
-  vmp_fonte: string | null;
+  cma: number | null;
+  cma_fonte: string | null;
   nao_detectado: boolean;
   limite_deteccao: number | null;
 };
@@ -53,14 +53,14 @@ type NovaLinha = {
   contaminante: string;
   concentracao: string;
   unidade: string;
-  vmp: string;
-  vmp_fonte: string;
+  cma: string;
+  cma_fonte: string;
   naoDetectado: boolean;
   limiteDeteccao: string;
 };
 
 function novaLinhaVazia(unidadeDefault: string): NovaLinha {
-  return { contaminante: "", concentracao: "", unidade: unidadeDefault, vmp: "", vmp_fonte: "", naoDetectado: false, limiteDeteccao: "" };
+  return { contaminante: "", concentracao: "", unidade: unidadeDefault, cma: "", cma_fonte: "", naoDetectado: false, limiteDeteccao: "" };
 }
 
 function formatDateBr(d: string) {
@@ -100,7 +100,7 @@ export default function ResultadosAnaliticosPage() {
       supabase.from("soil_descriptions").select("id, nomenclatura_poco, nome_sondagem").eq("project_id", projectId),
       supabase
         .from("analytical_results")
-        .select("id, soil_description_id, matriz, data_coleta, campanha, profundidade_m, contaminante, concentracao, unidade, vmp, vmp_fonte, nao_detectado, limite_deteccao")
+        .select("id, soil_description_id, matriz, data_coleta, campanha, profundidade_m, contaminante, concentracao, unidade, cma, cma_fonte, nao_detectado, limite_deteccao")
         .eq("project_id", projectId)
         .order("data_coleta", { ascending: false }),
     ]);
@@ -133,8 +133,8 @@ export default function ResultadosAnaliticosPage() {
         contaminante: r.contaminante,
         concentracao: r.concentracao,
         unidade: r.unidade,
-        vmp: r.vmp,
-        vmp_fonte: r.vmp_fonte,
+        cma: r.cma,
+        cma_fonte: r.cma_fonte,
         nao_detectado: r.nao_detectado,
         limite_deteccao: r.limite_deteccao,
       });
@@ -193,8 +193,8 @@ export default function ResultadosAnaliticosPage() {
           // dado pra quem for reprocessar com krigagem indicadora depois.
           concentracao: l.naoDetectado ? limite! / 2 : parseFloat(l.concentracao),
           unidade: l.unidade,
-          vmp: l.vmp.trim() ? parseFloat(l.vmp) : null,
-          vmp_fonte: l.vmp.trim() && l.vmp_fonte.trim() ? l.vmp_fonte.trim() : null,
+          cma: l.cma.trim() ? parseFloat(l.cma) : null,
+          cma_fonte: l.cma.trim() && l.cma_fonte.trim() ? l.cma_fonte.trim() : null,
           nao_detectado: l.naoDetectado,
           limite_deteccao: limite,
         };
@@ -267,7 +267,7 @@ export default function ResultadosAnaliticosPage() {
         ) : (
           <div className="space-y-3">
             {lancamentos.map((l) => {
-              const excedencias = l.rows.filter((r) => !r.nao_detectado && r.vmp != null && r.concentracao > r.vmp).length;
+              const excedencias = l.rows.filter((r) => !r.nao_detectado && r.cma != null && r.concentracao > r.cma).length;
               const expanded = expandedKey === l.key;
               return (
                 <div key={l.key} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -291,7 +291,7 @@ export default function ResultadosAnaliticosPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       {excedencias > 0 && (
                         <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-1 rounded-full">
-                          {excedencias} acima do VMP
+                          {excedencias} acima da CMA
                         </span>
                       )}
                       <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded-full">
@@ -309,13 +309,13 @@ export default function ResultadosAnaliticosPage() {
                             <tr className="text-left text-xs text-gray-400 uppercase tracking-wide">
                               <th className="pb-2 pr-3 font-bold">Contaminante</th>
                               <th className="pb-2 pr-3 font-bold">Concentração</th>
-                              <th className="pb-2 pr-3 font-bold">VMP</th>
+                              <th className="pb-2 pr-3 font-bold">CMA</th>
                               <th className="pb-2 pr-3 font-bold"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
                             {l.rows.map((r) => {
-                              const acima = !r.nao_detectado && r.vmp != null && r.concentracao > r.vmp;
+                              const acima = !r.nao_detectado && r.cma != null && r.concentracao > r.cma;
                               return (
                                 <tr key={r.id}>
                                   <td className="py-2 pr-3 font-medium text-[#391e2a]">{r.contaminante}</td>
@@ -330,7 +330,7 @@ export default function ResultadosAnaliticosPage() {
                                     )}
                                   </td>
                                   <td className="py-2 pr-3 text-gray-400">
-                                    {r.vmp != null ? `${r.vmp} ${r.unidade}${r.vmp_fonte ? ` (${r.vmp_fonte})` : ""}` : "—"}
+                                    {r.cma != null ? `${r.cma} ${r.unidade}${r.cma_fonte ? ` (${r.cma_fonte})` : ""}` : "—"}
                                   </td>
                                   <td className="py-2 text-right">
                                     <button onClick={() => excluirLinha(r.id)} className="text-xs text-gray-300 hover:text-red-500 transition">
@@ -502,16 +502,16 @@ export default function ResultadosAnaliticosPage() {
                     <input
                       type="number"
                       step="any"
-                      placeholder="VMP (opcional)"
-                      value={linha.vmp}
-                      onChange={(e) => atualizarLinha(idx, { vmp: e.target.value })}
+                      placeholder="CMA (opcional)"
+                      value={linha.cma}
+                      onChange={(e) => atualizarLinha(idx, { cma: e.target.value })}
                       className="flex-1 min-w-[110px] border rounded-lg px-2.5 py-2 text-sm focus:ring-2 focus:ring-[#80b02d] outline-none"
                     />
                     <input
                       type="text"
-                      placeholder="Fonte do VMP"
-                      value={linha.vmp_fonte}
-                      onChange={(e) => atualizarLinha(idx, { vmp_fonte: e.target.value })}
+                      placeholder="Fonte da CMA"
+                      value={linha.cma_fonte}
+                      onChange={(e) => atualizarLinha(idx, { cma_fonte: e.target.value })}
                       className="flex-1 min-w-[110px] border rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#80b02d] outline-none"
                     />
                     <button

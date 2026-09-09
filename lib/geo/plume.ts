@@ -96,7 +96,7 @@ const STATUS_BOM = "#0ca30c";
 const STATUS_ATENCAO = "#fab219";
 const STATUS_GRAVE = "#ec835a";
 const STATUS_CRITICO = "#d03b3b";
-// Rampa sequencial de um hue só (azul), usada só quando não há VMP pra
+// Rampa sequencial de um hue só (azul), usada só quando não há CMA pra
 // classificar por excedência — mesma família da paleta categórica validada
 // já usada no Mapa Geral (ver lib/pdf/mapa-geral.ts).
 const SEQ_AZUL = ["#cde2fb", "#86b6ef", "#3987e5", "#1c5cab"];
@@ -107,13 +107,13 @@ function formatNum(n: number): string {
   return n.toFixed(2);
 }
 
-export function construirFaixas(vmp: number | null, valorMax: number): FaixaPluma[] {
-  if (vmp && vmp > 0) {
+export function construirFaixas(cma: number | null, valorMax: number): FaixaPluma[] {
+  if (cma && cma > 0) {
     return [
-      { label: `Até ${formatNum(vmp)} — dentro do VMP`, cor: STATUS_BOM, min: 0, max: vmp },
-      { label: `${formatNum(vmp)}–${formatNum(vmp * 2)} — 1-2x VMP`, cor: STATUS_ATENCAO, min: vmp, max: vmp * 2 },
-      { label: `${formatNum(vmp * 2)}–${formatNum(vmp * 5)} — 2-5x VMP`, cor: STATUS_GRAVE, min: vmp * 2, max: vmp * 5 },
-      { label: `Acima de ${formatNum(vmp * 5)} — >5x VMP`, cor: STATUS_CRITICO, min: vmp * 5, max: null },
+      { label: `Até ${formatNum(cma)} — dentro da CMA`, cor: STATUS_BOM, min: 0, max: cma },
+      { label: `${formatNum(cma)}–${formatNum(cma * 2)} — 1-2x CMA`, cor: STATUS_ATENCAO, min: cma, max: cma * 2 },
+      { label: `${formatNum(cma * 2)}–${formatNum(cma * 5)} — 2-5x CMA`, cor: STATUS_GRAVE, min: cma * 2, max: cma * 5 },
+      { label: `Acima de ${formatNum(cma * 5)} — >5x CMA`, cor: STATUS_CRITICO, min: cma * 5, max: null },
     ];
   }
   const passo = valorMax / SEQ_AZUL.length || 1;
