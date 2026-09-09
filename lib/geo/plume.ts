@@ -14,20 +14,51 @@ import proj4 from "proj4";
 // soil-borne polychlorinated biphenyls"; "Improved three-dimensional
 // mapping of soil chromium pollution... IDW-based interpolation").
 //
-// Limitação conhecida (registrada, não escondida): IDW é isotrópico — não
-// sabe que uma pluma real se alonga na direção do fluxo de água
-// subterrânea (ver artigos de "flow guided/flow coordinate kriging" na
-// mesma base). Não modelamos direção de fluxo aqui; a pluma desenhada é uma
-// aproximação por distância, não uma simulação hidrogeológica.
+// Limitação original (IDW isotrópico não sabe que uma pluma real se alonga
+// na direção do fluxo de água subterrânea) tem uma correção parcial: se o
+// usuário desenhar a direção do fluxo no mapa (ver FluxoDirecao,
+// groundwater_flow_directions), a distância vira anisotrópica — esticada
+// no eixo perpendicular ao fluxo — em vez de um círculo puro (ver artigos
+// de "flow guided/flow coordinate kriging" na base filtrada, que fazem
+// essencialmente essa mesma transformação de coordenadas). Sem direção
+// informada, continua isotrópico como antes. Ainda não é uma simulação
+// hidrogeológica — é geometria aplicada sobre a distância, não um modelo de
+// transporte advectivo-dispersivo de verdade.
 //
 // A grade só é pintada em opacidade cheia perto de onde há poço amostrado;
 // além do raio de alcance (distância média entre vizinhos × 1.6) a cor
 // esmaece até ficar transparente — ver fatorEsmaecimento em
 // gradeParaCanvas. Isso evita pintar uma "caixa" opaca sobre área sem
-// nenhum dado de apoio, mas ainda não corta a pluma numa forma "orgânica"
-// de verdade (isso pediria delimitar pelo fluxo real de água subterrânea).
+// nenhum dado de apoio.
 
 export type PontoPluma = { x: number; y: number; valor: number };
+
+// Direção do fluxo de água subterrânea — desenhada pelo usuário como uma
+// seta sobre o mapa (ver groundwater_flow_directions), não digitada em
+// graus. Usada pra alongar a interpolação na direção do fluxo em vez de
+// espalhar em círculo. Sem isso (fluxo undefined), o cálculo continua
+// isotrópico como antes.
+export type FluxoDirecao = { direcaoGraus: number; razaoAnisotropia: number };
+
+// Distância "esticada": no eixo perpendicular ao fluxo, multiplica a
+// distância real pela razão de anisotropia antes de elevar ao quadrado —
+// então um ponto fora do eixo do fluxo passa a pesar como se estivesse mais
+// longe do que está de verdade, enquanto um ponto na mesma direção do fluxo
+// continua contando pela distância real. O resultado é uma elipse de
+// influência alongada no sentido do fluxo, em vez do círculo do IDW puro.
+function distanciaAnisotropicaSq(dx: number, dy: number, fluxo?: FluxoDirecao): number {
+  if (!fluxo) return dx * dx + dy * dy;
+  const rad = (fluxo.direcaoGraus * Math.PI) / 180;
+  const senT = Math.sin(rad);
+  const cosT = Math.cos(rad);
+  // Convenção de bússola (0° = norte = +Y, sentido horário) — mesma usada
+  // no ângulo calculado a partir da seta desenhada no mapa.
+  const aoLongoDoFluxo = dx * senT + dy * cosT;
+  const perpendicularAoFluxo = dx * cosT - dy * senT;
+  const razao = fluxo.razaoAnisotropia > 0 ? fluxo.razaoAnisotropia : 1;
+  const perpEsticado = perpendicularAoFluxo * razao;
+  return aoLongoDoFluxo * aoLongoDoFluxo + perpEsticado * perpEsticado;
+}
 
 export type GradeIDW = {
   minX: number;
@@ -63,12 +94,13 @@ function distanciaMediaVizinhoMaisProximo(pontos: PontoPluma[]): number {
 
 export function interpolarIDW(
   pontos: PontoPluma[],
-  opts: { potencia?: number; resolucaoCols?: number; margem?: number } = {}
+  opts: { potencia?: number; resolucaoCols?: number; margem?: number; fluxo?: FluxoDirecao } = {}
 ): GradeIDW | null {
   if (pontos.length < 2) return null;
   const potencia = opts.potencia ?? 2;
   const resolucaoCols = opts.resolucaoCols ?? 160;
   const margem = opts.margem ?? 0.25;
+  const fluxo = opts.fluxo;
 
   let minX = Math.min(...pontos.map((p) => p.x));
   let maxX = Math.max(...pontos.map((p) => p.x));
@@ -109,7 +141,7 @@ export function interpolarIDW(
       for (const p of pontos) {
         const dx = p.x - x;
         const dy = p.y - y;
-        const distSq = dx * dx + dy * dy;
+        const distSq = distanciaAnisotropicaSq(dx, dy, fluxo);
         if (distSq < distMin) distMin = distSq;
         if (distSq < 1e-4) {
           exato = p.valor;
@@ -217,6 +249,17 @@ export function gradeParaCanvas(grade: GradeIDW, faixas: FaixaPluma[], opacidade
   return canvas;
 }
 
+// Grau de bússola (0° = norte, sentido horário) a partir de dois pontos UTM
+// — origem e ponta da seta desenhada no mapa. Ninguém digita o ângulo:
+// desenha a seta olhando pro mapa que o cliente já manda pronto, e o
+// sistema calcula.
+export function anguloEntrePontos(origemX: number, origemY: number, pontaX: number, pontaY: number): number {
+  const dx = pontaX - origemX;
+  const dy = pontaY - origemY;
+  const graus = (Math.atan2(dx, dy) * 180) / Math.PI;
+  return (graus + 360) % 360;
+}
+
 export function utmParaLatLon(x: number, y: number, utmZona: string): [number, number] {
   const zoneNum = parseInt(utmZona, 10);
   const isSouth = /s/i.test(utmZona);
@@ -226,4 +269,17 @@ export function utmParaLatLon(x: number, y: number, utmZona: string): [number, n
     [x, y]
   );
   return [lat, lon];
+}
+
+// Inverso de utmParaLatLon — usado pra converter o clique da seta de fluxo
+// (lat/lon do Leaflet) pro mesmo referencial UTM dos poços.
+export function latLonParaUtm(lat: number, lon: number, utmZona: string): { x: number; y: number } {
+  const zoneNum = parseInt(utmZona, 10);
+  const isSouth = /s/i.test(utmZona);
+  const [x, y] = proj4(
+    "+proj=longlat +datum=WGS84 +no_defs",
+    `+proj=utm +zone=${zoneNum} ${isSouth ? "+south" : ""} +datum=WGS84 +units=m +no_defs`,
+    [lon, lat]
+  );
+  return { x, y };
 }
