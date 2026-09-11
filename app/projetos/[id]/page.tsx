@@ -14,6 +14,7 @@ import { buildSoilProfilePdf, mergeLayersWithVocReadings } from "../../../lib/pd
 import { buildWaterSamplingPdf } from "../../../lib/pdf/water-sampling";
 import { mergePdfSources } from "../../../lib/pdf/merge";
 import { downloadPdfBytes } from "../../../lib/pdf/download";
+import { baixarPdfsComoZip } from "../../../lib/pdf/zip";
 
 type WorkOrder = { id: string; title: string; finalized: boolean; created_at: string; };
 type Perfil = { id: string; nome_sondagem: string; nomenclatura_poco: string; created_at: string; };
@@ -91,13 +92,16 @@ export default function ProjetoPage() {
   const [mobile, setMobile] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // ── Seleção múltipla (baixar vários RDOs/Perfis de uma vez, mesclados num único PDF) ──
+  // ── Seleção múltipla (baixar vários RDOs/Perfis de uma vez — mesclados
+  // num único PDF, ou cada um separado dentro de um .zip) ──
   const [selectModeRdo, setSelectModeRdo] = useState(false);
   const [selectedRdos, setSelectedRdos] = useState<Set<string>>(new Set());
   const [downloadingRdos, setDownloadingRdos] = useState(false);
+  const [downloadingRdosZip, setDownloadingRdosZip] = useState(false);
   const [selectModePerfil, setSelectModePerfil] = useState(false);
   const [selectedPerfis, setSelectedPerfis] = useState<Set<string>>(new Set());
   const [downloadingPerfis, setDownloadingPerfis] = useState(false);
+  const [downloadingPerfisZip, setDownloadingPerfisZip] = useState(false);
 
   function toggleInSet(set: Set<string>, id: string, setter: (s: Set<string>) => void) {
     const next = new Set(set);
@@ -254,6 +258,32 @@ export default function ProjetoPage() {
     }
   }
 
+  // Mesma coisa, mas cada Perfil Descritivo vira seu próprio arquivo dentro
+  // de um .zip, em vez de tudo colado num PDF só.
+  async function baixarPerfisSelecionadosZip() {
+    if (selectedPerfis.size === 0) return;
+    setDownloadingPerfisZip(true);
+    try {
+      const selecionados = perfis.filter((p) => selectedPerfis.has(p.id));
+      const arquivos: { nome: string; fonte: jsPDF }[] = [];
+      for (const p of selecionados) {
+        const { data: solo } = await supabase.from("soil_descriptions").select("*").eq("id", p.id).single();
+        if (!solo) continue;
+        const mergedLayers = mergeLayersWithVocReadings(solo.layers || [], solo.voc_readings || [], solo.profundidade_total);
+        const pdf = await buildSoilProfilePdf({ data: solo, layers: mergedLayers, vocReadings: solo.voc_readings || [] });
+        arquivos.push({ nome: `Perfil_${p.nome_sondagem || p.nomenclatura_poco || p.id}`, fonte: pdf });
+      }
+      await baixarPdfsComoZip(arquivos, `Perfis_Descritivos_${arquivos.length}.zip`);
+    } catch (err) {
+      alert("Erro ao gerar o zip. Verifique o console.");
+      console.error(err);
+    } finally {
+      setDownloadingPerfisZip(false);
+      setSelectModePerfil(false);
+      setSelectedPerfis(new Set());
+    }
+  }
+
   // Baixa os RDOs selecionados como um único PDF mesclado — cada RDO junto
   // com seus anexos de perfil de solo/físico-químico, na mesma ordem da
   // geração individual (gerarPDF em app/projetos/[id]/rdo/[rdoId]/page.tsx).
@@ -291,6 +321,49 @@ export default function ProjetoPage() {
       console.error(err);
     } finally {
       setDownloadingRdos(false);
+      setSelectModeRdo(false);
+      setSelectedRdos(new Set());
+    }
+  }
+
+  // Mesma coisa, mas cada RDO (já com seus próprios anexos mesclados nele,
+  // igual ao download individual de um RDO) vira um arquivo separado dentro
+  // de um .zip, em vez de todos colados num PDF só.
+  async function baixarRdosSelecionadosZip() {
+    if (selectedRdos.size === 0) return;
+    setDownloadingRdosZip(true);
+    try {
+      const { data: proj } = await supabase.from("projects").select("name").eq("id", projectId).single();
+      const projectName = proj?.name || "";
+      const selecionados = rdos.filter((r) => selectedRdos.has(r.id));
+      const arquivos: { nome: string; fonte: Uint8Array }[] = [];
+      for (const r of selecionados) {
+        const { data: rdo } = await supabase.from("rdo_reports").select("*").eq("id", r.id).single();
+        if (!rdo) continue;
+        const sources: (jsPDF | Uint8Array)[] = [await buildRdoPdf({ rdo, projectName })];
+
+        const attachments: PdfAttachment[] = rdo.pdf_attachments || [];
+        for (const att of attachments) {
+          if (att.tipo === "soil_description") {
+            const { data: solo } = await supabase.from("soil_descriptions").select("*").eq("id", att.id).single();
+            if (solo) {
+              const mergedLayers = mergeLayersWithVocReadings(solo.layers || [], solo.voc_readings || [], solo.profundidade_total);
+              sources.push(await buildSoilProfilePdf({ data: solo, layers: mergedLayers, vocReadings: solo.voc_readings || [] }));
+            }
+          } else if (att.tipo === "water_sampling") {
+            const { data: amostra } = await supabase.from("water_samplings").select("*").eq("id", att.id).single();
+            if (amostra) sources.push(await buildWaterSamplingPdf({ amostra, projectName }));
+          }
+        }
+        const bytesDoRdo = await mergePdfSources(sources);
+        arquivos.push({ nome: `RDO_${r.data || r.id}`, fonte: bytesDoRdo });
+      }
+      await baixarPdfsComoZip(arquivos, `RDOs_${projectName}_${arquivos.length}.zip`);
+    } catch (err) {
+      alert("Erro ao gerar o zip. Verifique o console.");
+      console.error(err);
+    } finally {
+      setDownloadingRdosZip(false);
       setSelectModeRdo(false);
       setSelectedRdos(new Set());
     }
@@ -451,8 +524,10 @@ export default function ProjetoPage() {
                     active={selectModePerfil}
                     count={selectedPerfis.size}
                     downloading={downloadingPerfis}
+                    downloadingZip={downloadingPerfisZip}
                     onToggle={() => setSelectModePerfil(true)}
                     onDownload={baixarPerfisSelecionados}
+                    onDownloadZip={baixarPerfisSelecionadosZip}
                     onCancel={() => { setSelectModePerfil(false); setSelectedPerfis(new Set()); }}
                   />
                 )}
@@ -648,8 +723,10 @@ export default function ProjetoPage() {
                     active={selectModeRdo}
                     count={selectedRdos.size}
                     downloading={downloadingRdos}
+                    downloadingZip={downloadingRdosZip}
                     onToggle={() => setSelectModeRdo(true)}
                     onDownload={baixarRdosSelecionados}
+                    onDownloadZip={baixarRdosSelecionadosZip}
                     onCancel={() => { setSelectModeRdo(false); setSelectedRdos(new Set()); }}
                   />
                 )}
