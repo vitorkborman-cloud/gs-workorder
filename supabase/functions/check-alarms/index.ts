@@ -183,28 +183,67 @@ function isRecentActivation(iso: string | null, windowMs: number): boolean {
   return Date.now() - new Date(iso).getTime() < windowMs;
 }
 
-function formatTime(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const hh = String(d.getUTCHours() - 3).padStart(2, "0"); // BRT = UTC-3
-  const min = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${dd}/${mm} às ${hh}:${min}`;
+// O nome salvo em telemetry_devices vem como "Equipamento Siemens Energy",
+// mas na notificação o que importa é o projeto/cliente — tira o prefixo.
+function nomeCurto(name: string): string {
+  return name.replace(/^Equipamento\s+/i, "").trim() || name;
 }
 
-function formatAlarmDesc(active: ActiveAlarm[]): string {
-  if (active.length === 0) return "Alarme ativo";
-  const first = active[0];
-  const levelLabel = LEVEL_PT[first.level] ?? first.level;
-  let desc = "";
-  if (first.connectorName) desc += `${first.connectorName} — `;
-  desc += first.name;
-  if (levelLabel) desc += ` — Nível: ${levelLabel}`;
-  const time = formatTime(first.activatedAt);
-  if (time) desc += ` — ${time}`;
-  if (active.length > 1) desc += ` (+${active.length - 1} mais)`;
-  return desc;
+// Horário de Brasília via Intl (o "UTC-3 na mão" antigo gerava hora negativa
+// entre 00:00 e 02:59 UTC).
+function formatTime(iso: string | null): string {
+  if (!iso) return "";
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const p = (type: string) => parts.find((x) => x.type === type)?.value ?? "";
+  return `${p("day")}/${p("month")} às ${p("hour")}:${p("minute")}`;
+}
+
+// Mais grave primeiro — quem lê só as primeiras linhas já vê o que é urgente.
+const LEVEL_RANK: Record<string, number> = {
+  critical: 0,
+  base_high: 1,
+  base_medium: 2,
+  base_low: 3,
+  warning: 4,
+  info: 5,
+};
+
+// Teto de linhas por notificação: o payload de web push tem limite (~4 KB
+// criptografado) e o Android corta texto muito longo. Acima disso, o resto
+// fica resumido num "+N" — mas o histórico completo continua em alarm_history.
+const MAX_ALARM_LINES = 12;
+
+// Lista TODOS os alarmes novos (um por linha, mais graves primeiro), em vez
+// de só o primeiro + "(+N mais)" — quem recebe precisa ver cada alarme pra
+// decidir se é urgente.
+function formatAlarmBody(alarms: ActiveAlarm[]): string {
+  if (alarms.length === 0) return "Alarme ativo";
+  const sorted = [...alarms].sort((a, b) => {
+    const rank = (LEVEL_RANK[a.level] ?? 9) - (LEVEL_RANK[b.level] ?? 9);
+    if (rank !== 0) return rank;
+    return (a.activatedAt ?? "").localeCompare(b.activatedAt ?? "");
+  });
+
+  const lines: string[] = [];
+  const connectorName = sorted.find((a) => a.connectorName)?.connectorName;
+  if (connectorName) lines.push(connectorName);
+
+  for (const a of sorted.slice(0, MAX_ALARM_LINES)) {
+    const levelLabel = LEVEL_PT[a.level] ?? a.level;
+    const time = formatTime(a.activatedAt);
+    lines.push(`• ${a.name}${levelLabel ? ` — ${levelLabel}` : ""}${time ? ` — ${time}` : ""}`);
+  }
+  if (sorted.length > MAX_ALARM_LINES) {
+    lines.push(`+ ${sorted.length - MAX_ALARM_LINES} alarme(s) — veja todos no app`);
+  }
+  return lines.join("\n");
 }
 
 // Intervalo real entre execuções — usado pro texto das mensagens de alerta
@@ -344,7 +383,7 @@ async function handleDeviceFailure(device: any, errorDetail: string, subs: any[]
   if (shouldAlert) {
     await sendAlertPush(
       subs,
-      `⚠️ ${device.name} sem resposta`,
+      `⚠️ ${nomeCurto(device.name)} sem resposta`,
       `${DEVICE_FAILURE_THRESHOLD}+ verificações seguidas falharam (~${DEVICE_FAILURE_THRESHOLD * ROUND_INTERVAL_MIN} min ou mais). Última causa: ${errorDetail}`
     );
   }
@@ -354,7 +393,7 @@ async function handleDeviceRecovery(device: any, subs: any[]) {
   if (!device.failure_alerted) return; // não tinha alertado — nada pra normalizar
   await sendAlertPush(
     subs,
-    `✅ ${device.name} normalizado`,
+    `✅ ${nomeCurto(device.name)} normalizado`,
     "O dispositivo voltou a responder normalmente."
   );
 }
@@ -491,10 +530,14 @@ Deno.serve(async (req: Request) => {
           const alarmsForUser = newAlarms.filter((a) => !disabledAlarms.includes(a.refId));
           if (alarmsForUser.length === 0) continue;
 
+          // Tag única por envio: com tag fixa por equipamento, o Android
+          // SUBSTITUI a notificação anterior pela nova e os alarmes da
+          // rodada anterior sumiam do painel. Agora cada envio fica no
+          // painel até ser dispensado.
           const userPayload = JSON.stringify({
-            title: `⚠️ Alarme — ${device.name}`,
-            body: formatAlarmDesc(alarmsForUser),
-            tag: `alarm-${device.id}`,
+            title: `⚠️ ${alarmsForUser.length === 1 ? "Alarme" : `${alarmsForUser.length} alarmes`} — ${nomeCurto(device.name)}`,
+            body: formatAlarmBody(alarmsForUser),
+            tag: `alarm-${device.id}-${Date.now()}`,
             data: { url: "/mobile", deviceId: device.id },
           });
 
