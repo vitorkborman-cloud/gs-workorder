@@ -67,6 +67,24 @@ export type RdoV2 = {
   fotos?: { storagePath: string; legenda?: string }[];
 };
 
+// ── Quem preenche ───────────────────────────────────────────────────────────
+
+// Nome completo de cada colaborador, pela parte do e-mail antes do "@".
+// Quem não estiver aqui cai no nome do perfil ou, por último, no próprio login.
+const NOMES_POR_LOGIN: Record<string, string> = {
+  "v.borman": "Vitor Borman",
+  "v.oliveira": "Victor Hugo Oliveira",
+  "f.oliveira": "Fábio Oliveira",
+  "w.santos": "Wellington Santos",
+  "m.santos": "Michael Santos",
+  "g.calegari": "Gustavo Calegari",
+};
+
+export function nomeDoUsuario(user: { email?: string | null; user_metadata?: any } | null | undefined): string {
+  const login = (user?.email || "").split("@")[0].toLowerCase();
+  return NOMES_POR_LOGIN[login] || user?.user_metadata?.full_name || user?.user_metadata?.name || login;
+}
+
 // ── Números ─────────────────────────────────────────────────────────────────
 
 /** "12,5" / "12.5" / " 7 " -> número; vazio/ inválido -> null. */

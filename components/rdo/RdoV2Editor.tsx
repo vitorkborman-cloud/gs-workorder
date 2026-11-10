@@ -20,6 +20,7 @@ import {
   calcularDia,
   formatDataBr,
   formatNumero,
+  nomeDoUsuario,
   parseNumero,
   sincronizarLeituras,
   STATUS_CONCLUIDO,
@@ -161,9 +162,7 @@ export default function RdoV2Editor({
       setPdfAttachments(rdo.pdf_attachments || []);
       setEquipeCadastrada((equipeCfg || []).map((e: any) => e.nome));
 
-      const user = userData?.user;
-      const nomeUser = (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "") as string;
-      setPreenchidoPor(rdo.preenchido_por || nomeUser);
+      setPreenchidoPor(rdo.preenchido_por || nomeDoUsuario(userData?.user));
 
       // Leituras: RDO finalizado fica como foi lançado; os demais acompanham o cadastro.
       const existentes: LeituraRdo[] = Array.isArray(rdo.leituras) ? rdo.leituras : [];
