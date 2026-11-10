@@ -20,6 +20,7 @@ não sobe a cada atualização de conteúdo.
 | Documento                       | SHEQ n° | Versão atual | Gerado em |
 |----------------------------------|:-------:|:-------------:|-----------|
 | RDO (Relatório Diário de Obra)    | 151     | V 02          | `lib/pdf/rdo.ts` |
+| RDO simplificado (formato v2)     | 151     | V 03          | `lib/pdf/rdo-v2.ts` |
 | Ficha de Amostragem (PDF)         | 152     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarPDFGeral`) |
 | Excel de Amostragem               | 153     | V 00          | `app/projetos/[id]/fisico-quimicos/page.tsx` (`gerarExcelGeral`) |
 | Ficha Descritiva de Solo          | 154     | V 02          | `lib/pdf/soil-profile.ts` |
@@ -105,3 +106,14 @@ passou a listar cada tipo com sua cor e contagem, no lugar do bloco genérico
 tipos presentes a partir de uma paleta categórica fixa (mesma ordem sempre,
 nunca sorteada); a partir do 9° tipo distinto num mesmo projeto, os
 excedentes caem num cinza neutro ("Outros") em vez de inventar mais cores.
+
+### 2026-11-09 — RDO simplificado: novo layout (formato v2, V02 → V03)
+Novo formato de RDO (`formato = 'v2'`), gerado por `lib/pdf/rdo-v2.ts`. Sai do
+documento: condições climáticas, mão de obra/efetivo, assinaturas e o card de
+status de segurança. Entram: atividades fixas do projeto (Realizado Sim/Não),
+tabela de leituras de instrumentos por grupo com leitura anterior e
+volume/consumo do dia (acumulado: leitura − anterior; estoque: anterior −
+atual, com reabastecimento identificado; "não coletado" fica em branco, não
+vira zero), atividades do dia com responsáveis e status concluído/não
+concluído, e ocorrências em campo único. RDOs antigos (`formato = 'v1'`)
+continuam sendo gerados pelo layout V02, sem alteração.

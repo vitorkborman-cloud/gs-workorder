@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
 import { isMobileDevice } from "../../lib/isMobile";
+import { statusEhConcluido } from "../../lib/rdo/v2";
 
 import AdminShell from "../../components/layout/AdminShell";
 import { Button } from "../../components/ui/button";
@@ -91,7 +92,8 @@ export default function DashboardPage() {
     });
 
     setTotalActivities(activities.length);
-    setDoneActivities(activities.filter((x) => x.status.toLowerCase().includes("conclu")).length);
+    // "Não concluído" (RDO simplificado) também contém "conclu" — não conta.
+    setDoneActivities(activities.filter((x) => statusEhConcluido(x.status)).length);
     setCurveData(buildCurveData(activities));
   }
 

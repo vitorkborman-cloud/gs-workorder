@@ -5,7 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/layout/AdminShell";
 import { Button } from "@/components/ui/button";
-import { AtividadeEditor, type Atividade } from "@/components/rdo/AtividadeEditor";
+import { STATUS_NAO_CONCLUIDO } from "@/lib/rdo/v2";
+
+type Planejada = { atividade: string; responsaveis: string[] };
 
 export default function ProgramarRdoPage() {
   const params = useParams();
@@ -13,20 +15,24 @@ export default function ProgramarRdoPage() {
   const projectId = params.id as string;
 
   const [projectName, setProjectName] = useState("");
+  const [equipe, setEquipe] = useState<string[]>([]);
   const [scheduledDate, setScheduledDate] = useState("");
-  const [atividades, setAtividades] = useState<Atividade[]>([
-    { atividade: "", empresa: "", status: "Não iniciado", obs: "" },
-  ]);
+  const [atividades, setAtividades] = useState<Planejada[]>([{ atividade: "", responsaveis: [] }]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     supabase.from("projects").select("name").eq("id", projectId).single()
       .then(({ data }) => { if (data) setProjectName(data.name); });
+    supabase.from("rdo_equipe").select("nome").eq("project_id", projectId).eq("ativo", true).order("nome")
+      .then(({ data }) => setEquipe((data || []).map((e: any) => e.nome)));
   }, [projectId]);
+
+  const upd = (idx: number, patch: Partial<Planejada>) =>
+    setAtividades((prev) => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)));
 
   async function salvar() {
     if (!scheduledDate) { alert("Escolha a data planejada para o RDO."); return; }
-    const atividadesValidas = atividades.filter((a) => a.atividade.trim());
+    const validas = atividades.filter((a) => a.atividade.trim());
 
     setSaving(true);
     try {
@@ -34,12 +40,19 @@ export default function ProgramarRdoPage() {
 
       const { error } = await supabase.from("rdo_reports").insert({
         project_id: projectId,
+        formato: "v2",
         data: scheduledDate,
         inicio: "",
         fim: "",
         clima: [],
         envolvidos: [],
-        atividades: atividadesValidas.map((a) => ({ ...a, origem: "programada" })),
+        atividades: validas.map((a) => ({
+          atividade: a.atividade.trim(),
+          responsaveis: a.responsaveis,
+          status: STATUS_NAO_CONCLUIDO,
+          obs: "",
+          origem: "programada",
+        })),
         sheq: { incidente: "Não", incidenteObs: "", vazamento: "Não", vazamentoObs: "" },
         comentarios: "",
         fotos: [],
@@ -81,6 +94,7 @@ export default function ProgramarRdoPage() {
               />
               <p className="text-xs text-gray-400 mt-1">
                 O técnico verá este RDO como pendente de preenchimento no app mobile para essa data.
+                As leituras e atividades fixas do projeto entram automaticamente.
               </p>
             </div>
 
@@ -88,7 +102,45 @@ export default function ProgramarRdoPage() {
               <h3 className="text-sm font-bold text-[#391e2a] uppercase tracking-wider mb-4 border-b border-[#80b02d] inline-block pb-1">
                 Atividades Planejadas
               </h3>
-              <AtividadeEditor atividades={atividades} onChange={setAtividades} />
+              <div className="space-y-3">
+                {atividades.map((a, idx) => (
+                  <div key={idx} className="bg-white p-3 border rounded-md shadow-sm space-y-2">
+                    <div className="flex gap-3 items-center">
+                      <input
+                        type="text"
+                        value={a.atividade}
+                        onChange={(e) => upd(idx, { atividade: e.target.value })}
+                        className="flex-1 text-sm border p-2 rounded focus:ring-1 focus:ring-[#80b02d] outline-none"
+                        placeholder="Atividade planejada"
+                      />
+                      <button onClick={() => setAtividades(atividades.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-50 p-2 rounded">✕</button>
+                    </div>
+                    {equipe.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {equipe.map((n) => {
+                          const on = a.responsaveis.includes(n);
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => upd(idx, { responsaveis: on ? a.responsaveis.filter((x) => x !== n) : [...a.responsaveis, n] })}
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${on ? "bg-[#391e2a] text-white border-[#391e2a]" : "bg-white text-gray-500 border-gray-200"}`}
+                            >
+                              {n}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <button
+                  onClick={() => setAtividades([...atividades, { atividade: "", responsaveis: [] }])}
+                  className="text-xs font-bold text-[#80b02d] hover:text-[#6a9425] mt-2"
+                >
+                  + ADICIONAR ATIVIDADE
+                </button>
+              </div>
             </div>
 
             <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">

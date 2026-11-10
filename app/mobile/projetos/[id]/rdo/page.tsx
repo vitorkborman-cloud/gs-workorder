@@ -52,25 +52,25 @@ export default function MobileRdoList() {
   async function novoRdo() {
     setCreating(true);
     try {
-      const hoje = new Date().toISOString().slice(0, 10);
+      const d = new Date();
+      const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      // RDO simplificado (formato v2): leituras e atividades fixas são
+      // preenchidas pelo formulário a partir do cadastro do projeto.
       const { data, error } = await supabase
         .from("rdo_reports")
         .insert({
           project_id: projectId,
+          formato: "v2",
           data: hoje,
           inicio: "",
           fim: "",
-          clima: [
-            { periodo: "Manhã", tempo: "", condicao: "", razao: "" },
-            { periodo: "Tarde", tempo: "", condicao: "", razao: "" },
-            { periodo: "Noite", tempo: "", condicao: "", razao: "" },
-          ],
-          envolvidos: [{ empresa: "Greensoil", colaboradores: "", funcao: "" }],
-          atividades: [{ atividade: "", empresa: "", status: "", obs: "" }],
+          clima: [],
+          envolvidos: [],
+          atividades: [],
           sheq: { incidente: "Não", incidenteObs: "", vazamento: "Não", vazamentoObs: "" },
           comentarios: "",
           fotos: [],
-          assinaturas: [{ empresa: "Greensoil" }],
+          assinaturas: [],
           draft: true,
           status: "rascunho",
         })

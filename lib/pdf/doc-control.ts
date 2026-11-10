@@ -8,6 +8,8 @@ export type DocControl = { sheq: string; versao: number };
 
 export const DOC_CONTROL = {
   rdo:             { sheq: "151", versao: 2 },
+  // RDO simplificado (formato 'v2'). RDOs antigos seguem no layout acima.
+  rdoSimplificado: { sheq: "151", versao: 3 },
   fichaAmostragem: { sheq: "152", versao: 0 },
   excelAmostragem: { sheq: "153", versao: 0 },
   fichaSolo:       { sheq: "154", versao: 2 },
